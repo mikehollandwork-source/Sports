@@ -64,6 +64,7 @@ class Team:
     starter_fip_last5: float | None = None
     bullpen_fip_last5: float | None = None
     platoon_factor: float = 1.0
+    runs_last5: list = field(default_factory=list)  # runs scored, last 5 completed games
 
 
 @dataclass
@@ -230,6 +231,29 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
     ]
 
 
+def last5_runs_scored(team_id: int, date: str, lookback_days: int = 21) -> list[int]:
+    """Runs the team scored in its last 5 completed regular-season games before `date`."""
+    start = (dt.date.fromisoformat(date) - dt.timedelta(days=lookback_days)).isoformat()
+    data = _get("schedule", sportId=SPORT_ID, teamId=team_id,
+                startDate=start, endDate=date, gameType="R")
+    games: list[tuple[str, int]] = []
+    for day in data.get("dates", []):
+        for g in day.get("games", []):
+            if g.get("status", {}).get("abstractGameState") != "Final":
+                continue
+            home, away = g["teams"]["home"], g["teams"]["away"]
+            if home["team"]["id"] == team_id:
+                rs = home.get("score")
+            elif away["team"]["id"] == team_id:
+                rs = away.get("score")
+            else:
+                continue
+            if rs is not None:
+                games.append((g.get("gameDate", ""), int(rs)))
+    games.sort()
+    return [rs for _, rs in games[-5:]]
+
+
 def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
     """Active-roster pitchers other than today's probable starter (the bullpen)."""
     data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
@@ -297,5 +321,11 @@ def enrich_with_stats(game: Game, date: str) -> Game:
                 )
         except Exception as exc:
             log.warning("bullpen FIP failed for %s: %s", team.name, exc)
+
+        # --- runs scored in last 5 games (for the win-condition back-test) ---
+        try:
+            team.runs_last5 = last5_runs_scored(team.team_id, date)
+        except Exception as exc:
+            log.warning("last-5 runs failed for %s: %s", team.name, exc)
 
     return game

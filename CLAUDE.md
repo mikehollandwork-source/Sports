@@ -122,6 +122,10 @@ unit-testable with mock `Game`/`Team` objects.
   last-5-only, league-relative, additive: `offense_index + pitching_index`, where
   offense blends park-neutralized wOBA/ISO/discipline/speed with a platoon tilt and
   pitching is starter+bullpen FIP. `park_factors.py` holds the static park table.
+- **Win condition** (`win_condition` in `analysis.py`): a runs target each team must
+  reach to beat the opponent (opp's last-5 runs/game scaled by this team's combined
+  FIP vs league, +1), plus how many of the team's own last 5 games hit it. Currently
+  a reporting field only — it does not change the flagged pick.
 - Match the existing defensive style: degrade gracefully on network/parse errors;
   never let one game's failure abort the whole run.
 

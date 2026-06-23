@@ -54,6 +54,24 @@ The team with the higher `team_score` has the advantage. **Every weight,
 league baseline, and the wOBA/FIP constants live at the top of
 `src/analysis.py`** — tune them in one place. Missing data contributes 0.
 
+## Win condition (runs target + last-5 back-test)
+
+On top of the advantage score, each game gets a concrete, countable **win
+condition** per team — the runs total they'd need to beat the opponent — plus how
+often they actually hit it recently:
+
+```
+expected opponent runs = opponent's last-5 runs/game * (team combined FIP / LEAGUE_FIP)
+runs_to_win            = floor(expected opponent runs) + 1
+hit_in_last5           = # of the team's last 5 games scoring >= runs_to_win
+```
+
+So a strong-pitching team facing a mild offense gets a low bar; a weak-pitching
+team facing a hot offense gets a high one. Reported per team as
+`runs_to_win`, `expected_opponent_runs`, `hit_in_last5`, `hit_rate`, and the raw
+`last5_runs_scored`. This is a *reporting* signal today (it doesn't change the
+flagged pick) — easy to fold into the decision later if you want.
+
 ### Caveats baked into the metric
 
 - **Pure last-5 is a tiny, noisy sample** (your choice) — no season blending, so

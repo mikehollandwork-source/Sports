@@ -26,6 +26,8 @@ team is NOT the public's majority side. All knobs live here.
 
 from __future__ import annotations
 
+import math
+
 from .mlb_api import Game, Team
 
 # --- tunable constants (the whole formula lives here) -------------------------
@@ -127,8 +129,47 @@ def pitching_index(team: Team) -> float:
     return round((LEAGUE_FIP - combined) / LEAGUE_FIP, 4)
 
 
+def combined_fip(team: Team) -> float:
+    sp, bp = team.starter_fip_last5, team.bullpen_fip_last5
+    if sp is not None and bp is not None:
+        return W_SP * sp + W_BP * bp
+    if sp is not None:
+        return sp
+    if bp is not None:
+        return bp
+    return LEAGUE_FIP
+
+
 def team_score(team: Team) -> float:
     return round(offense_index(team) + pitching_index(team), 4)
+
+
+# --- win condition: runs target + last-5 back-test ----------------------------
+def win_condition(team: Team, opp: Team) -> dict | None:
+    """
+    The runs total `team` must reach to beat `opp`, and how often `team` hit it
+    over its own last 5 games.
+
+        expected opponent runs = opp's last-5 runs/game * (team combined FIP / league FIP)
+        runs_to_win            = floor(expected opponent runs) + 1
+        hit_in_last5           = # of team's last 5 games scoring >= runs_to_win
+    """
+    if not opp.runs_last5 or not team.runs_last5:
+        return None
+    opp_rpg = sum(opp.runs_last5) / len(opp.runs_last5)
+    pitch_factor = combined_fip(team) / LEAGUE_FIP   # <1 = pitching suppresses runs
+    exp_opp_runs = opp_rpg * pitch_factor
+    target = math.floor(exp_opp_runs) + 1
+    hits = sum(1 for r in team.runs_last5 if r >= target)
+    n = len(team.runs_last5)
+    return {
+        "runs_to_win": target,
+        "expected_opponent_runs": round(exp_opp_runs, 2),
+        "hit_in_last5": hits,
+        "games": n,
+        "hit_rate": round(hits / n, 2),
+        "last5_runs_scored": team.runs_last5,
+    }
 
 
 # --- decision -----------------------------------------------------------------
@@ -186,6 +227,10 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
         "public_majority": {
             "team": majority.name if majority else None,
             "detail": majority_detail,
+        },
+        "win_condition": {
+            "home": win_condition(game.home, game.away),
+            "away": win_condition(game.away, game.home),
         },
         "flagged": flagged,
         "pick": adv_team.name if flagged else None,
