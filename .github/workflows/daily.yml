@@ -1,0 +1,48 @@
+name: MLB Edge Finder
+
+# Runs the scraper on GitHub's runners, which have full internet access
+# (unlike the build sandbox). Trigger it manually from the phone via the
+# "Run workflow" button, or let the daily schedule fire.
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date to analyze (YYYY-MM-DD). Blank = today (US/Eastern)."
+        required: false
+        default: ""
+  schedule:
+    # 15:00 UTC ~= 11:00 ET, after lineups/probables are usually posted.
+    - cron: "0 15 * * *"
+
+permissions:
+  contents: write  # allow committing the output JSON back to the repo
+
+jobs:
+  build-picks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run edge finder
+        env:
+          PICKS_DATE: ${{ github.event.inputs.date }}
+        run: python -m src.main
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update MLB picks ($(date -u +%Y-%m-%d))"
+            git push
+          fi

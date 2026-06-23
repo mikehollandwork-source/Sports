@@ -73,28 +73,53 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project-Specific Instructions
 
-> **Repository status:** `Sports` is currently empty — no application code, build tooling, or
-> commit history exists yet. The sections below are placeholders. As real code lands, replace each
-> `TODO` with verified details (commands you have actually run, directories that actually exist).
-> Do not document structure that isn't there.
-
 ### Project Overview
 
-TODO: What this project is, its language/runtime, frameworks, and package manager.
+**MLB Public-vs-Stats Edge Finder.** A Python tool that, for each MLB game on a
+given day, flags the team that the betting public is *not* on but which holds the
+statistical advantage over the last 5 games — and writes those teams to a daily
+JSON file (`output/picks_<date>.json`).
+
+- **Language / runtime:** Python 3.11
+- **Dependencies:** `requests`, `beautifulsoup4` (see `requirements.txt`)
+- **Data sources:** official MLB Stats API (`statsapi.mlb.com`, schedule + last-5
+  player stats) and covers.com (public consensus % + forum-post tally).
+- **Runtime target:** GitHub Actions (full internet). The dev sandbox firewalls
+  covers.com and the MLB API, so live fetching cannot be tested locally there —
+  the first Actions run is the real integration test.
 
 ### Repository Structure
 
-TODO: Map the top-level directories and what lives in each.
+```
+src/
+  mlb_api.py   # MLB Stats API: schedule, rosters, last-5 game logs
+  covers.py    # covers.com: consensus % + forum-post tally (selectors UNVERIFIED)
+  analysis.py  # "statistical advantage" metric + public-vs-stats decision
+  main.py      # orchestration; writes output/picks_<date>.json
+.github/workflows/daily.yml   # manual + daily run; commits results back
+output/        # generated picks_<date>.json files
+```
 
 ### Common Commands
 
 ```bash
-# TODO: setup / install
-# TODO: build
-# TODO: run locally
-# TODO: test (full suite + single test)
-# TODO: lint / format
+pip install -r requirements.txt        # setup
+python -m src.main --date 2026-06-23    # run (omit --date for today, US/Eastern)
+python -m py_compile src/*.py           # quick compile check
 ```
+
+There is no test suite yet. The `analysis.py` decision logic is pure and easily
+unit-testable with mock `Game`/`Team` objects.
+
+### Key conventions & gotchas
+
+- **covers.com selectors are best-effort and unverified** — they will likely need
+  tweaking after the first live run. All covers parsers fail *soft* (log a warning,
+  return empty) so MLB-stats analysis still produces output.
+- **The advantage metric is documented in `src/analysis.py`** (and the README) and
+  is meant to be tuned. Keep the formula in one place.
+- Match the existing defensive style: degrade gracefully on network/parse errors;
+  never let one game's failure abort the whole run.
 
 ### Git & Branching
 
