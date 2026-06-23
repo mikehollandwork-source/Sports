@@ -117,7 +117,11 @@ unit-testable with mock `Game`/`Team` objects.
   tweaking after the first live run. All covers parsers fail *soft* (log a warning,
   return empty) so MLB-stats analysis still produces output.
 - **The advantage metric is documented in `src/analysis.py`** (and the README) and
-  is meant to be tuned. Keep the formula in one place.
+  is meant to be tuned. All weights, league baselines, and the wOBA/FIP constants
+  live at the top of `analysis.py` — keep the formula in one place. It is
+  last-5-only, league-relative, additive: `offense_index + pitching_index`, where
+  offense blends park-neutralized wOBA/ISO/discipline/speed with a platoon tilt and
+  pitching is starter+bullpen FIP. `park_factors.py` holds the static park table.
 - Match the existing defensive style: degrade gracefully on network/parse errors;
   never let one game's failure abort the whole run.
 

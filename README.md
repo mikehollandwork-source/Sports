@@ -22,16 +22,49 @@ Output: `output/picks_<date>.json` — full per-game breakdown plus a top-level
 
 ## The "statistical advantage" metric
 
+Everything is built from the **last 5 games** and expressed as a league-relative
+index (0 = average) so the parts add up:
+
 ```
-team_score = offense_rating + pitching_rating
-  offense_rating  = avg OPS of the team's hitters over their last 5 games
-  pitching_rating = (LEAGUE_ERA - era)/LEAGUE_ERA + (LEAGUE_WHIP - whip)/LEAGUE_WHIP
-                    (probable starter, last 5 outings; higher = better)
+team_score = offense_index + pitching_index          (higher = better)
 ```
 
-The higher `team_score` has the advantage. Baselines `LEAGUE_ERA`/`LEAGUE_WHIP`
-live in `src/analysis.py` — **tune these (and the formula) to taste.** Missing
-data contributes 0 and is noted in the output.
+**Offense** — park-neutralized, platoon-adjusted last-5 line:
+
+```
+offense_index = 0.55 * wOBA-vs-league      (overall run value, the backbone)
+              + 0.20 * ISO-vs-league       (power)
+              + 0.15 * (BB% - K%)-vs-league (plate discipline)
+              + 0.10 * SB-rate-vs-league    (baserunning)
+then * platoon factor (lineup bat-hands vs opposing starter hand, ~3%/matchup)
+```
+
+The lineup's last-5 rate stats are **neutralized by the parks they played in**
+(a team that feasted at Coors gets discounted). The full reported line is
+AVG / OBP / SLG / OPS / ISO / wOBA / BB% / K% / SB-rate.
+
+**Pitching** — FIP (skill, strips out defense/luck), starter + bullpen:
+
+```
+combined_FIP   = 0.55 * starter_FIP + 0.45 * bullpen_FIP   (last 5 outings)
+pitching_index = (LEAGUE_FIP - combined_FIP) / LEAGUE_FIP
+```
+
+The team with the higher `team_score` has the advantage. **Every weight,
+league baseline, and the wOBA/FIP constants live at the top of
+`src/analysis.py`** — tune them in one place. Missing data contributes 0.
+
+### Caveats baked into the metric
+
+- **Pure last-5 is a tiny, noisy sample** (your choice) — no season blending, so
+  one hot/cold week swings it. Read picks as "who's hot + better on paper now."
+- **Platoon uses league-average magnitude**, not true last-5 splits (those aren't
+  exposed by the API): each hitter's bat side vs the opposing starter's hand,
+  scaled ~3%. Direction is right; it's an approximation.
+- **Lineups** come from the posted batting order when available, else the active
+  roster's position players — early-day runs (before lineups post) use the roster.
+- **wOBA/ISO/discipline overlap** somewhat; wOBA is weighted as the backbone and
+  the others are smaller tilts to limit double-counting.
 
 ## Running it
 

@@ -1,41 +1,56 @@
 """
 Official MLB Stats API client (statsapi.mlb.com).
 
-Free, public, no key required. Used for:
-  - today's schedule + probable pitchers
-  - per-player last-5-game logs (hitting)
-  - probable pitcher last-5-start logs (pitching)
+Free, public, no key required. Provides everything the advantage metric needs,
+all from the last 5 games:
 
-Docs are unofficial; field paths below are based on the public v1 API and may
-need small adjustments after the first live run (see README).
+  - today's schedule + probable pitchers (with throwing hand)
+  - each team's projected lineup (boxscore battingOrder, falling back to roster)
+  - per-hitter last-5 counting stats (for wOBA / ISO / discipline / speed),
+    park-neutralized by the parks actually played in
+  - probable starter's last-5 FIP inputs
+  - bullpen's last-5 FIP inputs (relievers aggregated)
+
+The v1 API is undocumented; field paths below are best-effort and may need a
+small tweak after the first live run (this code can't be tested from the build
+sandbox, where the API is firewalled). Network/parse failures degrade soft.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import time
 from dataclasses import dataclass, field
 
 import requests
 
+from .park_factors import factor_for
+
+log = logging.getLogger("mlb_api")
+
 BASE = "https://statsapi.mlb.com/api/v1"
-SPORT_ID = 1  # MLB
+SPORT_ID = 1
 TIMEOUT = 20
+POLITE_DELAY = 0.1
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
 
 def _get(path: str, **params) -> dict:
-    """GET a v1 endpoint and return parsed JSON, raising on HTTP errors."""
     resp = SESSION.get(f"{BASE}/{path}", params=params, timeout=TIMEOUT)
     resp.raise_for_status()
+    time.sleep(POLITE_DELAY)
     return resp.json()
 
 
+# --- data models --------------------------------------------------------------
 @dataclass
 class Player:
     player_id: int
     name: str
+    hand: str = ""        # pitcher throws / batter bats: "L"/"R"/"S"
+    pa: int = 0           # last-5 plate appearances (hitters)
 
 
 @dataclass
@@ -44,10 +59,11 @@ class Team:
     name: str
     abbreviation: str = ""
     probable_pitcher: Player | None = None
-    # Filled in by the stats layer:
-    hitter_ops_last5: float | None = None   # avg OPS of probable/roster hitters
-    pitcher_era_last5: float | None = None
-    pitcher_whip_last5: float | None = None
+    # Filled by enrich_with_stats():
+    offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
+    starter_fip_last5: float | None = None
+    bullpen_fip_last5: float | None = None
+    platoon_factor: float = 1.0
 
 
 @dataclass
@@ -57,29 +73,25 @@ class Game:
     home: Team
     away: Team
     venue: str = ""
-    extra: dict = field(default_factory=dict)
+    park_factor: float = 1.0
 
 
+# --- schedule -----------------------------------------------------------------
 def schedule_for(date: str) -> list[Game]:
-    """Return the MLB games scheduled on `date` (YYYY-MM-DD)."""
-    data = _get(
-        "schedule",
-        sportId=SPORT_ID,
-        date=date,
-        hydrate="probablePitcher,team",
-    )
+    data = _get("schedule", sportId=SPORT_ID, date=date, hydrate="probablePitcher,team")
     games: list[Game] = []
     for day in data.get("dates", []):
         for g in day.get("games", []):
-            home_raw = g["teams"]["home"]
-            away_raw = g["teams"]["away"]
+            home = _team_from_raw(g["teams"]["home"])
+            away = _team_from_raw(g["teams"]["away"])
             games.append(
                 Game(
                     game_pk=g["gamePk"],
                     date=date,
                     venue=g.get("venue", {}).get("name", ""),
-                    home=_team_from_raw(home_raw),
-                    away=_team_from_raw(away_raw),
+                    home=home,
+                    away=away,
+                    park_factor=factor_for(home.name),
                 )
             )
     return games
@@ -89,110 +101,201 @@ def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")
     probable = Player(pp["id"], pp.get("fullName", "")) if pp else None
-    return Team(
-        team_id=t["id"],
-        name=t.get("name", ""),
-        abbreviation=t.get("abbreviation", ""),
-        probable_pitcher=probable,
-    )
+    return Team(team_id=t["id"], name=t.get("name", ""), abbreviation=t.get("abbreviation", ""),
+                probable_pitcher=probable)
 
 
 def _season_for(date: str) -> int:
     return dt.date.fromisoformat(date).year
 
 
-def roster_hitter_ids(team_id: int, date: str) -> list[Player]:
-    """Active-roster position players for a team (used as the hitting sample)."""
-    data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
-    players: list[Player] = []
-    for entry in data.get("roster", []):
-        pos = entry.get("position", {}).get("type", "")
-        if pos and pos != "Pitcher":
-            players.append(Player(entry["person"]["id"], entry["person"].get("fullName", "")))
-    return players
-
-
+# --- game logs ----------------------------------------------------------------
 def _last_n_gamelog(player_id: int, group: str, season: int, n: int = 5) -> list[dict]:
-    """Return the most recent `n` game-log split rows for a player."""
-    data = _get(
-        f"people/{player_id}/stats",
-        stats="gameLog",
-        group=group,
-        season=season,
-    )
+    data = _get(f"people/{player_id}/stats", stats="gameLog", group=group, season=season)
     splits: list[dict] = []
     for s in data.get("stats", []):
         splits.extend(s.get("splits", []))
-    # game logs come oldest->newest; take the last n
-    return splits[-n:]
+    return splits[-n:]  # logs are oldest->newest
 
 
-def hitter_ops_last5(player_id: int, season: int) -> float | None:
-    """Average OPS across a hitter's last 5 games (None if no data)."""
-    rows = _last_n_gamelog(player_id, "hitting", season, 5)
-    ops_vals = []
-    for r in rows:
-        stat = r.get("stat", {})
-        ops = stat.get("ops")
-        if ops not in (None, "-", ".---"):
-            try:
-                ops_vals.append(float(ops))
-            except ValueError:
-                continue
-    if not ops_vals:
-        return None
-    return sum(ops_vals) / len(ops_vals)
+def _row_park_factor(team_name: str, split: dict) -> float:
+    """Park factor for the game this split represents (best-effort)."""
+    try:
+        if split.get("isHome", True):
+            return factor_for(team_name)
+        opp = split.get("opponent", {}).get("name", "")
+        return factor_for(opp)
+    except Exception:
+        return 1.0
 
 
-def pitcher_last5(player_id: int, season: int) -> tuple[float | None, float | None]:
-    """Return (ERA, WHIP) aggregated over a pitcher's last 5 outings."""
-    rows = _last_n_gamelog(player_id, "pitching", season, 5)
-    er = ip = bb = h = 0.0
-    found = False
-    for r in rows:
-        stat = r.get("stat", {})
-        try:
-            er += float(stat.get("earnedRuns", 0))
-            ip += _ip_to_float(stat.get("inningsPitched", "0"))
-            bb += float(stat.get("baseOnBalls", 0))
-            h += float(stat.get("hits", 0))
-            found = True
-        except (ValueError, TypeError):
-            continue
-    if not found or ip == 0:
-        return None, None
-    era = (er * 9.0) / ip
-    whip = (bb + h) / ip
-    return round(era, 3), round(whip, 3)
-
-
-def _ip_to_float(ip: str | float) -> float:
-    """Convert MLB innings-pitched notation (e.g. '5.2' = 5 and 2/3) to float."""
+def _ip_to_float(ip) -> float:
     s = str(ip)
     if "." in s:
         whole, frac = s.split(".")
         return int(whole) + int(frac) / 3.0
-    return float(s)
+    return float(s or 0)
 
 
-def enrich_with_stats(game: Game, date: str, polite_delay: float = 0.2) -> Game:
-    """Populate last-5 hitting/pitching ratings for both teams of a game."""
+# --- hitting: last-5 counting stats, park-neutralized -------------------------
+HIT_FIELDS = {
+    "ab": "atBats", "h": "hits", "2b": "doubles", "3b": "triples", "hr": "homeRuns",
+    "bb": "baseOnBalls", "so": "strikeOuts", "hbp": "hitByPitch", "sf": "sacFlies",
+    "sb": "stolenBases", "pa": "plateAppearances", "tb": "totalBases",
+}
+
+
+def hitter_last5(player_id: int, team_name: str, season: int) -> dict:
+    """Sum a hitter's last-5 counting stats + PA-weighted park factor."""
+    rows = _last_n_gamelog(player_id, "hitting", season, 5)
+    acc = {k: 0.0 for k in HIT_FIELDS}
+    park_pa = pf_weight = 0.0
+    for r in rows:
+        stat = r.get("stat", {})
+        pa = float(stat.get("plateAppearances", 0) or 0)
+        for k, src in HIT_FIELDS.items():
+            acc[k] += float(stat.get(src, 0) or 0)
+        pf = _row_park_factor(team_name, r)
+        park_pa += pf * pa
+        pf_weight += pa
+    acc["park_factor"] = (park_pa / pf_weight) if pf_weight else 1.0
+    return acc
+
+
+# --- pitching: last-5 FIP inputs ----------------------------------------------
+def pitcher_fip_last5(player_id: int, season: int) -> float | None:
+    rows = _last_n_gamelog(player_id, "pitching", season, 5)
+    hr = bb = hbp = k = 0.0
+    ip = 0.0
+    for r in rows:
+        stat = r.get("stat", {})
+        hr += float(stat.get("homeRuns", 0) or 0)
+        bb += float(stat.get("baseOnBalls", 0) or 0)
+        hbp += float(stat.get("hitByPitch", 0) or 0)
+        k += float(stat.get("strikeOuts", 0) or 0)
+        ip += _ip_to_float(stat.get("inningsPitched", 0))
+    if ip == 0:
+        return None
+    from .analysis import FIP_CONSTANT
+    return round((13 * hr + 3 * (bb + hbp) - 2 * k) / ip + FIP_CONSTANT, 3)
+
+
+# --- roster / lineup / handedness ---------------------------------------------
+def _people(ids: list[int]) -> dict[int, dict]:
+    if not ids:
+        return {}
+    data = _get("people", personIds=",".join(str(i) for i in ids))
+    return {p["id"]: p for p in data.get("people", [])}
+
+
+def probable_hands(game: Game) -> None:
+    """Fill each probable pitcher's throwing hand."""
+    ids = [t.probable_pitcher.player_id for t in (game.home, game.away) if t.probable_pitcher]
+    people = _people(ids)
+    for t in (game.home, game.away):
+        pp = t.probable_pitcher
+        if pp and pp.player_id in people:
+            pp.hand = people[pp.player_id].get("pitchHand", {}).get("code", "")
+
+
+def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
+    """Projected lineup: boxscore battingOrder if posted, else roster hitters."""
+    try:
+        box = SESSION.get(
+            f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore", timeout=TIMEOUT
+        ).json()
+        side = "home" if home else "away"
+        order = box["teams"][side].get("battingOrder", [])
+        if order:
+            people = _people(list(order))
+            return [
+                Player(pid, people.get(pid, {}).get("fullName", ""),
+                       hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
+                for pid in order
+            ]
+    except Exception as exc:
+        log.warning("boxscore lineup unavailable for %s (%s); using roster", game_pk, exc)
+
+    data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
+    ids = [
+        e["person"]["id"]
+        for e in data.get("roster", [])
+        if e.get("position", {}).get("type", "") not in ("Pitcher", "")
+    ]
+    people = _people(ids)
+    return [
+        Player(pid, people.get(pid, {}).get("fullName", ""),
+               hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
+        for pid in ids
+    ]
+
+
+def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
+    """Active-roster pitchers other than today's probable starter (the bullpen)."""
+    data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
+    out = []
+    for e in data.get("roster", []):
+        if e.get("position", {}).get("type", "") == "Pitcher":
+            pid = e["person"]["id"]
+            if pid != starter_id:
+                out.append(pid)
+    return out
+
+
+# --- orchestration ------------------------------------------------------------
+def enrich_with_stats(game: Game, date: str) -> Game:
+    """Populate last-5 offense + starter/bullpen FIP + handedness for both teams."""
     season = _season_for(date)
-    for team in (game.home, game.away):
-        # Hitting: average OPS over the roster's position players (last 5 each).
-        hitters = roster_hitter_ids(team.team_id, date)
-        ops_vals = []
-        for p in hitters:
-            v = hitter_ops_last5(p.player_id, season)
-            if v is not None:
-                ops_vals.append(v)
-            time.sleep(polite_delay)
-        team.hitter_ops_last5 = round(sum(ops_vals) / len(ops_vals), 4) if ops_vals else None
+    probable_hands(game)
 
-        # Pitching: probable starter's last 5 outings.
+    for team, is_home in ((game.home, True), (game.away, False)):
+        # --- offense: aggregate the lineup's last-5 counting stats ---
+        hitters = lineup(game.game_pk, team.team_id, date, is_home)
+        agg = {k: 0.0 for k in HIT_FIELDS}
+        park_num = park_den = 0.0
+        bats = []  # (bat_hand, pa) for platoon factor
+        for h in hitters:
+            try:
+                line = hitter_last5(h.player_id, team.name, season)
+            except Exception as exc:
+                log.warning("hitter %s last-5 failed: %s", h.player_id, exc)
+                continue
+            pa = line["pa"]
+            for k in HIT_FIELDS:
+                agg[k] += line[k]
+            park_num += line["park_factor"] * pa
+            park_den += pa
+            bats.append((h.hand, pa))
+        agg["park_factor"] = (park_num / park_den) if park_den else 1.0
+        team.offense = agg
+        team.offense["bats"] = bats  # consumed by analysis.platoon_factor
+
+        # --- pitching: starter FIP + bullpen FIP (last 5) ---
         if team.probable_pitcher:
-            era, whip = pitcher_last5(team.probable_pitcher.player_id, season)
-            team.pitcher_era_last5 = era
-            team.pitcher_whip_last5 = whip
-        time.sleep(polite_delay)
+            try:
+                team.starter_fip_last5 = pitcher_fip_last5(team.probable_pitcher.player_id, season)
+            except Exception as exc:
+                log.warning("starter FIP failed for %s: %s", team.name, exc)
+
+        try:
+            starter_id = team.probable_pitcher.player_id if team.probable_pitcher else None
+            rel = reliever_ids(team.team_id, date, starter_id)
+            hr = bb = hbp = k = ip = 0.0
+            for pid in rel:
+                rows = _last_n_gamelog(pid, "pitching", season, 5)
+                for r in rows:
+                    s = r.get("stat", {})
+                    hr += float(s.get("homeRuns", 0) or 0)
+                    bb += float(s.get("baseOnBalls", 0) or 0)
+                    hbp += float(s.get("hitByPitch", 0) or 0)
+                    k += float(s.get("strikeOuts", 0) or 0)
+                    ip += _ip_to_float(s.get("inningsPitched", 0))
+            if ip > 0:
+                from .analysis import FIP_CONSTANT
+                team.bullpen_fip_last5 = round(
+                    (13 * hr + 3 * (bb + hbp) - 2 * k) / ip + FIP_CONSTANT, 3
+                )
+        except Exception as exc:
+            log.warning("bullpen FIP failed for %s: %s", team.name, exc)
+
     return game
