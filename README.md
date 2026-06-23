@@ -40,13 +40,15 @@ then * platoon factor (lineup bat-hands vs opposing starter hand, ~3%/matchup)
 ```
 
 The lineup's last-5 rate stats are **neutralized by the parks they played in**
-(a team that feasted at Coors gets discounted). The full reported line is
-AVG / OBP / SLG / OPS / ISO / wOBA / BB% / K% / SB-rate.
+(a team that feasted at Coors gets discounted) **and strength-adjusted for the
+pitching they faced** (production vs tough arms counts more). The full reported
+line is AVG / OBP / SLG / OPS / ISO / wOBA / BB% / K% / SB-rate.
 
-**Pitching** — FIP (skill, strips out defense/luck), starter + bullpen:
+**Pitching** — FIP (skill, strips out defense/luck), starter + bullpen, each
+**strength-adjusted for the offenses faced** (suppressing strong bats counts more):
 
 ```
-combined_FIP   = 0.55 * starter_FIP + 0.45 * bullpen_FIP   (last 5 outings)
+combined_FIP   = 0.55 * starter_FIP + 0.45 * bullpen_FIP   (last 5, SOS-adjusted)
 pitching_index = (LEAGUE_FIP - combined_FIP) / LEAGUE_FIP
 ```
 
@@ -54,23 +56,45 @@ The team with the higher `team_score` has the advantage. **Every weight,
 league baseline, and the wOBA/FIP constants live at the top of
 `src/analysis.py`** — tune them in one place. Missing data contributes 0.
 
-## Win condition (runs target + last-5 back-test)
+### Strength of schedule (SOS)
 
-On top of the advantage score, each game gets a concrete, countable **win
-condition** per team — the runs total they'd need to beat the opponent — plus how
-often they actually hit it recently:
+Recent stats are re-rated by the **quality of opponents faced**, blending each
+opponent's season FIP/wOBA (70%) with their win% (30%), clamped to ±25%:
 
 ```
-expected opponent runs = opponent's last-5 runs/game * (team combined FIP / LEAGUE_FIP)
-runs_to_win            = floor(expected opponent runs) + 1
-hit_in_last5           = # of the team's last 5 games scoring >= runs_to_win
+opp_pitching_factor  (>1 vs tough arms)  scales hitters' production
+opp_offense_factor   (>1 vs tough bats)  scales pitchers' FIP (divides -> better)
 ```
 
-So a strong-pitching team facing a mild offense gets a low bar; a weak-pitching
-team facing a hot offense gets a high one. Reported per team as
-`runs_to_win`, `expected_opponent_runs`, `hit_in_last5`, `hit_rate`, and the raw
-`last5_runs_scored`. This is a *reporting* signal today (it doesn't change the
-flagged pick) — easy to fold into the decision later if you want.
+This feeds both the main advantage indices **and** the win-condition back-test
+below. Opponent win% comes free from one standings call; FIP/wOBA is one cached
+call per team.
+
+## Win condition (multi-part target + SOS-adjusted back-test)
+
+Each game gets a concrete, countable **win condition** per team, then back-tests
+it against the team's own last 5 games — with each past game re-rated by the
+opponent it came against:
+
+```
+runs_to_win   = floor(opp runs/g * team_FIP / LEAGUE_FIP) + 1    (must outscore)
+runs_to_allow = floor(team runs/g * opp_FIP / LEAGUE_FIP)        (must hold under)
+
+per past game (SOS-adjusted):
+  adj_scored  = runs_scored  * opp_pitching_factor
+  adj_allowed = runs_allowed / opp_offense_factor
+```
+
+`back_test` counts, out of the last 5, how often the team:
+- **scored_target** — adj runs ≥ `runs_to_win`
+- **held_under_ceiling** — adj runs allowed ≤ `runs_to_allow`
+- **complete_win_condition** — both in the same game
+- **actually_won** — outscored the opponent
+- **out_hit** — more hits than allowed
+
+Plus `avg_opp_win_pct_faced` and a `per_game` breakdown. This is a *reporting*
+signal today (it doesn't change the flagged pick) — easy to fold into the
+decision later (e.g. require a complete-win-condition hit rate).
 
 ### Caveats baked into the metric
 
@@ -83,6 +107,8 @@ flagged pick) — easy to fold into the decision later if you want.
   roster's position players — early-day runs (before lineups post) use the roster.
 - **wOBA/ISO/discipline overlap** somewhat; wOBA is weighted as the backbone and
   the others are smaller tilts to limit double-counting.
+- **SOS uses season opponent ratings**, not their form on the day they were played;
+  it's clamped to ±25% so a soft/brutal stretch can't dominate.
 
 ## Running it
 

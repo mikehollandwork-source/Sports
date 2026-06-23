@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import requests
 
 from .park_factors import factor_for
+from . import strength
 
 log = logging.getLogger("mlb_api")
 
@@ -64,7 +65,8 @@ class Team:
     starter_fip_last5: float | None = None
     bullpen_fip_last5: float | None = None
     platoon_factor: float = 1.0
-    runs_last5: list = field(default_factory=list)  # runs scored, last 5 completed games
+    games_last5: list = field(default_factory=list)  # per-game results + opp strength
+    sos: dict = field(default_factory=dict)          # avg opp strength faced (see analysis)
 
 
 @dataclass
@@ -138,6 +140,12 @@ def _ip_to_float(ip) -> float:
     return float(s or 0)
 
 
+def _opp_strength(split: dict, season: int) -> dict:
+    """Season strength of the opponent in a game-log split (neutral on miss)."""
+    opp = split.get("opponent", {})
+    return strength.team_strength(opp.get("id"), season)
+
+
 # --- hitting: last-5 counting stats, park-neutralized -------------------------
 HIT_FIELDS = {
     "ab": "atBats", "h": "hits", "2b": "doubles", "3b": "triples", "hr": "homeRuns",
@@ -147,10 +155,12 @@ HIT_FIELDS = {
 
 
 def hitter_last5(player_id: int, team_name: str, season: int) -> dict:
-    """Sum a hitter's last-5 counting stats + PA-weighted park factor."""
+    """Sum a hitter's last-5 counting stats + PA-weighted park factor and the
+    PA-weighted strength (FIP, win%) of the pitching staffs faced."""
     rows = _last_n_gamelog(player_id, "hitting", season, 5)
     acc = {k: 0.0 for k in HIT_FIELDS}
     park_pa = pf_weight = 0.0
+    opp_fip_pa = opp_fip_w = opp_win_pa = 0.0
     for r in rows:
         stat = r.get("stat", {})
         pa = float(stat.get("plateAppearances", 0) or 0)
@@ -159,26 +169,59 @@ def hitter_last5(player_id: int, team_name: str, season: int) -> dict:
         pf = _row_park_factor(team_name, r)
         park_pa += pf * pa
         pf_weight += pa
+        s = _opp_strength(r, season)
+        opp_win_pa += s["win_pct"] * pa
+        if s["fip"] is not None:
+            opp_fip_pa += s["fip"] * pa
+            opp_fip_w += pa
     acc["park_factor"] = (park_pa / pf_weight) if pf_weight else 1.0
+    acc["opp_fip"] = (opp_fip_pa / opp_fip_w) if opp_fip_w else None
+    acc["opp_win"] = (opp_win_pa / pf_weight) if pf_weight else 0.5
+    acc["weight_pa"] = pf_weight
     return acc
 
 
 # --- pitching: last-5 FIP inputs ----------------------------------------------
-def pitcher_fip_last5(player_id: int, season: int) -> float | None:
-    rows = _last_n_gamelog(player_id, "pitching", season, 5)
-    hr = bb = hbp = k = 0.0
-    ip = 0.0
+def _accumulate_pitching(rows: list[dict], season: int, acc: dict) -> None:
+    """Add FIP component sums + IP-weighted opponent-offense strength from rows."""
     for r in rows:
         stat = r.get("stat", {})
-        hr += float(stat.get("homeRuns", 0) or 0)
-        bb += float(stat.get("baseOnBalls", 0) or 0)
-        hbp += float(stat.get("hitByPitch", 0) or 0)
-        k += float(stat.get("strikeOuts", 0) or 0)
-        ip += _ip_to_float(stat.get("inningsPitched", 0))
-    if ip == 0:
-        return None
+        ip = _ip_to_float(stat.get("inningsPitched", 0))
+        acc["hr"] += float(stat.get("homeRuns", 0) or 0)
+        acc["bb"] += float(stat.get("baseOnBalls", 0) or 0)
+        acc["hbp"] += float(stat.get("hitByPitch", 0) or 0)
+        acc["k"] += float(stat.get("strikeOuts", 0) or 0)
+        acc["ip"] += ip
+        s = _opp_strength(r, season)
+        acc["opp_win_ip"] += s["win_pct"] * ip
+        if s["woba"] is not None:
+            acc["opp_woba_ip"] += s["woba"] * ip
+            acc["opp_woba_w"] += ip
+
+
+def _fip_from_acc(acc: dict) -> dict:
+    """Turn accumulated pitching sums into FIP + opponent-offense averages."""
+    if acc["ip"] <= 0:
+        return {"fip": None, "opp_woba": None, "opp_win": 0.5}
     from .analysis import FIP_CONSTANT
-    return round((13 * hr + 3 * (bb + hbp) - 2 * k) / ip + FIP_CONSTANT, 3)
+    fip = (13 * acc["hr"] + 3 * (acc["bb"] + acc["hbp"]) - 2 * acc["k"]) / acc["ip"] + FIP_CONSTANT
+    return {
+        "fip": round(fip, 3),
+        "opp_woba": (acc["opp_woba_ip"] / acc["opp_woba_w"]) if acc["opp_woba_w"] else None,
+        "opp_win": (acc["opp_win_ip"] / acc["ip"]) if acc["ip"] else 0.5,
+    }
+
+
+def _new_pitch_acc() -> dict:
+    return {"hr": 0.0, "bb": 0.0, "hbp": 0.0, "k": 0.0, "ip": 0.0,
+            "opp_woba_ip": 0.0, "opp_woba_w": 0.0, "opp_win_ip": 0.0}
+
+
+def pitcher_last5(player_id: int, season: int) -> dict:
+    """Starter's last-5 FIP + IP-weighted opponent-offense strength faced."""
+    acc = _new_pitch_acc()
+    _accumulate_pitching(_last_n_gamelog(player_id, "pitching", season, 5), season, acc)
+    return _fip_from_acc(acc)
 
 
 # --- roster / lineup / handedness ---------------------------------------------
@@ -231,27 +274,45 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
     ]
 
 
-def last5_runs_scored(team_id: int, date: str, lookback_days: int = 21) -> list[int]:
-    """Runs the team scored in its last 5 completed regular-season games before `date`."""
-    start = (dt.date.fromisoformat(date) - dt.timedelta(days=lookback_days)).isoformat()
-    data = _get("schedule", sportId=SPORT_ID, teamId=team_id,
-                startDate=start, endDate=date, gameType="R")
-    games: list[tuple[str, int]] = []
-    for day in data.get("dates", []):
-        for g in day.get("games", []):
-            if g.get("status", {}).get("abstractGameState") != "Final":
-                continue
-            home, away = g["teams"]["home"], g["teams"]["away"]
-            if home["team"]["id"] == team_id:
-                rs = home.get("score")
-            elif away["team"]["id"] == team_id:
-                rs = away.get("score")
-            else:
-                continue
-            if rs is not None:
-                games.append((g.get("gameDate", ""), int(rs)))
-    games.sort()
-    return [rs for _, rs in games[-5:]]
+def team_last5_gamelog(team_id: int, season: int) -> list[dict]:
+    """
+    Last 5 completed games as per-game dicts with runs/hits scored & allowed and
+    the opponent's season strength (for the SOS-adjusted win-condition back-test).
+
+    Team-level hitting game-log gives runs/hits scored; pitching gives runs/hits
+    allowed; the two are aligned by date.
+    """
+    data = _get(f"teams/{team_id}/stats", stats="gameLog",
+                group="hitting,pitching", season=season)
+    hit_splits: list[dict] = []
+    pit_by_date: dict[str, dict] = {}
+    for s in data.get("stats", []):
+        grp = s.get("group", {}).get("displayName", "")
+        for sp in s.get("splits", []):
+            if grp == "hitting":
+                hit_splits.append(sp)
+            elif grp == "pitching":
+                pit_by_date[sp.get("date", "")] = sp
+
+    out: list[dict] = []
+    for sp in hit_splits[-5:]:
+        hs = sp.get("stat", {})
+        date = sp.get("date", "")
+        opp = sp.get("opponent", {})
+        ps = pit_by_date.get(date, {}).get("stat", {})
+        strg = strength.team_strength(opp.get("id"), season)
+        out.append({
+            "date": date,
+            "opponent": opp.get("name", ""),
+            "runs_scored": int(hs.get("runs", 0) or 0),
+            "hits": int(hs.get("hits", 0) or 0),
+            "runs_allowed": int(ps.get("runs", 0) or 0),
+            "hits_allowed": int(ps.get("hits", 0) or 0),
+            "opp_fip": strg["fip"],
+            "opp_woba": strg["woba"],
+            "opp_win": strg["win_pct"],
+        })
+    return out
 
 
 def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
@@ -273,10 +334,13 @@ def enrich_with_stats(game: Game, date: str) -> Game:
     probable_hands(game)
 
     for team, is_home in ((game.home, True), (game.away, False)):
+        sos: dict = {}
+
         # --- offense: aggregate the lineup's last-5 counting stats ---
         hitters = lineup(game.game_pk, team.team_id, date, is_home)
         agg = {k: 0.0 for k in HIT_FIELDS}
         park_num = park_den = 0.0
+        opp_fip_num = opp_fip_w = opp_win_num = 0.0
         bats = []  # (bat_hand, pa) for platoon factor
         for h in hitters:
             try:
@@ -289,43 +353,43 @@ def enrich_with_stats(game: Game, date: str) -> Game:
                 agg[k] += line[k]
             park_num += line["park_factor"] * pa
             park_den += pa
+            opp_win_num += line["opp_win"] * pa
+            if line["opp_fip"] is not None:
+                opp_fip_num += line["opp_fip"] * pa
+                opp_fip_w += pa
             bats.append((h.hand, pa))
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
         team.offense = agg
         team.offense["bats"] = bats  # consumed by analysis.platoon_factor
+        sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
+        sos["bat_opp_win"] = (opp_win_num / park_den) if park_den else 0.5
 
-        # --- pitching: starter FIP + bullpen FIP (last 5) ---
+        # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
             try:
-                team.starter_fip_last5 = pitcher_fip_last5(team.probable_pitcher.player_id, season)
+                sp = pitcher_last5(team.probable_pitcher.player_id, season)
+                team.starter_fip_last5 = sp["fip"]
+                sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
             except Exception as exc:
                 log.warning("starter FIP failed for %s: %s", team.name, exc)
 
         try:
             starter_id = team.probable_pitcher.player_id if team.probable_pitcher else None
-            rel = reliever_ids(team.team_id, date, starter_id)
-            hr = bb = hbp = k = ip = 0.0
-            for pid in rel:
-                rows = _last_n_gamelog(pid, "pitching", season, 5)
-                for r in rows:
-                    s = r.get("stat", {})
-                    hr += float(s.get("homeRuns", 0) or 0)
-                    bb += float(s.get("baseOnBalls", 0) or 0)
-                    hbp += float(s.get("hitByPitch", 0) or 0)
-                    k += float(s.get("strikeOuts", 0) or 0)
-                    ip += _ip_to_float(s.get("inningsPitched", 0))
-            if ip > 0:
-                from .analysis import FIP_CONSTANT
-                team.bullpen_fip_last5 = round(
-                    (13 * hr + 3 * (bb + hbp) - 2 * k) / ip + FIP_CONSTANT, 3
-                )
+            acc = _new_pitch_acc()
+            for pid in reliever_ids(team.team_id, date, starter_id):
+                _accumulate_pitching(_last_n_gamelog(pid, "pitching", season, 5), season, acc)
+            bp = _fip_from_acc(acc)
+            team.bullpen_fip_last5 = bp["fip"]
+            sos["bp_opp_woba"], sos["bp_opp_win"] = bp["opp_woba"], bp["opp_win"]
         except Exception as exc:
             log.warning("bullpen FIP failed for %s: %s", team.name, exc)
 
-        # --- runs scored in last 5 games (for the win-condition back-test) ---
+        team.sos = sos
+
+        # --- last 5 games (for the SOS-adjusted win-condition back-test) ---
         try:
-            team.runs_last5 = last5_runs_scored(team.team_id, date)
+            team.games_last5 = team_last5_gamelog(team.team_id, season)
         except Exception as exc:
-            log.warning("last-5 runs failed for %s: %s", team.name, exc)
+            log.warning("last-5 game log failed for %s: %s", team.name, exc)
 
     return game
