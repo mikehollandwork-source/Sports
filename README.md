@@ -14,8 +14,15 @@ For every MLB game on a given day:
 3. **Public majority** — from covers.com, two ways:
    - **Consensus %** — covers' published public-betting percentages.
    - **Forum tally** — mentions of each team across that day's MLB forum posts.
-4. **Flag the edge** — if the statistically-advantaged team is *not* the public's
-   majority side, that team is added to the day's `picks`.
+4. **Pick the team** — a team is added to the day's `picks` only when **all three**
+   line up on it:
+   - it holds the **last-5 statistical advantage** (higher `team_score`), **and**
+   - the covers.com **public majority is *not* on it** (the public-vs-stats edge), **and**
+   - it **met the full win condition in ≥ 3 of its last 5 games** (scored its target
+     *and* held the opponent under its ceiling, SOS-adjusted).
+
+   The per-game `pick_criteria` block shows each of the three flags so you can see
+   why a game did or didn't make the cut. The threshold lives in `WC_PICK_MIN`.
 
 Output: `output/picks_<date>.json` — full per-game breakdown plus a top-level
 `picks` list.
@@ -92,9 +99,10 @@ per past game (SOS-adjusted):
 - **actually_won** — outscored the opponent
 - **out_hit** — more hits than allowed
 
-Plus `avg_opp_win_pct_faced` and a `per_game` breakdown. This is a *reporting*
-signal today (it doesn't change the flagged pick) — easy to fold into the
-decision later (e.g. require a complete-win-condition hit rate).
+Plus `avg_opp_win_pct_faced` and a `per_game` breakdown. **`complete_win_condition`
+gates the pick:** the advantage team must have met it in ≥ `WC_PICK_MIN` (3) of its
+last 5 games, on top of the public-vs-stats edge (see "What it does" above). The
+other four counts are reported for context.
 
 ### Caveats baked into the metric
 

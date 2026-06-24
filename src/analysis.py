@@ -53,6 +53,11 @@ W_SOS_WIN = 0.30    # weight on opponent win%
 LEAGUE_WINPCT = 0.500
 SOS_CLAMP = (0.80, 1.25)
 
+# A game is only picked when the advantage team also met the FULL win condition
+# (scored its target AND held the opponent under its ceiling, SOS-adjusted) in at
+# least this many of its last 5 games.
+WC_PICK_MIN = 3
+
 # wOBA linear weights (approx; intentional walks not split out)
 WOBA_W = {"bb": 0.69, "hbp": 0.72, "1b": 0.89, "2b": 1.27, "3b": 1.62, "hr": 2.10}
 
@@ -284,7 +289,19 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
 
     adv_team, hs, as_ = statistical_favorite(game)
     majority, majority_detail = public_majority(game, consensus, forum_counts)
-    flagged = bool(majority) and adv_team.team_id != majority.team_id
+
+    wc_home = win_condition(game.home, game.away)
+    wc_away = win_condition(game.away, game.home)
+
+    # The pick fires only when all three line up on the SAME (advantage) team:
+    #   1. it holds the last-5 statistical advantage  (it's adv_team by definition)
+    #   2. the public majority on covers is NOT on it (the public-vs-stats edge)
+    #   3. it met the full win condition in >= 3 of its last 5 games
+    public_vs_stats_edge = bool(majority) and adv_team.team_id != majority.team_id
+    adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
+    wc_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
+    win_condition_met = wc_hits >= WC_PICK_MIN
+    flagged = public_vs_stats_edge and win_condition_met
 
     return {
         "game_pk": game.game_pk,
@@ -301,8 +318,14 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "detail": majority_detail,
         },
         "win_condition": {
-            "home": win_condition(game.home, game.away),
-            "away": win_condition(game.away, game.home),
+            "home": wc_home,
+            "away": wc_away,
+        },
+        "pick_criteria": {
+            "public_vs_stats_edge": public_vs_stats_edge,
+            "win_condition_met": win_condition_met,
+            "complete_win_condition_hits": wc_hits,
+            "threshold": WC_PICK_MIN,
         },
         "flagged": flagged,
         "pick": adv_team.name if flagged else None,
