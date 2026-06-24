@@ -36,7 +36,11 @@ For every MLB game on a given day:
    versa) — every step pulls on the result. Weights default to ~equal thirds
    (`W_EDGE/W_FADE/W_WC`), all tunable at the top of `analysis.py`. The per-game
    `pick_criteria` block reports the confidence **and each component's margin,
-   strength, and weight**, so you can see exactly how every step contributed.
+   strength, and weight**, plus a `status`/`reason`, so you can see exactly how
+   every step contributed. The daily issue + Telegram render a **full board**:
+   every matchup with its advantage team, a ✅ for picks and a 🔸 **LEAN** for the
+   rest (with the reason it missed — e.g. "public is also on the favorite", "no
+   public lean", or "confidence X < threshold (weakest: …)"), ranked by confidence.
 5. **Betting lines** — each game's `betting_lines` block splits the two sides into
    `majority` (the higher consensus %) and `non_majority`, with each side's team,
    `consensus_pct`, and `moneyline`. (covers' MLB consensus is moneyline-only —

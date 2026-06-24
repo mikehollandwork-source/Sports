@@ -68,41 +68,39 @@ def run(date: str) -> dict:
     }
 
 
+def _ranked(games: list) -> list:
+    """All games, strongest decision first (confidence desc)."""
+    return sorted(games, key=lambda g: g.get("pick_criteria", {}).get("confidence", 0.0),
+                  reverse=True)
+
+
 def build_summary(payload: dict) -> str:
-    """Human-readable markdown for the daily picks issue."""
+    """Markdown board for the daily issue: every matchup, its advantage team, a
+    check for picks and a labelled LEAN (with the reason) for the rest."""
     date = payload["date"]
     picks = payload.get("picks", [])
-    games = payload.get("games", [])
-    out = [f"# MLB Public-vs-Stats Picks — {date}", ""]
+    out = [f"# MLB Board — {date}", ""]
+    out.append(f"**{len(picks)} pick(s)"
+               + (f": {', '.join(picks)}**" if picks else " — no game cleared the bar today.**"))
+    out.append("")
 
-    if not picks:
-        out.append("**No edge picks today.** No game cleared the confidence threshold "
-                   "while the public was fading the statistical favorite.")
-    else:
-        out.append(f"**{len(picks)} pick(s): {', '.join(picks)}**")
-        out.append("")
-        for g in games:
-            if not g.get("flagged"):
-                continue
-            sa, pm, pc = g["statistical_advantage"], g["public_majority"], g["pick_criteria"]
-            c = pc["components"]
+    for g in _ranked(payload.get("games", [])):
+        pc = g["pick_criteria"]
+        c = pc["components"]
+        adv = pc["advantage_team"]
+        comp = (f"edge {c['stat_edge']['strength']}/fade {c['public_fade']['strength']}/"
+                f"wc {c['win_condition']['strength']}")
+        if g.get("flagged"):
             bl = g.get("betting_lines")
-            out.append(f"## ✅ {g['pick']} — {g['matchup']}")
-            out.append(f"- **Confidence {pc['confidence']}** (≥ {pc['threshold']}) = "
-                       f"edge {c['stat_edge']['strength']} · "
-                       f"fade {c['public_fade']['strength']} · "
-                       f"win-cond {c['win_condition']['strength']}")
-            out.append(f"- Statistical edge: **{sa['team']}** "
-                       f"(home {sa['home_score']} / away {sa['away_score']}, "
-                       f"margin {c['stat_edge']['margin']})")
-            out.append(f"- Public is on (and we fade): **{pm['team']}** "
-                       f"(fade strength {c['public_fade']['strength']})")
-            out.append(f"- Win condition: **{c['win_condition']['hits']}/5**")
-            if bl:
-                m, n = bl["majority"], bl["non_majority"]
-                out.append(f"- Moneyline: pick **{n['team']} {n['moneyline']}** — "
-                           f"public on {m['team']} {m['moneyline']} ({m['consensus_pct']}%)")
-            out.append("")
+            ml = f" · {bl['non_majority']['moneyline']}" if bl else ""
+            out.append(f"✅ **{adv}** · {g['matchup']} · conf **{pc['confidence']}** "
+                       f"({comp}){ml} · fading {g['public_majority']['team']}")
+        else:
+            out.append(f"🔸 LEAN **{adv}** · {g['matchup']} · conf {pc['confidence']} "
+                       f"({comp}) · {pc['reason']}")
+    out.append("")
+    out.append("_✅ = pick (public fading the stat favorite + confidence ≥ threshold); "
+               "🔸 = lean (advantage team shown, with why it missed)._")
 
     out.append("")
     out.append(grade.bankroll_line())
@@ -129,25 +127,22 @@ def write_outputs(payload: dict, date: str) -> None:
 
 
 def telegram_text(payload: dict) -> str:
-    """Plain-text picks summary for Telegram (no markdown that the API would garble)."""
+    """Plain-text board for Telegram (every matchup; ✅ pick, 🔸 lean + reason)."""
     date = payload["date"]
     picks = payload.get("picks", [])
-    lines = [f"⚾ MLB Picks — {date}"]
-    if not picks:
-        lines.append("No edge picks today.")
-    else:
-        lines.append(f"{len(picks)} pick(s): {', '.join(picks)}")
-        for g in payload.get("games", []):
-            if not g.get("flagged"):
-                continue
-            pc = g["pick_criteria"]
-            c = pc["components"]
+    head = f"⚾ MLB Board — {date} ({len(picks)} pick(s)"
+    head += f": {', '.join(picks)})" if picks else ")"
+    lines = [head]
+    for g in _ranked(payload.get("games", [])):
+        pc = g["pick_criteria"]
+        adv = pc["advantage_team"]
+        if g.get("flagged"):
             bl = g.get("betting_lines")
             ml = f" {bl['non_majority']['moneyline']}" if bl else ""
-            lines.append(
-                f"• {g['pick']}{ml} — conf {pc['confidence']} "
-                f"(edge {c['stat_edge']['strength']}/fade {c['public_fade']['strength']}/"
-                f"wc {c['win_condition']['strength']}); fading {g['public_majority']['team']}")
+            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {pc['confidence']} — "
+                         f"fading {g['public_majority']['team']}")
+        else:
+            lines.append(f"🔸 {adv} ({g['matchup']}) conf {pc['confidence']} — {pc['reason']}")
     lines.append(grade.bankroll_line().replace("**", ""))
     ts = tune.status_line().replace("**", "")
     if ts:
