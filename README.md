@@ -146,11 +146,14 @@ python -m src.main --date 2026-06-23   # omit --date for today (US/Eastern)
 
 - **covers.com selectors are unverified.** covers' HTML is undocumented and this
   code could not be tested against it from the build sandbox (covers is
-  firewalled there). The selectors/URLs in `src/covers.py` are best-effort and
-  **will likely need a small tweak after the first live Actions run.** Every
-  covers parser fails *soft* — on any problem it logs a warning and returns empty
-  data, so the MLB-stats analysis still produces output. Check the Actions log
-  for `selectors likely need updating` warnings.
+  firewalled there). covers is a **Next.js site**, so the consensus numbers are
+  rendered client-side in an embedded `__NEXT_DATA__` JSON blob — the parser tries
+  that JSON first, then falls back to a table heuristic. Every covers parser fails
+  *soft* — on a miss it logs a **structural fingerprint** (`... parse empty | ...`)
+  instead of just a generic warning. To fix the selectors for real, run the
+  workflow once with the **`covers_debug` input checked** (or `COVERS_DEBUG=1`):
+  it dumps the raw HTML covers serves into `output/covers_debug/` and commits it
+  back, so the exact markup is available to pin the parser to.
 - **Forum sentiment is a blunt heuristic.** "Majority side" from forum text is a
   raw mention tally — it does not understand fades, sarcasm, or parlays. Treat
   the consensus % as the stronger signal; the forum tally is corroboration.

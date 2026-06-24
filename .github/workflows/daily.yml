@@ -10,6 +10,11 @@ on:
         description: "Date to analyze (YYYY-MM-DD). Blank = today (US/Eastern)."
         required: false
         default: ""
+      covers_debug:
+        description: "Dump raw covers.com HTML to output/covers_debug/ (for fixing selectors)."
+        type: boolean
+        required: false
+        default: false
   schedule:
     # 15:00 UTC ~= 11:00 ET, after lineups/probables are usually posted.
     - cron: "0 15 * * *"
@@ -33,6 +38,7 @@ jobs:
       - name: Run edge finder
         env:
           PICKS_DATE: ${{ github.event.inputs.date }}
+          COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
         run: python -m src.main
 
       - name: Commit results
