@@ -143,6 +143,14 @@ settlement assumes **even money (+100)**: a win is +$1.00, a loss −$1.00, and 
 bankroll is simply wins − losses. Run a specific date with
 `python -m src.grade --date YYYY-MM-DD` (or the `grade_date` workflow input).
 
+`src/backtest.py` is a point-in-time *historical* backtest (forum-only public
+signal, even money). **Known limitation:** the covers forum listing exposes only
+thread-creation dates, not per-day posts, so daily public sentiment can't be
+reconstructed without crawling into individual threads (not built) — so it
+currently finds ~0 picks. The forward bankroll above is the real measure of
+performance; the backtest's point-in-time machinery is correct and waits on that
+thread crawler.
+
 ## Running it
 
 ### On GitHub Actions (intended use)

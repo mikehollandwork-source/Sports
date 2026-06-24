@@ -2,6 +2,14 @@
 Point-in-time backtest: reconstruct what the edge finder WOULD have picked on
 each of the last N days, and settle those picks against actual results at $1/pick.
 
+KNOWN LIMITATION (why this currently finds ~0 picks): the only recoverable
+historical public signal is the forum, but the forum *listing* page exposes
+thread-creation dates, not per-day posts - so daily sentiment can't be
+reconstructed without crawling into individual threads (not built). Until then
+the backtest yields ~0 picks; the forward bankroll (src/grade.py) is the real
+measure. The point-in-time machinery here is correct and reusable if that
+forum-thread crawler is ever added.
+
 Honest limits (see README):
   - Past public sentiment uses FORUM history only - covers serves no historical
     consensus %, so these picks run on the weaker forum signal (the live system
