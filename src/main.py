@@ -22,7 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, grade, notify, tune
-from .analysis import evaluate_game
+from .analysis import consensus_details_url, evaluate_game, line_confirms
 from .mlb_api import enrich_with_stats, schedule_for
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -55,7 +55,10 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        results.append(evaluate_game(g, consensus, forum_counts))
+        result = evaluate_game(g, consensus, forum_counts)
+        if result["flagged"]:
+            _apply_line_filter(g, result, consensus)  # sharp-money confirmation
+        results.append(result)
 
     picks = [r["pick"] for r in results if r["flagged"]]
     log.info("Flagged %d edge game(s)", len(picks))
@@ -66,6 +69,29 @@ def run(date: str) -> dict:
         "games": results,
         "picks": picks,
     }
+
+
+def _apply_line_filter(game, result: dict, consensus: dict) -> None:
+    """Hard sharp-money gate: keep a candidate pick only if the line moved toward
+    it (reverse line movement confirms the fade). Otherwise downgrade to a lean."""
+    url = consensus_details_url(game, consensus)
+    lm = None
+    if url:
+        try:
+            lm = covers.line_movement(url)
+        except Exception as exc:
+            log.warning("line movement fetch failed for %s: %s", game.game_pk, exc)
+    side = "home" if result["pick"] == game.home.name else "away"
+    confirms, info = line_confirms(side, lm)
+    pc = result["pick_criteria"]
+    pc["line_check"] = info
+    if confirms is not True:
+        result["flagged"] = False
+        result["pick"] = None
+        pc["status"] = "lean"
+        pc["reason"] = (f"line did not confirm the fade — {info['reason']}"
+                        if info["status"] == "contradicts"
+                        else "line movement unavailable — can't confirm the fade")
 
 
 def _ranked(games: list) -> list:
@@ -100,8 +126,19 @@ def _public_evidence(g: dict) -> str:
     return f"{team}" + (f" [{', '.join(bits)}]" if bits else "")
 
 
+def _line_bullet(pc: dict) -> str | None:
+    lc = pc.get("line_check")
+    if not lc:
+        return None
+    if lc["status"] == "unknown":
+        return "   • line: unavailable (couldn't verify movement)"
+    mark = "confirms ✓" if lc["status"] == "confirms" else "did NOT confirm ✗"
+    return (f"   • line: {mark} ({lc['open']:+d}→{lc['current']:+d}, "
+            f"{lc['implied_shift']:+.1%} to the pick)")
+
+
 def _game_lines(g: dict) -> list[str]:
-    """Two-to-three readable lines breaking down one matchup for the board."""
+    """Readable lines breaking down one matchup for the board."""
     pc = g["pick_criteria"]
     c = pc["components"]
     adv, conf = pc["advantage_team"], pc["confidence"]
@@ -112,20 +149,25 @@ def _game_lines(g: dict) -> list[str]:
     if g.get("flagged"):
         bl = g.get("betting_lines")
         ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
-        return [
+        lines = [
             f"✅ **{adv}** — {g['matchup']} · **confidence {_c10(conf)}** ✓ "
             f"(need {_c10(pc['threshold'])}){ml}",
             f"   • stat edge: {edge}",
             f"   • public is on: {pub} → **we fade them**",
             f"   • win condition: {wc}/5 games",
         ]
-    return [
-        f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {_c10(conf)}",
-        f"   • stat edge: {edge}",
-        f"   • public is on: {pub}",
-        f"   • win condition: {wc}/5 games",
-        f"   • why not a pick: {pc['reason']}",
-    ]
+    else:
+        lines = [
+            f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {_c10(conf)}",
+            f"   • stat edge: {edge}",
+            f"   • public is on: {pub}",
+            f"   • win condition: {wc}/5 games",
+            f"   • why not a pick: {pc['reason']}",
+        ]
+    lb = _line_bullet(pc)
+    if lb:
+        lines.append(lb)
+    return lines
 
 
 def build_summary(payload: dict) -> str:

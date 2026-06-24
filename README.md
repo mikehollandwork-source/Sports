@@ -37,7 +37,13 @@ For every MLB game on a given day:
    (`W_EDGE/W_FADE/W_WC`), all tunable at the top of `analysis.py`. The per-game
    `pick_criteria` block reports the confidence **and each component's margin,
    strength, and weight**, plus a `status`/`reason`, so you can see exactly how
-   every step contributed. The daily issue + Telegram render a **full board**:
+   every step contributed.
+   **Line-movement gate (final, hard):** a candidate that clears the above is only
+   kept as a pick if the **moneyline moved toward it** from open to current
+   (reverse line movement = sharp money confirming the fade). covers' matchup
+   details page supplies the open→current line; if it moved with the public, or
+   can't be verified, the pick is downgraded to a lean (`line_check` in the
+   output, shown on the board). Tunable via `LINE_CONFIRM_MIN`. The daily issue + Telegram render a **full board**:
    every matchup with its advantage team, a ✅ for picks and a 🔸 **LEAN** for the
    rest (with the reason it missed — e.g. "public is also on the favorite", "no
    public lean", or "confidence X < threshold (weakest: …)"), ranked by confidence.

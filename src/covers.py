@@ -135,6 +135,35 @@ def _pct(text: str) -> float | None:
     return float(m.group(1)) if m else None
 
 
+def line_movement(details_url: str) -> dict | None:
+    """Open->current moneyline per side from a matchup-details page. The
+    'Moneyline Consensus: Picks Per Line' series lists the moneylines the game was
+    offered at over time (first = opening, last = current). Returns
+    {away_open, away_current, home_open, home_current} (American odds ints) or None."""
+    if not details_url:
+        return None
+    url = (details_url if details_url.startswith("http")
+           else "https://contests.covers.com" + details_url)
+    soup, _, _ = _fetch(url)
+    if soup is None:
+        return None
+
+    def series(cls: str) -> list[int]:
+        vals = []
+        for e in soup.select("." + cls):
+            t = e.get_text(strip=True)
+            if re.fullmatch(r"[+-]\d{3,4}", t):  # valid moneyline (excludes '0'/labels)
+                vals.append(int(t))
+        return vals
+
+    away = series("covers-CoversConsensusDetailsTable-awayLine")
+    home = series("covers-CoversConsensusDetailsTable-homeLine")
+    if not away or not home:
+        return None
+    return {"away_open": away[0], "away_current": away[-1],
+            "home_open": home[0], "home_current": home[-1]}
+
+
 def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
     """Each matchup row holds two team anchors (href /consensus/pickleadersbyteam/,
     text = abbreviation, e.g. 'Bos'), two bet-% spans
