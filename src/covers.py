@@ -91,17 +91,6 @@ def _next_data(soup: BeautifulSoup) -> dict | None:
     return None
 
 
-def _iter_dicts(obj):
-    """Recursively yield every dict nested anywhere inside a JSON structure."""
-    if isinstance(obj, dict):
-        yield obj
-        for v in obj.values():
-            yield from _iter_dicts(v)
-    elif isinstance(obj, list):
-        for v in obj:
-            yield from _iter_dicts(v)
-
-
 def _fingerprint(text: str, final_url: str, soup: BeautifulSoup, what: str) -> None:
     """When a parse yields nothing, log enough structure to fix selectors next
     time without another blind round-trip."""
@@ -130,62 +119,42 @@ def consensus_percentages() -> dict[str, dict[str, float]]:
     # covers.com is a Next.js site, so the consensus numbers are rendered
     # client-side and live in the __NEXT_DATA__ JSON, not in static <tr>s.
     # Try the JSON first, then fall back to the table heuristic.
-    out = _consensus_from_json(soup) or _consensus_from_table(soup)
+    out = _consensus_from_table(soup)
     if not out:
         _fingerprint(text, final_url, soup, "consensus")
     return out
 
 
-def _consensus_from_json(soup: BeautifulSoup) -> dict[str, dict[str, float]]:
-    """Pull consensus % from the embedded __NEXT_DATA__ blob.
-
-    Looks for game-shaped dicts that carry two teams and two betting
-    percentages. Key names vary, so we match loosely: any key containing
-    'consensus'/'percent'/'wager'/'tickets' with a 0-100 value, paired with the
-    nearest team identifiers in the same dict. Best-effort; soft on miss.
-    """
-    data = _next_data(soup)
-    if not data:
-        return {}
-    out: dict[str, dict[str, float]] = {}
-    pct_key = re.compile(r"consensus|percent|wager|ticket", re.I)
-    for d in _iter_dicts(data):
-        pcts = [v for k, v in d.items()
-                if pct_key.search(str(k)) and isinstance(v, (int, float)) and 0 <= v <= 100]
-        teams = _team_labels(d)
-        if len(teams) >= 2 and len(pcts) >= 2:
-            key = f"{teams[0]}@{teams[1]}".lower()
-            out[key] = {teams[0]: float(pcts[0]), teams[1]: float(pcts[1])}
-    return out
-
-
-def _team_labels(d: dict) -> list[str]:
-    """Team names/abbreviations referenced directly inside a dict."""
-    labels: list[str] = []
-    for k, v in d.items():
-        kl = str(k).lower()
-        if "team" in kl or "abbr" in kl or kl in ("away", "home"):
-            if isinstance(v, str) and v.strip():
-                labels.append(v.strip())
-            elif isinstance(v, dict):
-                for nk in ("name", "fullName", "abbreviation", "abbr", "shortName"):
-                    if isinstance(v.get(nk), str) and v[nk].strip():
-                        labels.append(v[nk].strip())
-                        break
-    return labels
+def _pct(text: str) -> float | None:
+    m = re.search(r"(\d{1,3})\s*%", text)
+    return float(m.group(1)) if m else None
 
 
 def _consensus_from_table(soup: BeautifulSoup) -> dict[str, dict[str, float]]:
-    """Fallback: parse a static consensus table if covers serves one."""
+    """Parse the contests.covers.com consensus table.
+
+    Each matchup row holds two team anchors (href /consensus/pickleadersbyteam/...,
+    text = team abbreviation, e.g. 'Bos') and two bet-percentage spans
+    (covers-CoversConsensus-consensusTable--high / --low). The spans are in
+    away-then-home order; --high/--low only styles the larger side, so we align
+    the two percentages to the two teams by position, not by magnitude.
+
+    Returns {"away@home": {away_abbr: pct, home_abbr: pct}} (abbrevs lowercased
+    in the key; matched to games by analysis._name_hit on team.abbreviation).
+    """
     out: dict[str, dict[str, float]] = {}
-    rows = soup.select("[class*=consensus] tr, table tr")
-    for row in rows:
-        teams = [t.get_text(strip=True) for t in row.select("[class*=team], td a")]
-        pcts = [float(m.group(1)) for m in re.finditer(r"(\d{1,3})\s*%", row.get_text(" "))]
-        teams = [t for t in teams if t]
-        if len(teams) >= 2 and len(pcts) >= 2:
-            key = f"{teams[0]}@{teams[1]}".lower()
-            out[key] = {teams[0]: pcts[0], teams[1]: pcts[1]}
+    for tr in soup.select("tr"):
+        teams = [a.get_text(strip=True) for a in tr.find_all("a")
+                 if "pickleadersbyteam" in a.get("href", "")]
+        spans = tr.select(".covers-CoversConsensus-consensusTable--high,"
+                          " .covers-CoversConsensus-consensusTable--low")
+        if len(teams) < 2 or len(spans) < 2:
+            continue
+        away_pct, home_pct = _pct(spans[0].get_text()), _pct(spans[1].get_text())
+        if away_pct is None or home_pct is None:
+            continue
+        key = f"{teams[0]}@{teams[1]}".lower()
+        out[key] = {teams[0]: away_pct, teams[1]: home_pct}
     return out
 
 

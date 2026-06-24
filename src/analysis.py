@@ -377,16 +377,26 @@ def _team_stats(team: Team) -> dict:
 
 
 def _matches(game: Game, names: list[str]) -> bool:
-    blob = " ".join(names).lower()
-    return _name_hit(game.home, blob) and _name_hit(game.away, blob)
+    return _name_hit(game.home, names) and _name_hit(game.away, names)
 
 
-def _name_hit(team: Team, blob: str) -> bool:
+def _name_hit(team: Team, names: list[str]) -> bool:
+    """True if any covers label identifies this team. covers uses abbreviations
+    (e.g. 'Bos'), so match team.abbreviation as an exact token first, then fall
+    back to the nickname as a substring."""
+    names_l = [n.lower() for n in names]
+    abbr = (team.abbreviation or "").lower()
+    if abbr and abbr in names_l:
+        return True
     nick = team.name.lower().split()[-1] if team.name else ""
-    return bool(nick) and nick in blob
+    return bool(nick) and nick in " ".join(names_l)
 
 
 def _resolve(game: Game, label: str) -> Team:
     low = label.lower()
+    if (game.home.abbreviation or "").lower() == low:
+        return game.home
+    if (game.away.abbreviation or "").lower() == low:
+        return game.away
     home_nick = game.home.name.lower().split()[-1] if game.home.name else ""
     return game.home if home_nick and home_nick in low else game.away
