@@ -123,10 +123,9 @@ def consensus() -> dict[str, dict]:
     if not out:
         _fingerprint(text, final_url, soup, "consensus")
     elif DEBUG:
-        url = next((v["details_url"] for v in out.values() if v.get("details_url")), "")
-        if url:
-            _fetch(_abs_forum(url) if url.startswith("/forum") else
-                   ("https://contests.covers.com" + url if url.startswith("/") else url))
+        # dump full-slate odds/matchups pages to find a line source for EVERY game
+        _fetch("https://www.covers.com/sport/baseball/mlb/odds")
+        _fetch("https://www.covers.com/sports/mlb/matchups")
     return out
 
 
