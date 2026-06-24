@@ -35,9 +35,11 @@ from bs4 import BeautifulSoup
 
 log = logging.getLogger("covers")
 
-# --- Endpoints (verify/adjust after first live run) ---------------------------
-CONSENSUS_URL = "https://www.covers.com/sport/baseball/mlb/consensus"
-FORUM_URL = "https://www.covers.com/forums/mlb-betting-forum"
+# --- Endpoints ----------------------------------------------------------------
+# The old www.covers.com/sport/... paths 404 now. Public-betting consensus lives
+# on the contests subdomain; the MLB forum moved to /forum/mlb-betting-27.
+CONSENSUS_URL = "https://contests.covers.com/consensus/topconsensus/mlb/overall"
+FORUM_URL = "https://www.covers.com/forum/mlb-betting-27"
 
 TIMEOUT = 20
 POLITE_DELAY = 1.0  # seconds between requests
