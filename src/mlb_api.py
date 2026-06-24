@@ -64,6 +64,8 @@ class Team:
     offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
     starter_fip_last5: float | None = None
     bullpen_fip_last5: float | None = None
+    starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
+    bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
     platoon_factor: float = 1.0
     games_last5: list = field(default_factory=list)  # per-game results + opp strength
     sos: dict = field(default_factory=dict)          # avg opp strength faced (see analysis)
@@ -200,15 +202,16 @@ def _accumulate_pitching(rows: list[dict], season: int, acc: dict) -> None:
 
 
 def _fip_from_acc(acc: dict) -> dict:
-    """Turn accumulated pitching sums into FIP + opponent-offense averages."""
+    """Turn accumulated pitching sums into FIP + opponent-offense averages + IP."""
     if acc["ip"] <= 0:
-        return {"fip": None, "opp_woba": None, "opp_win": 0.5}
+        return {"fip": None, "opp_woba": None, "opp_win": 0.5, "ip": 0.0}
     from .analysis import FIP_CONSTANT
     fip = (13 * acc["hr"] + 3 * (acc["bb"] + acc["hbp"]) - 2 * acc["k"]) / acc["ip"] + FIP_CONSTANT
     return {
         "fip": round(fip, 3),
         "opp_woba": (acc["opp_woba_ip"] / acc["opp_woba_w"]) if acc["opp_woba_w"] else None,
         "opp_win": (acc["opp_win_ip"] / acc["ip"]) if acc["ip"] else 0.5,
+        "ip": round(acc["ip"], 2),
     }
 
 
@@ -369,6 +372,7 @@ def enrich_with_stats(game: Game, date: str) -> Game:
             try:
                 sp = pitcher_last5(team.probable_pitcher.player_id, season)
                 team.starter_fip_last5 = sp["fip"]
+                team.starter_ip_last5 = sp["ip"]
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
             except Exception as exc:
                 log.warning("starter FIP failed for %s: %s", team.name, exc)
@@ -380,6 +384,7 @@ def enrich_with_stats(game: Game, date: str) -> Game:
                 _accumulate_pitching(_last_n_gamelog(pid, "pitching", season, 5), season, acc)
             bp = _fip_from_acc(acc)
             team.bullpen_fip_last5 = bp["fip"]
+            team.bullpen_ip_last5 = bp["ip"]
             sos["bp_opp_woba"], sos["bp_opp_win"] = bp["opp_woba"], bp["opp_win"]
         except Exception as exc:
             log.warning("bullpen FIP failed for %s: %s", team.name, exc)

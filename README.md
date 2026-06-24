@@ -55,9 +55,16 @@ line is AVG / OBP / SLG / OPS / ISO / wOBA / BB% / K% / SB-rate.
 **strength-adjusted for the offenses faced** (suppressing strong bats counts more):
 
 ```
-combined_FIP   = 0.55 * starter_FIP + 0.45 * bullpen_FIP   (last 5, SOS-adjusted)
+each FIP   -> regress to league mean by innings:  w = IP / (IP + FIP_PRIOR_IP)
+              shrunk_FIP = w * FIP + (1-w) * LEAGUE_FIP        (small-sample guard)
+combined_FIP   = 0.55 * starter_FIP + 0.45 * bullpen_FIP   (last 5, shrunk + SOS-adjusted)
 pitching_index = (LEAGUE_FIP - combined_FIP) / LEAGUE_FIP
 ```
+
+The **shrinkage** stops a tiny noisy sample from blowing up the index: a 2-IP spot
+start with two homers (a ~12 FIP) gets pulled most of the way back to average,
+while a genuinely bad FIP over a full ~30-IP sample is believed. `IP` behind each
+FIP is reported alongside it.
 
 The team with the higher `team_score` has the advantage. **Every weight,
 league baseline, and the wOBA/FIP constants live at the top of

@@ -58,6 +58,12 @@ SOS_CLAMP = (0.80, 1.25)
 # least this many of its last 5 games.
 WC_PICK_MIN = 3
 
+# Small-sample guard for last-5 FIP: a 2-IP spot start with two homers posts an
+# absurd FIP that would otherwise dominate the pitching index. Regress each FIP
+# toward the league mean by innings pitched: weight = ip / (ip + FIP_PRIOR_IP),
+# so ~one start's worth of innings counts as a league-average prior. Tunable.
+FIP_PRIOR_IP = 9.0
+
 # wOBA linear weights (approx; intentional walks not split out)
 WOBA_W = {"bb": 0.69, "hbp": 0.72, "1b": 0.89, "2b": 1.27, "3b": 1.62, "hr": 2.10}
 
@@ -150,17 +156,30 @@ def platoon_factor(bats: list, opp_hand: str) -> float:
 
 
 # --- pitching -----------------------------------------------------------------
-def _adjusted_fip(fip: float | None, opp_woba, opp_win) -> float | None:
-    """SOS-adjust a FIP by the offense faced: tougher offense -> lower (better)."""
+def _shrink_fip(fip: float | None, ip: float) -> float | None:
+    """Regress a small-sample FIP toward the league mean by innings pitched, so a
+    tiny noisy sample can't blow up the index."""
+    if fip is None or ip <= 0:
+        return fip
+    w = ip / (ip + FIP_PRIOR_IP)
+    return w * fip + (1.0 - w) * LEAGUE_FIP
+
+
+def _adjusted_fip(fip: float | None, ip: float, opp_woba, opp_win) -> float | None:
+    """Shrink a FIP for sample size, then SOS-adjust by the offense faced
+    (tougher offense -> lower/better)."""
+    fip = _shrink_fip(fip, ip)
     if fip is None:
         return None
     return fip / opp_offense_factor(opp_woba, opp_win)
 
 
 def combined_fip(team: Team) -> float | None:
-    """Starter+bullpen FIP, each SOS-adjusted for the offenses faced."""
-    sp = _adjusted_fip(team.starter_fip_last5, team.sos.get("sp_opp_woba"), team.sos.get("sp_opp_win"))
-    bp = _adjusted_fip(team.bullpen_fip_last5, team.sos.get("bp_opp_woba"), team.sos.get("bp_opp_win"))
+    """Starter+bullpen FIP, each sample-shrunk then SOS-adjusted for offenses faced."""
+    sp = _adjusted_fip(team.starter_fip_last5, team.starter_ip_last5,
+                       team.sos.get("sp_opp_woba"), team.sos.get("sp_opp_win"))
+    bp = _adjusted_fip(team.bullpen_fip_last5, team.bullpen_ip_last5,
+                       team.sos.get("bp_opp_woba"), team.sos.get("bp_opp_win"))
     if sp is not None and bp is not None:
         return W_SP * sp + W_BP * bp
     if sp is not None:
@@ -340,7 +359,9 @@ def _team_stats(team: Team) -> dict:
         "offense": offense_line(team.offense),
         "platoon_factor": team.platoon_factor,
         "starter_fip_last5": team.starter_fip_last5,
+        "starter_ip_last5": team.starter_ip_last5,
         "bullpen_fip_last5": team.bullpen_fip_last5,
+        "bullpen_ip_last5": team.bullpen_ip_last5,
         "combined_fip_sos_adj": round(combined_fip(team), 3) if combined_fip(team) is not None else None,
         "strength_of_schedule": {
             "bat_opp_pitching_factor": round(
