@@ -166,8 +166,11 @@ python -m src.main --date 2026-06-23   # omit --date for today (US/Eastern)
   it dumps the raw HTML covers serves into `output/covers_debug/` and commits it
   back, so the exact markup is available to pin the parser to.
 - **Forum sentiment is a blunt heuristic.** "Majority side" from forum text is a
-  raw mention tally — it does not understand fades, sarcasm, or parlays. Treat
-  the consensus % as the stronger signal; the forum tally is corroboration.
+  raw mention tally — it matches each team by name/nickname/city **and its
+  abbreviation** (BOS, NYY, …), the abbreviation on word boundaries so a short
+  code can't trigger inside another word (e.g. "bosses"). It does not understand
+  fades, sarcasm, or parlays. Treat the consensus % as the stronger signal; the
+  forum tally is corroboration.
 - **This is not betting advice.** A last-5-games stat edge ignores matchups,
   bullpens, weather, injuries, lineups, and market prices. It's a research
   signal, nothing more. Bet responsibly.

@@ -147,7 +147,11 @@ def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
         away_pct, home_pct = _pct(spans[0].get_text()), _pct(spans[1].get_text())
         if away_pct is None or home_pct is None:
             continue
-        odds = re.findall(r"[+-]\d{2,4}", tr.get_text(" "))  # moneylines, away then home
+        # Moneylines (away then home). American moneyline odds are always 3-4
+        # signed digits (>= |100|); a run-line spread is +/-1.5 (one digit + a
+        # decimal). Requiring 3-4 digits as a standalone token (no surrounding
+        # digit/dot) means a spread can never be mistaken for the moneyline.
+        odds = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", tr.get_text(" "))
         away_ml = odds[0] if len(odds) >= 2 else None
         home_ml = odds[1] if len(odds) >= 2 else None
         key = f"{teams[0]}@{teams[1]}".lower()
@@ -158,16 +162,20 @@ def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
     return out
 
 
-def forum_majority(team_names: list[str], date: str) -> dict[str, int]:
+def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
     """
-    Tally how often each team in `team_names` is mentioned across that day's
-    MLB forum posts. Returns {team_name: mention_count}.
+    Tally how often each team is mentioned across that day's MLB forum posts.
+    `teams` is a list of (full_name, abbreviation); returns {full_name: count}.
+
+    Forum posters lean on abbreviations ("BOS", "NYY", "LAD") as much as names,
+    so each team matches on full name / nickname / city (as substrings) AND its
+    abbreviation (as a whole word, so short codes don't hit inside other words).
 
     This is a deliberately simple heuristic (mention = implicit lean). It does
     not understand sarcasm, fades, or parlays - see README caveats.
     """
     soup, text, final_url = _fetch(FORUM_URL)
-    counts = {name: 0 for name in team_names}
+    counts = {name: 0 for name, _ in teams}
     if soup is None:
         return counts
 
@@ -175,14 +183,19 @@ def forum_majority(team_names: list[str], date: str) -> dict[str, int]:
     if not posts:
         _fingerprint(text, final_url, soup, "forum")
 
-    # Build a matcher per team: full name + last word (e.g. "Yankees") + city.
-    matchers = {name: _team_patterns(name) for name in team_names}
-    for text in posts:
-        low = text.lower()
+    matchers = {name: _team_patterns(name, abbr) for name, abbr in teams}
+    for body in posts:
+        low = body.lower()
         for name, pats in matchers.items():
-            if any(p in low for p in pats):
+            if _mentions(low, pats):
                 counts[name] += 1
     return counts
+
+
+def _mentions(low_text: str, pats: dict) -> bool:
+    if any(s in low_text for s in pats["subs"]):
+        return True
+    return any(re.search(rf"\b{re.escape(w)}\b", low_text) for w in pats["words"])
 
 
 def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
@@ -203,12 +216,14 @@ def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
     return posts
 
 
-def _team_patterns(name: str) -> list[str]:
-    """Lowercased match strings for a team: full name, nickname, city."""
-    name = name.strip()
-    parts = name.lower().split()
-    pats = {name.lower()}
+def _team_patterns(name: str, abbr: str = "") -> dict:
+    """Match patterns for a team. `subs` (full name, nickname, city) are matched
+    as substrings; `words` (the abbreviation) are matched on word boundaries so a
+    2-3 letter code can't trigger inside an unrelated word."""
+    parts = name.strip().lower().split()
+    subs = {name.strip().lower()}
     if parts:
-        pats.add(parts[-1])          # nickname, e.g. "yankees"
-        pats.add(" ".join(parts[:-1]))  # city, e.g. "new york"
-    return [p for p in pats if p]
+        subs.add(parts[-1])             # nickname, e.g. "yankees"
+        subs.add(" ".join(parts[:-1]))  # city, e.g. "new york"
+    words = {abbr.lower()} if abbr else set()
+    return {"subs": [s for s in subs if s], "words": [w for w in words if w]}

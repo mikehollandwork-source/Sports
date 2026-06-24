@@ -46,8 +46,8 @@ def run(date: str) -> dict:
 
     # Public sentiment (fetched once, shared across games).
     consensus = covers.consensus()
-    team_names = [t.name for g in games for t in (g.home, g.away)]
-    forum_counts = covers.forum_majority(team_names, date)
+    teams = [(t.name, t.abbreviation) for g in games for t in (g.home, g.away)]
+    forum_counts = covers.forum_majority(teams, date)
 
     results = []
     for g in games:
