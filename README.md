@@ -21,15 +21,22 @@ For every MLB game on a given day:
    only one present, and a tied signal lets the other break it. `public_majority.
    detail` reports both leans, the blend, and whether they agree — so a strong
    forum read can outvote a strong consensus (raise/lower `PUBLIC_W_FORUM` to taste).
-4. **Pick the team** — a team is added to the day's `picks` only when **all three**
-   line up on it:
-   - it holds the **last-5 statistical advantage** (higher `team_score`), **and**
-   - the covers.com **public majority is *not* on it** (the public-vs-stats edge), **and**
-   - it **met the full win condition in ≥ 3 of its last 5 games** (scored its target
-     *and* held the opponent under its ceiling, SOS-adjusted).
-
-   The per-game `pick_criteria` block shows each of the three flags so you can see
-   why a game did or didn't make the cut. The threshold lives in `WC_PICK_MIN`.
+4. **Pick the team** — a single **confidence score** blends every signal's
+   *strength* so no one step dominates. **Precondition** (keeps the
+   public-vs-stats thesis): the statistical favorite must be the side the public
+   is fading. Then:
+   ```
+   confidence = W_EDGE·edge_strength + W_FADE·fade_strength + W_WC·wincond_strength
+     edge_strength    = clamp(team_score margin / EDGE_FULL, 0..1)   (how big the stat edge is)
+     fade_strength    = |public blended_lean|                        (how hard the public is on the other side)
+     wincond_strength = complete_win_condition_hits / 5              (how often it met the full win condition)
+   ```
+   A game is picked when `confidence ≥ CONF_MIN`. Because the components trade off,
+   a thin stat edge can be carried by a strong fade + win condition (and vice
+   versa) — every step pulls on the result. Weights default to ~equal thirds
+   (`W_EDGE/W_FADE/W_WC`), all tunable at the top of `analysis.py`. The per-game
+   `pick_criteria` block reports the confidence **and each component's margin,
+   strength, and weight**, so you can see exactly how every step contributed.
 5. **Betting lines** — each game's `betting_lines` block splits the two sides into
    `majority` (the higher consensus %) and `non_majority`, with each side's team,
    `consensus_pct`, and `moneyline`. (covers' MLB consensus is moneyline-only —
@@ -118,9 +125,9 @@ per past game (SOS-adjusted):
 - **out_hit** — more hits than allowed
 
 Plus `avg_opp_win_pct_faced` and a `per_game` breakdown. **`complete_win_condition`
-gates the pick:** the advantage team must have met it in ≥ `WC_PICK_MIN` (3) of its
-last 5 games, on top of the public-vs-stats edge (see "What it does" above). The
-other four counts are reported for context.
+feeds the pick confidence:** its rate (hits / 5) is one of the three blended
+strengths in the decision (see "What it does" above), alongside the stat-edge size
+and the public-fade strength. The other four counts are reported for context.
 
 ### Caveats baked into the metric
 
@@ -156,8 +163,8 @@ fetch right before first pitch — a possible follow-up.)*
 **Learning from losses:** every settled pick stores its context (win-condition
 hits, stat-edge margin, underdog/favorite, odds). The ledger's `review` block
 compares wins vs losses and, once enough losses accrue, emits concrete tuning
-**suggestions** (e.g. "losses skew to lower win-condition hits → raise
-`WC_PICK_MIN`"). It's a *reporting* aid that surfaces what to change — it does not
+**suggestions** (e.g. "losses skew to lower win-condition hits → raise `W_WC` or
+`CONF_MIN`"). It's a *reporting* aid that surfaces what to change — it does not
 silently rewrite the formula.
 
 `src/backtest.py` is a point-in-time *historical* backtest (forum-only public

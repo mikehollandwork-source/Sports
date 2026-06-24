@@ -76,8 +76,8 @@ def build_summary(payload: dict) -> str:
     out = [f"# MLB Public-vs-Stats Picks — {date}", ""]
 
     if not picks:
-        out.append("**No edge picks today.** No game had the public on the wrong "
-                   "side of a team that also met the win condition (≥ 3/5).")
+        out.append("**No edge picks today.** No game cleared the confidence threshold "
+                   "while the public was fading the statistical favorite.")
     else:
         out.append(f"**{len(picks)} pick(s): {', '.join(picks)}**")
         out.append("")
@@ -85,13 +85,19 @@ def build_summary(payload: dict) -> str:
             if not g.get("flagged"):
                 continue
             sa, pm, pc = g["statistical_advantage"], g["public_majority"], g["pick_criteria"]
+            c = pc["components"]
             bl = g.get("betting_lines")
             out.append(f"## ✅ {g['pick']} — {g['matchup']}")
+            out.append(f"- **Confidence {pc['confidence']}** (≥ {pc['threshold']}) = "
+                       f"edge {c['stat_edge']['strength']} · "
+                       f"fade {c['public_fade']['strength']} · "
+                       f"win-cond {c['win_condition']['strength']}")
             out.append(f"- Statistical edge: **{sa['team']}** "
-                       f"(home {sa['home_score']} / away {sa['away_score']})")
-            out.append(f"- Public is on (and we fade): **{pm['team']}**")
-            out.append(f"- Win condition met **{pc['complete_win_condition_hits']}/5** "
-                       f"(threshold {pc['threshold']})")
+                       f"(home {sa['home_score']} / away {sa['away_score']}, "
+                       f"margin {c['stat_edge']['margin']})")
+            out.append(f"- Public is on (and we fade): **{pm['team']}** "
+                       f"(fade strength {c['public_fade']['strength']})")
+            out.append(f"- Win condition: **{c['win_condition']['hits']}/5**")
             if bl:
                 m, n = bl["majority"], bl["non_majority"]
                 out.append(f"- Moneyline: pick **{n['team']} {n['moneyline']}** — "

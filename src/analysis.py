@@ -60,10 +60,14 @@ SOS_CLAMP = (0.80, 1.25)
 PUBLIC_W_FORUM = 0.65
 PUBLIC_W_CONSENSUS = 0.35
 
-# A game is only picked when the advantage team also met the FULL win condition
-# (scored its target AND held the opponent under its ceiling, SOS-adjusted) in at
-# least this many of its last 5 games.
-WC_PICK_MIN = 3
+# Pick decision: blend every signal's STRENGTH into one confidence in [0, 1] so no
+# single step dominates. A game is picked when the statistical favorite is also the
+# side the public is fading (the precondition that keeps the public-vs-stats
+# thesis) AND the blended confidence >= CONF_MIN. Each component is scaled to
+# [0, 1] then combined with these ~equal weights (sum 1):
+W_EDGE, W_FADE, W_WC = 0.34, 0.33, 0.33
+EDGE_FULL = 0.40    # team_score margin that counts as a full-strength stat edge
+CONF_MIN = 0.50     # minimum blended confidence to flag a pick
 
 # Small-sample guard for last-5 FIP: a 2-IP spot start with two homers posts an
 # absurd FIP that would otherwise dominate the pitching index. Regress each FIP
@@ -111,6 +115,10 @@ def offense_line(agg: dict) -> dict:
 
 def _clamp(x: float) -> float:
     return max(SOS_CLAMP[0], min(SOS_CLAMP[1], x))
+
+
+def _clamp01(x: float) -> float:
+    return max(0.0, min(1.0, x))
 
 
 def opp_pitching_factor(opp_fip: float | None, opp_win: float | None) -> float:
@@ -392,15 +400,21 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
 
-    # The pick fires only when all three line up on the SAME (advantage) team:
-    #   1. it holds the last-5 statistical advantage  (it's adv_team by definition)
-    #   2. the public majority on covers is NOT on it (the public-vs-stats edge)
-    #   3. it met the full win condition in >= 3 of its last 5 games
-    public_vs_stats_edge = bool(majority) and adv_team.team_id != majority.team_id
+    # Precondition: there's a public read AND the statistical favorite is the side
+    # the public is fading (keeps the public-vs-stats thesis).
+    public_edge = bool(majority) and adv_team.team_id != majority.team_id
+
+    # Confidence = weighted blend of every signal's STRENGTH (each scaled to [0,1]),
+    # so a thin edge can be carried by a strong fade + win condition and vice versa
+    # - no single step decides on its own.
     adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
     wc_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
-    win_condition_met = wc_hits >= WC_PICK_MIN
-    flagged = public_vs_stats_edge and win_condition_met
+    edge_margin = abs(hs - as_)
+    edge_conf = _clamp01(edge_margin / EDGE_FULL)
+    fade_conf = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
+    wc_conf = (wc_hits / 5.0) if adv_wc else 0.0
+    confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf + W_WC * wc_conf, 3)
+    flagged = public_edge and confidence >= CONF_MIN
 
     return {
         "game_pk": game.game_pk,
@@ -422,10 +436,17 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "away": wc_away,
         },
         "pick_criteria": {
-            "public_vs_stats_edge": public_vs_stats_edge,
-            "win_condition_met": win_condition_met,
-            "complete_win_condition_hits": wc_hits,
-            "threshold": WC_PICK_MIN,
+            "public_edge": public_edge,
+            "confidence": confidence,
+            "threshold": CONF_MIN,
+            "components": {
+                "stat_edge": {"margin": round(edge_margin, 3), "strength": round(edge_conf, 3),
+                              "weight": W_EDGE},
+                "public_fade": {"blended_lean": majority_detail.get("blended_lean"),
+                                "strength": round(fade_conf, 3), "weight": W_FADE},
+                "win_condition": {"hits": wc_hits, "strength": round(wc_conf, 3), "weight": W_WC},
+            },
+            "win_condition_hits": wc_hits,
         },
         "flagged": flagged,
         "pick": adv_team.name if flagged else None,

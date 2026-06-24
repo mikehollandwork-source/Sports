@@ -109,7 +109,8 @@ def grade_date(date: str) -> list[dict]:
             "odds_source": "pick-time moneyline" if ml is not None else "assumed even (+100)",
             "profit": round(american_profit(odds) if won else -STAKE, 2),
             # context kept so losses can be reviewed / the formula tuned (item 3)
-            "win_condition_hits": pc.get("complete_win_condition_hits"),
+            "win_condition_hits": pc.get("win_condition_hits"),
+            "confidence": pc.get("confidence"),
             "edge_margin": round(abs((sa.get("home_score") or 0) - (sa.get("away_score") or 0)), 3),
             "underdog": odds > 0,
         })
@@ -175,10 +176,10 @@ def _suggestions(rev: dict) -> list[str]:
         return out
     wc_w, wc_l = rev["avg_win_cond_hits_on_wins"], rev["avg_win_cond_hits_on_losses"]
     if wc_w is not None and wc_l is not None and wc_l + 0.5 < wc_w:
-        out.append("Losses skew to lower win-condition hits — try raising WC_PICK_MIN (3 → 4).")
+        out.append("Losses skew to lower win-condition hits — raise W_WC or CONF_MIN.")
     em_w, em_l = rev["avg_edge_margin_on_wins"], rev["avg_edge_margin_on_losses"]
     if em_w is not None and em_l is not None and em_l + 0.05 < em_w:
-        out.append("Losses have thinner stat edges — try a minimum edge_margin to flag a pick.")
+        out.append("Losses have thinner stat edges — raise W_EDGE or CONF_MIN.")
     if rev["losses_as_favorite"] >= 4 and rev["losses_as_favorite"] >= 2 * max(1, rev["losses_as_underdog"]):
         out.append("Most losses are favorites (-odds) — consider an underdog-only filter.")
     return out
