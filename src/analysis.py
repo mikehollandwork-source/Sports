@@ -308,9 +308,9 @@ def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
 
 
 def betting_lines(game: Game, consensus: dict) -> dict | None:
-    """Each side's moneyline + run line, split into the public-majority side (the
-    higher consensus %) and the side the public is fading. Returns None if this
-    game has no consensus row."""
+    """Each side's moneyline, split into the public-majority side (the higher
+    consensus %) and the side the public is fading. Returns None if this game has
+    no consensus row. (covers' MLB consensus is moneyline-only - no run line.)"""
     sides = _match_consensus(game, consensus)
     if not sides:
         return None
@@ -322,7 +322,6 @@ def betting_lines(game: Game, consensus: dict) -> dict | None:
             "team": _resolve(game, side["abbr"]).name,
             "consensus_pct": side["pct"],
             "moneyline": side["moneyline"],
-            "run_line": side["run_line"],
         }
 
     return {"majority": fmt(majority), "non_majority": fmt(non_majority)}

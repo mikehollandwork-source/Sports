@@ -23,6 +23,10 @@ For every MLB game on a given day:
 
    The per-game `pick_criteria` block shows each of the three flags so you can see
    why a game did or didn't make the cut. The threshold lives in `WC_PICK_MIN`.
+5. **Betting lines** — each game's `betting_lines` block splits the two sides into
+   `majority` (the higher consensus %) and `non_majority`, with each side's team,
+   `consensus_pct`, and `moneyline`. (covers' MLB consensus is moneyline-only —
+   it carries no run-line/spread consensus, so only the moneyline is attached.)
 
 Output: `output/picks_<date>.json` — full per-game breakdown plus a top-level
 `picks` list.
