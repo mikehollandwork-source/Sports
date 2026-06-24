@@ -11,9 +11,16 @@ For every MLB game on a given day:
    (`statsapi.mlb.com`, free, no key).
 2. **Last-5-game stats** — each team's hitters' OPS over their last 5 games, and
    the probable starter's ERA/WHIP over their last 5 outings (MLB API).
-3. **Public majority** — from covers.com, two ways:
+3. **Public majority** — from covers.com, two signals **blended into a lean
+   toward the home team**, where the **forum is weighted higher** than consensus
+   (`PUBLIC_W_FORUM 0.65` vs `PUBLIC_W_CONSENSUS 0.35` in `analysis.py`):
+   - **Forum tally** — mentions of each team across that day's MLB forum posts
+     (the heavier signal; spread/run-line posts are excluded).
    - **Consensus %** — covers' published public-betting percentages.
-   - **Forum tally** — mentions of each team across that day's MLB forum posts.
+   The blend's sign picks the public side; either signal alone decides if it's the
+   only one present, and a tied signal lets the other break it. `public_majority.
+   detail` reports both leans, the blend, and whether they agree — so a strong
+   forum read can outvote a strong consensus (raise/lower `PUBLIC_W_FORUM` to taste).
 4. **Pick the team** — a team is added to the day's `picks` only when **all three**
    line up on it:
    - it holds the **last-5 statistical advantage** (higher `team_score`), **and**
