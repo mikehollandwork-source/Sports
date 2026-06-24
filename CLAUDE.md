@@ -121,7 +121,15 @@ unit-testable with mock `Game`/`Team` objects.
   live at the top of `analysis.py` — keep the formula in one place. It is
   last-5-only, league-relative, additive: `offense_index + pitching_index`, where
   offense blends park-neutralized wOBA/ISO/discipline/speed with a platoon tilt and
-  pitching is starter+bullpen FIP. `park_factors.py` holds the static park table.
+  pitching is starter+bullpen FIP. Both sides are strength-of-schedule adjusted.
+  `park_factors.py` holds the static park table; `strength.py` fetches opponent
+  season win%/wOBA/FIP (cached) and `analysis.opp_*_factor` turn them into clamped
+  multipliers.
+- **Win condition** (`win_condition` in `analysis.py`): per-matchup `runs_to_win`
+  and `runs_to_allow` bars, back-tested over the team's last 5 games (each re-rated
+  by opponent strength) into counts of scored_target / held_under_ceiling /
+  complete_win_condition / actually_won / out_hit. Reporting only — it does not
+  change the flagged pick. `team_last5_gamelog` supplies the per-game data.
 - Match the existing defensive style: degrade gracefully on network/parse errors;
   never let one game's failure abort the whole run.
 

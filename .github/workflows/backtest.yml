@@ -1,0 +1,58 @@
+name: Backtest
+
+# Reconstructs what the edge finder would have picked over the last N days and
+# settles those picks at $1 each (even money). Manual trigger only.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days back to backtest"
+        required: false
+        default: "10"
+      end:
+        description: "Last date (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run backtest
+        env:
+          BT_END: ${{ github.event.inputs.end }}
+          BT_DAYS: ${{ github.event.inputs.days }}
+        run: |
+          ARGS="--days ${BT_DAYS:-10}"
+          if [ -n "$BT_END" ]; then ARGS="$ARGS --end $BT_END"; fi
+          python -m src.backtest $ARGS
+
+      - name: Post backtest issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "Backtest $(date -u +%Y-%m-%d)" --body-file output/latest_backtest.md
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --staged --quiet; then
+            echo "No report changes."
+          else
+            git commit -m "Backtest report ($(date -u +%Y-%m-%d))"
+            git push
+          fi

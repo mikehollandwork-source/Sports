@@ -10,12 +10,22 @@ on:
         description: "Date to analyze (YYYY-MM-DD). Blank = today (US/Eastern)."
         required: false
         default: ""
+      covers_debug:
+        description: "Dump raw covers.com HTML to output/covers_debug/ (for fixing selectors)."
+        type: boolean
+        required: false
+        default: false
+      grade_date:
+        description: "Date to grade for the bankroll (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
+        required: false
+        default: ""
   schedule:
     # 15:00 UTC ~= 11:00 ET, after lineups/probables are usually posted.
     - cron: "0 15 * * *"
 
 permissions:
   contents: write  # allow committing the output JSON back to the repo
+  issues: write    # allow posting the daily picks issue
 
 jobs:
   build-picks:
@@ -30,10 +40,30 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Grade prior day's picks (running bankroll)
+        env:
+          GRADE_DATE: ${{ github.event.inputs.grade_date }}
+        run: python -m src.grade   # GRADE_DATE blank -> yesterday US/Eastern
+
       - name: Run edge finder
         env:
           PICKS_DATE: ${{ github.event.inputs.date }}
+          COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
         run: python -m src.main
+
+      - name: Post daily picks issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(cat output/latest_date.txt)
+          BODY=output/latest_summary.md
+          existing=$(gh issue list --search "Picks $DATE in:title" --state all \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$BODY"
+          else
+            gh issue create --title "Picks $DATE" --body-file "$BODY"
+          fi
 
       - name: Commit results
         run: |
