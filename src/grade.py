@@ -40,9 +40,25 @@ def american_profit(odds: int, stake: float = STAKE) -> float:
 
 
 def empty_ledger() -> dict:
-    return {"bankroll": 0.0, "stake": STAKE, "odds_assumption": f"+{ODDS} (even money)",
+    return {"bankroll": 0.0, "stake": STAKE,
+            "odds_basis": "pick-time moneyline when recorded, else +100 (even money)",
             "record": {"wins": 0, "losses": 0, "picks": 0},
             "entries": []}
+
+
+def _pick_moneyline(g: dict) -> int | None:
+    """The pick's actual moneyline captured at pick time (from betting_lines),
+    as an int (+104, -115). None if this game had no recorded line."""
+    bl = g.get("betting_lines")
+    if not bl:
+        return None
+    for side in (bl.get("majority"), bl.get("non_majority")):
+        if side and side.get("team") == g.get("pick") and side.get("moneyline"):
+            try:
+                return int(str(side["moneyline"]).replace("+", ""))
+            except (ValueError, TypeError):
+                return None
+    return None
 
 
 def load_ledger() -> dict:
@@ -75,6 +91,10 @@ def grade_date(date: str) -> list[dict]:
             log.info("skip ungraded pick %s (%s)", g.get("pick"), g.get("matchup"))
             continue
         won = res["winner"] == g["pick"]
+        ml = _pick_moneyline(g)
+        odds = ml if ml is not None else ODDS
+        sa = g.get("statistical_advantage", {})
+        pc = g.get("pick_criteria", {})
         settled.append({
             "key": f"{date}#{g['game_pk']}",
             "date": date,
@@ -82,8 +102,13 @@ def grade_date(date: str) -> list[dict]:
             "pick": g["pick"],
             "result": "W" if won else "L",
             "score": f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}",
-            "odds": ODDS,
-            "profit": round(american_profit(ODDS) if won else -STAKE, 2),
+            "odds": odds,
+            "odds_source": "pick-time moneyline" if ml is not None else "assumed even (+100)",
+            "profit": round(american_profit(odds) if won else -STAKE, 2),
+            # context kept so losses can be reviewed / the formula tuned (item 3)
+            "win_condition_hits": pc.get("complete_win_condition_hits"),
+            "edge_margin": round(abs((sa.get("home_score") or 0) - (sa.get("away_score") or 0)), 3),
+            "underdog": odds > 0,
         })
     return settled
 
@@ -107,6 +132,7 @@ def update_ledger(date: str) -> dict:
         added += 1
 
     if added:
+        ledger["review"] = review(ledger)
         save_ledger(ledger)
         log.info("graded %s: +%d pick(s), bankroll now %+.2f",
                  date, added, ledger["bankroll"])
@@ -115,12 +141,66 @@ def update_ledger(date: str) -> dict:
     return ledger
 
 
+def _avg(xs: list) -> float | None:
+    xs = [x for x in xs if x is not None]
+    return round(sum(xs) / len(xs), 2) if xs else None
+
+
+def review(ledger: dict) -> dict:
+    """Summarize wins vs losses so each loss makes the system tunable (item 3).
+    Reporting only - it surfaces what to change, it does not change the formula."""
+    e = ledger["entries"]
+    wins = [x for x in e if x["result"] == "W"]
+    losses = [x for x in e if x["result"] == "L"]
+    rev = {
+        "wins": len(wins), "losses": len(losses),
+        "avg_win_cond_hits_on_wins": _avg([x.get("win_condition_hits") for x in wins]),
+        "avg_win_cond_hits_on_losses": _avg([x.get("win_condition_hits") for x in losses]),
+        "avg_edge_margin_on_wins": _avg([x.get("edge_margin") for x in wins]),
+        "avg_edge_margin_on_losses": _avg([x.get("edge_margin") for x in losses]),
+        "losses_as_underdog": sum(1 for x in losses if x.get("underdog")),
+        "losses_as_favorite": sum(1 for x in losses if x.get("underdog") is False),
+    }
+    rev["suggestions"] = _suggestions(rev)
+    return rev
+
+
+def _suggestions(rev: dict) -> list[str]:
+    """Actionable tuning hints once enough losses have accrued (>= 4)."""
+    out: list[str] = []
+    if rev["losses"] < 4:
+        return out
+    wc_w, wc_l = rev["avg_win_cond_hits_on_wins"], rev["avg_win_cond_hits_on_losses"]
+    if wc_w is not None and wc_l is not None and wc_l + 0.5 < wc_w:
+        out.append("Losses skew to lower win-condition hits — try raising WC_PICK_MIN (3 → 4).")
+    em_w, em_l = rev["avg_edge_margin_on_wins"], rev["avg_edge_margin_on_losses"]
+    if em_w is not None and em_l is not None and em_l + 0.05 < em_w:
+        out.append("Losses have thinner stat edges — try a minimum edge_margin to flag a pick.")
+    if rev["losses_as_favorite"] >= 4 and rev["losses_as_favorite"] >= 2 * max(1, rev["losses_as_underdog"]):
+        out.append("Most losses are favorites (-odds) — consider an underdog-only filter.")
+    return out
+
+
 def bankroll_line(ledger: dict | None = None) -> str:
     """One-line bankroll summary for the daily issue."""
     ledger = ledger or load_ledger()
     r = ledger["record"]
     return (f"**Running bankroll: {ledger['bankroll']:+.2f} units** "
-            f"({r['wins']}-{r['losses']} on {r['picks']} picks, $1/pick at even money)")
+            f"({r['wins']}-{r['losses']} on {r['picks']} picks, $1/pick; "
+            f"pick-time moneyline odds, even-money fallback)")
+
+
+def review_line(ledger: dict | None = None) -> str:
+    """Loss-review note for the daily issue (empty until there are losses)."""
+    ledger = ledger or load_ledger()
+    rev = ledger.get("review") or review(ledger)
+    if not rev["losses"]:
+        return ""
+    parts = [f"**Loss review:** {rev['losses']} loss(es); "
+             f"avg win-condition hits — wins {rev['avg_win_cond_hits_on_wins']} "
+             f"vs losses {rev['avg_win_cond_hits_on_losses']}."]
+    parts += [f"→ {s}" for s in rev["suggestions"]]
+    return " ".join(parts)
 
 
 def yesterday_eastern() -> str:

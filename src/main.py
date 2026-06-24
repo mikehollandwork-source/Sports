@@ -100,6 +100,10 @@ def build_summary(payload: dict) -> str:
 
     out.append("")
     out.append(grade.bankroll_line())
+    rev = grade.review_line()
+    if rev:
+        out.append("")
+        out.append(rev)
     out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
     return "\n".join(out)
 

@@ -138,10 +138,20 @@ today's picks, so the bankroll line shows up in the daily issue and the ledger
 is committed back. Grading is idempotent per pick (by `game_pk`), so re-running a
 partially-complete day safely catches late finishers without double-counting.
 
-We have no true historical closing odds (covers serves only current lines), so
-settlement assumes **even money (+100)**: a win is +$1.00, a loss −$1.00, and the
-bankroll is simply wins − losses. Run a specific date with
-`python -m src.grade --date YYYY-MM-DD` (or the `grade_date` workflow input).
+Settlement uses each pick's **moneyline captured at pick time** (from
+`betting_lines`): a $1 win pays the American odds (e.g. +106 → +$1.06), a loss is
+−$1.00. Picks with no recorded line (forum-only games covers' consensus didn't
+list) fall back to **even money (+100)**. Each entry records the odds and its
+source. Run a specific date with `python -m src.grade --date YYYY-MM-DD` (or the
+`grade_date` workflow input). *(True closing odds would need a separate odds-page
+fetch right before first pitch — a possible follow-up.)*
+
+**Learning from losses:** every settled pick stores its context (win-condition
+hits, stat-edge margin, underdog/favorite, odds). The ledger's `review` block
+compares wins vs losses and, once enough losses accrue, emits concrete tuning
+**suggestions** (e.g. "losses skew to lower win-condition hits → raise
+`WC_PICK_MIN`"). It's a *reporting* aid that surfaces what to change — it does not
+silently rewrite the formula.
 
 `src/backtest.py` is a point-in-time *historical* backtest (forum-only public
 signal, even money). **Known limitation:** the covers forum listing exposes only
@@ -190,9 +200,12 @@ python -m src.main --date 2026-06-23   # omit --date for today (US/Eastern)
 - **Forum sentiment is a blunt heuristic.** "Majority side" from forum text is a
   raw mention tally — it matches each team by name/nickname/city **and its
   abbreviation** (BOS, NYY, …), the abbreviation on word boundaries so a short
-  code can't trigger inside another word (e.g. "bosses"). It does not understand
-  fades, sarcasm, or parlays. Treat the consensus % as the stronger signal; the
-  forum tally is corroboration.
+  code can't trigger inside another word (e.g. "bosses"). **Run-line / spread
+  picks are disregarded:** each mention owns the text up to the next team
+  mention, and if that text is a spread context (`-1.5`, `run line`, `RL`,
+  `cover`, `ATS`) it isn't counted toward the *moneyline* tally — an explicit
+  `ML` overrides. It still doesn't understand fades, sarcasm, or parlays. Treat
+  the consensus % as the stronger signal; the forum tally is corroboration.
 - **This is not betting advice.** A last-5-games stat edge ignores matchups,
   bullpens, weather, injuries, lineups, and market prices. It's a research
   signal, nothing more. Bet responsibly.

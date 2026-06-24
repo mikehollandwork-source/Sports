@@ -185,17 +185,52 @@ def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
 
     matchers = {name: _team_patterns(name, abbr) for name, abbr in teams}
     for body in posts:
-        low = body.lower()
-        for name, pats in matchers.items():
-            if _mentions(low, pats):
-                counts[name] += 1
+        for name in _post_moneyline_teams(body.lower(), matchers):
+            counts[name] += 1
     return counts
 
 
-def _mentions(low_text: str, pats: dict) -> bool:
-    if any(s in low_text for s in pats["subs"]):
-        return True
-    return any(re.search(rf"\b{re.escape(w)}\b", low_text) for w in pats["words"])
+# Run-line / spread language: a pick written next to one of these is a SPREAD
+# pick (e.g. "NYY -1.5", "Sox run line", "take the Yanks to cover), NOT a
+# moneyline pick - it should not feed the moneyline-based public tally.
+SPREAD_RE = re.compile(r"[+-]\s?1\.5|1½|\brun[- ]?line\b|\brl\b|\bspread\b|\bats\b"
+                       r"|\bcover(?:s|ed|ing)?\b", re.I)
+# Explicit moneyline language overrides a nearby spread marker.
+ML_RE = re.compile(r"\bml\b|\bmoney\s?line\b|\bm/?l\b|\bstraight[- ]?up\b|\bsu\b", re.I)
+
+
+def _mention_spans(low_text: str, pats: dict) -> list[tuple[int, int]]:
+    """Character spans where this team is named (substrings + boundaried abbr)."""
+    spans: list[tuple[int, int]] = []
+    for s in pats["subs"]:
+        i = low_text.find(s)
+        while i != -1:
+            spans.append((i, i + len(s)))
+            i = low_text.find(s, i + 1)
+    for w in pats["words"]:
+        spans.extend(m.span() for m in re.finditer(rf"\b{re.escape(w)}\b", low_text))
+    return spans
+
+
+def _post_moneyline_teams(low_text: str, matchers: dict) -> set[str]:
+    """Teams leaned on as MONEYLINE picks in a post. Each team mention owns the
+    text from it up to the next team mention, so a run-line/spread marker is
+    attributed to the pick it follows (e.g. 'NYY ML, BOS -1.5' -> NYY only).
+    A team is counted unless every one of its segments is a spread pick; an
+    explicit 'ML' always counts."""
+    marks: list[tuple[int, int, str]] = []
+    for name, pats in matchers.items():
+        for a, b in _mention_spans(low_text, pats):
+            marks.append((a, b, name))
+    marks.sort()
+
+    out: set[str] = set()
+    for i, (a, _b, name) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(low_text)
+        scope = low_text[a:end]
+        if ML_RE.search(scope) or not SPREAD_RE.search(scope):
+            out.add(name)
+    return out
 
 
 def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
@@ -254,10 +289,8 @@ def forum_day_counts(teams: list[tuple[str, str]], dates: list[str],
             break
         for d, body in dated:
             if d in counts:
-                low = body.lower()
-                for name, pats in matchers.items():
-                    if _mentions(low, pats):
-                        counts[d][name] += 1
+                for name in _post_moneyline_teams(body.lower(), matchers):
+                    counts[d][name] += 1
         if min(d for d, _ in dated) < earliest:  # paged past our window
             break
     return counts
