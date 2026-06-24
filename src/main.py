@@ -74,9 +74,58 @@ def _ranked(games: list) -> list:
                   reverse=True)
 
 
+def _edge_word(strength: float) -> str:
+    return "strong" if strength >= 0.66 else "moderate" if strength >= 0.33 else "slight"
+
+
+def _public_evidence(g: dict) -> str:
+    """Plain description of who the public is on and the evidence behind it,
+    in away–home order to match the matchup."""
+    det = g["public_majority"]["detail"]
+    team = g["public_majority"]["team"]
+    if not team:
+        return "no public read (forum + consensus both empty)"
+    bits = []
+    fo = det.get("forum")
+    if fo:
+        bits.append(f"forum {fo['away']}–{fo['home']} (away–home)")
+    co = det.get("consensus")
+    if co:
+        bits.append("consensus " + "–".join(f"{int(round(v))}%" for v in co["pcts"].values()))
+    return f"{team}" + (f" [{', '.join(bits)}]" if bits else "")
+
+
+def _game_lines(g: dict) -> list[str]:
+    """Two-to-three readable lines breaking down one matchup for the board."""
+    pc = g["pick_criteria"]
+    c = pc["components"]
+    adv, conf = pc["advantage_team"], pc["confidence"]
+    e = c["stat_edge"]
+    edge = f"{adv} ({_edge_word(e['strength'])}, margin {e['margin']})"
+    wc = c["win_condition"]["hits"]
+    pub = _public_evidence(g)
+    if g.get("flagged"):
+        bl = g.get("betting_lines")
+        ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
+        return [
+            f"✅ **{adv}** — {g['matchup']} · **confidence {conf}** ✓ (≥ {pc['threshold']}){ml}",
+            f"   • stat edge: {edge}",
+            f"   • public is on: {pub} → **we fade them**",
+            f"   • win condition: {wc}/5 games",
+        ]
+    return [
+        f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {conf}",
+        f"   • stat edge: {edge}",
+        f"   • public is on: {pub}",
+        f"   • win condition: {wc}/5 games",
+        f"   • why not a pick: {pc['reason']}",
+    ]
+
+
 def build_summary(payload: dict) -> str:
-    """Markdown board for the daily issue: every matchup, its advantage team, a
-    check for picks and a labelled LEAN (with the reason) for the rest."""
+    """Markdown board for the daily issue: every matchup broken down — advantage
+    team, the public read + evidence, win condition, and a check (pick) or the
+    specific reason it's only a lean."""
     date = payload["date"]
     picks = payload.get("picks", [])
     out = [f"# MLB Board — {date}", ""]
@@ -85,22 +134,12 @@ def build_summary(payload: dict) -> str:
     out.append("")
 
     for g in _ranked(payload.get("games", [])):
-        pc = g["pick_criteria"]
-        c = pc["components"]
-        adv = pc["advantage_team"]
-        comp = (f"edge {c['stat_edge']['strength']}/fade {c['public_fade']['strength']}/"
-                f"wc {c['win_condition']['strength']}")
-        if g.get("flagged"):
-            bl = g.get("betting_lines")
-            ml = f" · {bl['non_majority']['moneyline']}" if bl else ""
-            out.append(f"✅ **{adv}** · {g['matchup']} · conf **{pc['confidence']}** "
-                       f"({comp}){ml} · fading {g['public_majority']['team']}")
-        else:
-            out.append(f"🔸 LEAN **{adv}** · {g['matchup']} · conf {pc['confidence']} "
-                       f"({comp}) · {pc['reason']}")
-    out.append("")
-    out.append("_✅ = pick (public fading the stat favorite + confidence ≥ threshold); "
-               "🔸 = lean (advantage team shown, with why it missed)._")
+        out.extend(_game_lines(g))
+        out.append("")
+
+    out.append("_✅ = pick (the public is fading the stat favorite and confidence ≥ threshold). "
+               "🔸 = lean: the advantage team is shown, but it's not a play — usually because the "
+               "public agrees with the stats (no one to fade) or confidence fell short._")
 
     out.append("")
     out.append(grade.bankroll_line())
@@ -136,13 +175,16 @@ def telegram_text(payload: dict) -> str:
     for g in _ranked(payload.get("games", [])):
         pc = g["pick_criteria"]
         adv = pc["advantage_team"]
+        wc = pc["components"]["win_condition"]["hits"]
         if g.get("flagged"):
             bl = g.get("betting_lines")
             ml = f" {bl['non_majority']['moneyline']}" if bl else ""
-            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {pc['confidence']} — "
-                         f"fading {g['public_majority']['team']}")
+            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {pc['confidence']}")
+            lines.append(f"   edge {_edge_word(pc['components']['stat_edge']['strength'])}, "
+                         f"win-cond {wc}/5; public on {_public_evidence(g)} → we fade")
         else:
-            lines.append(f"🔸 {adv} ({g['matchup']}) conf {pc['confidence']} — {pc['reason']}")
+            lines.append(f"🔸 {adv} ({g['matchup']}) conf {pc['confidence']}")
+            lines.append(f"   public on {_public_evidence(g)}; win-cond {wc}/5 — {pc['reason']}")
     lines.append(grade.bankroll_line().replace("**", ""))
     ts = tune.status_line().replace("**", "")
     if ts:
