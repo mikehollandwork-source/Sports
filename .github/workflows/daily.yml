@@ -49,6 +49,8 @@ jobs:
         env:
           PICKS_DATE: ${{ github.event.inputs.date }}
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
 
       - name: Post daily picks issue

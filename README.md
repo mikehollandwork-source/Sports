@@ -11,18 +11,32 @@ For every MLB game on a given day:
    (`statsapi.mlb.com`, free, no key).
 2. **Last-5-game stats** — each team's hitters' OPS over their last 5 games, and
    the probable starter's ERA/WHIP over their last 5 outings (MLB API).
-3. **Public majority** — from covers.com, two ways:
+3. **Public majority** — from covers.com, two signals **blended into a lean
+   toward the home team**, where the **forum is weighted higher** than consensus
+   (`PUBLIC_W_FORUM 0.65` vs `PUBLIC_W_CONSENSUS 0.35` in `analysis.py`):
+   - **Forum tally** — mentions of each team across that day's MLB forum posts
+     (the heavier signal; spread/run-line posts are excluded).
    - **Consensus %** — covers' published public-betting percentages.
-   - **Forum tally** — mentions of each team across that day's MLB forum posts.
-4. **Pick the team** — a team is added to the day's `picks` only when **all three**
-   line up on it:
-   - it holds the **last-5 statistical advantage** (higher `team_score`), **and**
-   - the covers.com **public majority is *not* on it** (the public-vs-stats edge), **and**
-   - it **met the full win condition in ≥ 3 of its last 5 games** (scored its target
-     *and* held the opponent under its ceiling, SOS-adjusted).
-
-   The per-game `pick_criteria` block shows each of the three flags so you can see
-   why a game did or didn't make the cut. The threshold lives in `WC_PICK_MIN`.
+   The blend's sign picks the public side; either signal alone decides if it's the
+   only one present, and a tied signal lets the other break it. `public_majority.
+   detail` reports both leans, the blend, and whether they agree — so a strong
+   forum read can outvote a strong consensus (raise/lower `PUBLIC_W_FORUM` to taste).
+4. **Pick the team** — a single **confidence score** blends every signal's
+   *strength* so no one step dominates. **Precondition** (keeps the
+   public-vs-stats thesis): the statistical favorite must be the side the public
+   is fading. Then:
+   ```
+   confidence = W_EDGE·edge_strength + W_FADE·fade_strength + W_WC·wincond_strength
+     edge_strength    = clamp(team_score margin / EDGE_FULL, 0..1)   (how big the stat edge is)
+     fade_strength    = |public blended_lean|                        (how hard the public is on the other side)
+     wincond_strength = complete_win_condition_hits / 5              (how often it met the full win condition)
+   ```
+   A game is picked when `confidence ≥ CONF_MIN`. Because the components trade off,
+   a thin stat edge can be carried by a strong fade + win condition (and vice
+   versa) — every step pulls on the result. Weights default to ~equal thirds
+   (`W_EDGE/W_FADE/W_WC`), all tunable at the top of `analysis.py`. The per-game
+   `pick_criteria` block reports the confidence **and each component's margin,
+   strength, and weight**, so you can see exactly how every step contributed.
 5. **Betting lines** — each game's `betting_lines` block splits the two sides into
    `majority` (the higher consensus %) and `non_majority`, with each side's team,
    `consensus_pct`, and `moneyline`. (covers' MLB consensus is moneyline-only —
@@ -111,9 +125,9 @@ per past game (SOS-adjusted):
 - **out_hit** — more hits than allowed
 
 Plus `avg_opp_win_pct_faced` and a `per_game` breakdown. **`complete_win_condition`
-gates the pick:** the advantage team must have met it in ≥ `WC_PICK_MIN` (3) of its
-last 5 games, on top of the public-vs-stats edge (see "What it does" above). The
-other four counts are reported for context.
+feeds the pick confidence:** its rate (hits / 5) is one of the three blended
+strengths in the decision (see "What it does" above), alongside the stat-edge size
+and the public-fade strength. The other four counts are reported for context.
 
 ### Caveats baked into the metric
 
@@ -138,10 +152,29 @@ today's picks, so the bankroll line shows up in the daily issue and the ledger
 is committed back. Grading is idempotent per pick (by `game_pk`), so re-running a
 partially-complete day safely catches late finishers without double-counting.
 
-We have no true historical closing odds (covers serves only current lines), so
-settlement assumes **even money (+100)**: a win is +$1.00, a loss −$1.00, and the
-bankroll is simply wins − losses. Run a specific date with
-`python -m src.grade --date YYYY-MM-DD` (or the `grade_date` workflow input).
+Settlement uses each pick's **moneyline captured at pick time** (from
+`betting_lines`): a $1 win pays the American odds (e.g. +106 → +$1.06), a loss is
+−$1.00. Picks with no recorded line (forum-only games covers' consensus didn't
+list) fall back to **even money (+100)**. Each entry records the odds and its
+source. Run a specific date with `python -m src.grade --date YYYY-MM-DD` (or the
+`grade_date` workflow input). *(True closing odds would need a separate odds-page
+fetch right before first pitch — a possible follow-up.)*
+
+**Learning from losses:** every settled pick stores its context (win-condition
+hits, stat-edge margin, each component's strength, underdog/favorite, odds). The
+ledger's `review` block compares wins vs losses and emits tuning **suggestions**.
+
+**Bankroll auto-tuning** (`src/tune.py`): after each grading, selectivity adapts
+to recent results and is written to `output/tuning.json`, which `analysis.py`
+loads on the next run. It's deliberately simple — **get stricter after losing
+days, ease back when it recovers**:
+- One losing day is ignored. After **back-to-back losing days** the pick bar
+  `CONF_MIN` rises by `STRICT_STEP` (0.03) per additional consecutive losing day,
+  capped at `CONF_MIN_MAX` (0.65) — e.g. 2 days → 0.53, 3 → 0.56.
+- The moment a day turns a **profit**, `CONF_MIN` snaps back to the 0.50 default.
+
+Nothing else changes (weights stay put), it's fully **reversible** (delete
+`tuning.json`), and the daily issue shows the current streak / bar.
 
 `src/backtest.py` is a point-in-time *historical* backtest (forum-only public
 signal, even money). **Known limitation:** the covers forum listing exposes only
@@ -150,6 +183,26 @@ reconstructed without crawling into individual threads (not built) — so it
 currently finds ~0 picks. The forward bankroll above is the real measure of
 performance; the backtest's point-in-time machinery is correct and waits on that
 thread crawler.
+
+## Pre-game refresh + Telegram
+
+`.github/workflows/pregame.yml` polls every ~15 min during game hours and, **~30
+minutes before each distinct first-pitch time, regenerates the day's picks once**
+so they use confirmed lineups and the latest lines. `src/pregame.py` groups games
+by start time, so **simultaneous games are one "slot" = one run** (no double
+runs), and a per-day `output/pregame_state_<date>.json` dedupes each slot across
+polls. (Actions cron is ~15-min granular and can be delayed, so "30 min before" is
+approximate — it fires roughly T-15 to T-45.)
+
+**Telegram delivery** (`src/notify.py`): both the daily run and each pre-game
+refresh send the picks to Telegram (the pre-game refresh only when the pick set
+changed). To enable it, add two repo **secrets**:
+- `TELEGRAM_BOT_TOKEN` — create a bot via [@BotFather](https://t.me/BotFather).
+- `TELEGRAM_CHAT_ID` — message your bot once, then read your id from
+  `https://api.telegram.org/bot<token>/getUpdates`.
+
+Until those secrets are set, Telegram sending no-ops quietly and everything else
+runs normally.
 
 ## Running it
 
@@ -190,9 +243,12 @@ python -m src.main --date 2026-06-23   # omit --date for today (US/Eastern)
 - **Forum sentiment is a blunt heuristic.** "Majority side" from forum text is a
   raw mention tally — it matches each team by name/nickname/city **and its
   abbreviation** (BOS, NYY, …), the abbreviation on word boundaries so a short
-  code can't trigger inside another word (e.g. "bosses"). It does not understand
-  fades, sarcasm, or parlays. Treat the consensus % as the stronger signal; the
-  forum tally is corroboration.
+  code can't trigger inside another word (e.g. "bosses"). **Run-line / spread
+  picks are disregarded:** each mention owns the text up to the next team
+  mention, and if that text is a spread context (`-1.5`, `run line`, `RL`,
+  `cover`, `ATS`) it isn't counted toward the *moneyline* tally — an explicit
+  `ML` overrides. It still doesn't understand fades, sarcasm, or parlays. Treat
+  the consensus % as the stronger signal; the forum tally is corroboration.
 - **This is not betting advice.** A last-5-games stat edge ignores matchups,
   bullpens, weather, injuries, lineups, and market prices. It's a research
   signal, nothing more. Bet responsibly.

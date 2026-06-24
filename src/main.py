@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, grade
+from . import covers, grade, notify, tune
 from .analysis import evaluate_game
 from .mlb_api import enrich_with_stats, schedule_for
 
@@ -76,8 +76,8 @@ def build_summary(payload: dict) -> str:
     out = [f"# MLB Public-vs-Stats Picks — {date}", ""]
 
     if not picks:
-        out.append("**No edge picks today.** No game had the public on the wrong "
-                   "side of a team that also met the win condition (≥ 3/5).")
+        out.append("**No edge picks today.** No game cleared the confidence threshold "
+                   "while the public was fading the statistical favorite.")
     else:
         out.append(f"**{len(picks)} pick(s): {', '.join(picks)}**")
         out.append("")
@@ -85,13 +85,19 @@ def build_summary(payload: dict) -> str:
             if not g.get("flagged"):
                 continue
             sa, pm, pc = g["statistical_advantage"], g["public_majority"], g["pick_criteria"]
+            c = pc["components"]
             bl = g.get("betting_lines")
             out.append(f"## ✅ {g['pick']} — {g['matchup']}")
+            out.append(f"- **Confidence {pc['confidence']}** (≥ {pc['threshold']}) = "
+                       f"edge {c['stat_edge']['strength']} · "
+                       f"fade {c['public_fade']['strength']} · "
+                       f"win-cond {c['win_condition']['strength']}")
             out.append(f"- Statistical edge: **{sa['team']}** "
-                       f"(home {sa['home_score']} / away {sa['away_score']})")
-            out.append(f"- Public is on (and we fade): **{pm['team']}**")
-            out.append(f"- Win condition met **{pc['complete_win_condition_hits']}/5** "
-                       f"(threshold {pc['threshold']})")
+                       f"(home {sa['home_score']} / away {sa['away_score']}, "
+                       f"margin {c['stat_edge']['margin']})")
+            out.append(f"- Public is on (and we fade): **{pm['team']}** "
+                       f"(fade strength {c['public_fade']['strength']})")
+            out.append(f"- Win condition: **{c['win_condition']['hits']}/5**")
             if bl:
                 m, n = bl["majority"], bl["non_majority"]
                 out.append(f"- Moneyline: pick **{n['team']} {n['moneyline']}** — "
@@ -100,8 +106,53 @@ def build_summary(payload: dict) -> str:
 
     out.append("")
     out.append(grade.bankroll_line())
+    rev = grade.review_line()
+    if rev:
+        out.append("")
+        out.append(rev)
+    tune_status = tune.status_line()
+    if tune_status:
+        out.append("")
+        out.append(tune_status)
     out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
     return "\n".join(out)
+
+
+def write_outputs(payload: dict, date: str) -> None:
+    """Persist the picks JSON + the daily-issue artifacts (used by main and the
+    pre-game refresh)."""
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    (OUTPUT_DIR / f"picks_{date}.json").write_text(json.dumps(payload, indent=2))
+    (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))  # gitignored
+    (OUTPUT_DIR / "latest_date.txt").write_text(date)                      # gitignored
+    log.info("Wrote picks for %s (%d pick(s))", date, len(payload.get("picks", [])))
+
+
+def telegram_text(payload: dict) -> str:
+    """Plain-text picks summary for Telegram (no markdown that the API would garble)."""
+    date = payload["date"]
+    picks = payload.get("picks", [])
+    lines = [f"⚾ MLB Picks — {date}"]
+    if not picks:
+        lines.append("No edge picks today.")
+    else:
+        lines.append(f"{len(picks)} pick(s): {', '.join(picks)}")
+        for g in payload.get("games", []):
+            if not g.get("flagged"):
+                continue
+            pc = g["pick_criteria"]
+            c = pc["components"]
+            bl = g.get("betting_lines")
+            ml = f" {bl['non_majority']['moneyline']}" if bl else ""
+            lines.append(
+                f"• {g['pick']}{ml} — conf {pc['confidence']} "
+                f"(edge {c['stat_edge']['strength']}/fade {c['public_fade']['strength']}/"
+                f"wc {c['win_condition']['strength']}); fading {g['public_majority']['team']}")
+    lines.append(grade.bankroll_line().replace("**", ""))
+    ts = tune.status_line().replace("**", "")
+    if ts:
+        lines.append(ts)
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -110,16 +161,8 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = run(args.date)
-
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    out_path = OUTPUT_DIR / f"picks_{args.date}.json"
-    out_path.write_text(json.dumps(payload, indent=2))
-    log.info("Wrote %s", out_path)
-
-    # Artifacts for the workflow's "post daily picks issue" step (gitignored).
-    (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))
-    (OUTPUT_DIR / "latest_date.txt").write_text(args.date)
-
+    write_outputs(payload, args.date)
+    notify.send_telegram(telegram_text(payload))
     print(json.dumps(payload.get("picks", []), indent=2))
 
 
