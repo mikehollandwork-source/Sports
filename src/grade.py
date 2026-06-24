@@ -135,13 +135,15 @@ def update_ledger(date: str) -> dict:
     added = _add(ledger["picks"], pe) + _add(ledger["leans"], le)
     if added:
         ledger["review"] = review(ledger["picks"])
-        save_ledger(ledger)
         log.info("graded %s: picks book %+.2f (%d-%d), leans book %+.2f (%d-%d)", date,
                  ledger["picks"]["bankroll"], ledger["picks"]["record"]["wins"],
                  ledger["picks"]["record"]["losses"], ledger["leans"]["bankroll"],
                  ledger["leans"]["record"]["wins"], ledger["leans"]["record"]["losses"])
     else:
         log.info("nothing new to settle for %s", date)
+    # Always persist so the ledger artifact exists from the first grade onward
+    # (an unchanged rewrite produces no git diff).
+    save_ledger(ledger)
     return ledger
 
 

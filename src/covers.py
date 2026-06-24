@@ -150,11 +150,12 @@ def slate_lines() -> list[dict]:
             if m and m.group(1) not in abbr:
                 abbr.append(m.group(1))
         if len(abbr) < 2 or (abbr[0], abbr[1]) in seen:
+            if len(abbr) < 2:
+                log.warning("slate: row dropped — couldn't read 2 team abbreviations (got %s)", abbr)
             continue
         op = r.select_one(".opening-lines-div")
         opens = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", op.get_text(" ") if op else "")
-        if len(opens) < 2:
-            continue
+        ao, ho = (int(opens[0]), int(opens[1])) if len(opens) >= 2 else (None, None)
 
         def _cur(cls: str) -> int | None:
             el = r.select_one("." + cls)
@@ -163,12 +164,17 @@ def slate_lines() -> list[dict]:
 
         ca = _cur("covers-CoversMatchups-topOddsAway")
         ch = _cur("covers-CoversMatchups-topOddsHome")
-        if ca is None or ch is None:
+        # Keep the row as long as we have a usable price: current is what the
+        # tracker needs; opens (for the sharp-money line filter) can be missing.
+        if (ca is None or ch is None) and (ao is None or ho is None):
+            log.warning("slate: row dropped — no usable odds for %s@%s", abbr[0], abbr[1])
             continue
         seen.add((abbr[0], abbr[1]))
         out.append({"away_abbr": abbr[0], "home_abbr": abbr[1],
-                    "away_open": int(opens[0]), "home_open": int(opens[1]),
-                    "away_current": ca, "home_current": ch})
+                    "away_open": ao, "home_open": ho,
+                    "away_current": ca if ca is not None else ao,
+                    "home_current": ch if ch is not None else ho})
+    log.info("slate: parsed %d game line(s) from the odds page", len(out))
     return out
 
 
