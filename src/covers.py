@@ -105,23 +105,26 @@ def _fingerprint(text: str, final_url: str, soup: BeautifulSoup, what: str) -> N
     )
 
 
-def consensus_percentages() -> dict[str, dict[str, float]]:
+def consensus() -> dict[str, dict]:
     """
-    Return {matchup_key: {team_name_or_abbr: bet_percentage}}.
+    Parse the contests.covers.com MLB consensus table.
 
-    matchup_key is a normalized "away@home"-ish string; callers match it to a
-    game by team name. Returns {} on any failure.
+    Returns {"away@home": {"away": side, "home": side, "details_url": str}} where
+    each `side` is {abbr, pct, moneyline, run_line}. Keys/abbrevs are matched to
+    games by analysis._name_hit on team.abbreviation. Returns {} on any failure.
+
+    moneyline is read off the consensus row (the signed odds next to the bet %).
+    run_line is filled in from each game's matchup-details page by
+    attach_run_lines(); it is None until then.
     """
     soup, text, final_url = _fetch(CONSENSUS_URL)
     if soup is None:
         return {}
-
-    # covers.com is a Next.js site, so the consensus numbers are rendered
-    # client-side and live in the __NEXT_DATA__ JSON, not in static <tr>s.
-    # Try the JSON first, then fall back to the table heuristic.
-    out = _consensus_from_table(soup)
+    out = _parse_consensus_rows(soup)
     if not out:
         _fingerprint(text, final_url, soup, "consensus")
+    elif DEBUG:
+        _dump_details_sample(out)
     return out
 
 
@@ -130,19 +133,14 @@ def _pct(text: str) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def _consensus_from_table(soup: BeautifulSoup) -> dict[str, dict[str, float]]:
-    """Parse the contests.covers.com consensus table.
-
-    Each matchup row holds two team anchors (href /consensus/pickleadersbyteam/...,
-    text = team abbreviation, e.g. 'Bos') and two bet-percentage spans
-    (covers-CoversConsensus-consensusTable--high / --low). The spans are in
-    away-then-home order; --high/--low only styles the larger side, so we align
-    the two percentages to the two teams by position, not by magnitude.
-
-    Returns {"away@home": {away_abbr: pct, home_abbr: pct}} (abbrevs lowercased
-    in the key; matched to games by analysis._name_hit on team.abbreviation).
-    """
-    out: dict[str, dict[str, float]] = {}
+def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
+    """Each matchup row holds two team anchors (href /consensus/pickleadersbyteam/,
+    text = abbreviation, e.g. 'Bos'), two bet-% spans
+    (covers-CoversConsensus-consensusTable--high/--low, in away-then-home order),
+    the two moneylines as signed odds, and a 'Details' link to the matchup page.
+    --high/--low only styles the larger side, so percentages and odds are aligned
+    to teams by position, not magnitude."""
+    out: dict[str, dict] = {}
     for tr in soup.select("tr"):
         teams = [a.get_text(strip=True) for a in tr.find_all("a")
                  if "pickleadersbyteam" in a.get("href", "")]
@@ -153,9 +151,32 @@ def _consensus_from_table(soup: BeautifulSoup) -> dict[str, dict[str, float]]:
         away_pct, home_pct = _pct(spans[0].get_text()), _pct(spans[1].get_text())
         if away_pct is None or home_pct is None:
             continue
+        odds = re.findall(r"[+-]\d{2,4}", tr.get_text(" "))  # moneylines, away then home
+        away_ml = odds[0] if len(odds) >= 2 else None
+        home_ml = odds[1] if len(odds) >= 2 else None
+        details = next((a.get("href", "") for a in tr.find_all("a")
+                        if "matchupconsensusdetails" in a.get("href", "")), "")
         key = f"{teams[0]}@{teams[1]}".lower()
-        out[key] = {teams[0]: away_pct, teams[1]: home_pct}
+        out[key] = {
+            "away": {"abbr": teams[0], "pct": away_pct, "moneyline": away_ml, "run_line": None},
+            "home": {"abbr": teams[1], "pct": home_pct, "moneyline": home_ml, "run_line": None},
+            "details_url": details,
+        }
     return out
+
+
+def _abs_url(href: str) -> str:
+    if href.startswith("http"):
+        return href
+    return "https://contests.covers.com" + href if href.startswith("/") else href
+
+
+def _dump_details_sample(consensus_out: dict) -> None:
+    """In DEBUG, fetch one matchup-details page so its run-line markup can be
+    inspected (the dump happens inside _fetch)."""
+    url = next((v["details_url"] for v in consensus_out.values() if v.get("details_url")), "")
+    if url:
+        _fetch(_abs_url(url))
 
 
 def forum_majority(team_names: list[str], date: str) -> dict[str, int]:

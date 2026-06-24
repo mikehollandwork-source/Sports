@@ -275,17 +275,25 @@ def statistical_favorite(game: Game) -> tuple[Team, float, float]:
     return winner, hs, as_
 
 
+def _match_consensus(game: Game, consensus: dict) -> dict | None:
+    """The consensus row whose two abbreviations are this game's two teams."""
+    for sides in consensus.values():
+        if _matches(game, [sides["away"]["abbr"], sides["home"]["abbr"]]):
+            return sides
+    return None
+
+
 def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
     detail = {"consensus": None, "forum": None, "agree": None}
 
     cons_team = None
-    for _, pcts in consensus.items():
-        names = list(pcts.keys())
-        if _matches(game, names):
-            top = max(pcts, key=pcts.get)
-            cons_team = _resolve(game, top)
-            detail["consensus"] = {"pick": top, "pcts": pcts}
-            break
+    sides = _match_consensus(game, consensus)
+    if sides:
+        away, home = sides["away"], sides["home"]
+        top = away if away["pct"] >= home["pct"] else home
+        cons_team = _resolve(game, top["abbr"])
+        detail["consensus"] = {"pick": top["abbr"],
+                               "pcts": {away["abbr"]: away["pct"], home["abbr"]: home["pct"]}}
 
     forum_team = None
     hc, ac = forum_counts.get(game.home.name, 0), forum_counts.get(game.away.name, 0)
@@ -297,6 +305,27 @@ def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
         detail["agree"] = cons_team.team_id == forum_team.team_id
 
     return (cons_team or forum_team), detail
+
+
+def betting_lines(game: Game, consensus: dict) -> dict | None:
+    """Each side's moneyline + run line, split into the public-majority side (the
+    higher consensus %) and the side the public is fading. Returns None if this
+    game has no consensus row."""
+    sides = _match_consensus(game, consensus)
+    if not sides:
+        return None
+    away, home = sides["away"], sides["home"]
+    majority, non_majority = (away, home) if away["pct"] >= home["pct"] else (home, away)
+
+    def fmt(side: dict) -> dict:
+        return {
+            "team": _resolve(game, side["abbr"]).name,
+            "consensus_pct": side["pct"],
+            "moneyline": side["moneyline"],
+            "run_line": side["run_line"],
+        }
+
+    return {"majority": fmt(majority), "non_majority": fmt(non_majority)}
 
 
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
@@ -336,6 +365,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "team": majority.name if majority else None,
             "detail": majority_detail,
         },
+        "betting_lines": betting_lines(game, consensus),
         "win_condition": {
             "home": wc_home,
             "away": wc_away,
