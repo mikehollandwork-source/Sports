@@ -63,7 +63,10 @@ def _pick_moneyline(g: dict) -> int | None:
 
 def load_ledger() -> dict:
     if LEDGER_PATH.exists():
-        return json.loads(LEDGER_PATH.read_text())
+        led = json.loads(LEDGER_PATH.read_text())
+        led.pop("odds_assumption", None)  # legacy key -> normalize to odds_basis
+        led.setdefault("odds_basis", empty_ledger()["odds_basis"])
+        return led
     return empty_ledger()
 
 
