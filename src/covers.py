@@ -122,6 +122,11 @@ def consensus() -> dict[str, dict]:
     out = _parse_consensus_rows(soup)
     if not out:
         _fingerprint(text, final_url, soup, "consensus")
+    elif DEBUG:
+        url = next((v["details_url"] for v in out.values() if v.get("details_url")), "")
+        if url:
+            _fetch(_abs_forum(url) if url.startswith("/forum") else
+                   ("https://contests.covers.com" + url if url.startswith("/") else url))
     return out
 
 
@@ -154,10 +159,13 @@ def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
         odds = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", tr.get_text(" "))
         away_ml = odds[0] if len(odds) >= 2 else None
         home_ml = odds[1] if len(odds) >= 2 else None
+        details = next((a.get("href", "") for a in tr.find_all("a")
+                        if "matchupconsensusdetails" in a.get("href", "")), "")
         key = f"{teams[0]}@{teams[1]}".lower()
         out[key] = {
             "away": {"abbr": teams[0], "pct": away_pct, "moneyline": away_ml},
             "home": {"abbr": teams[1], "pct": home_pct, "moneyline": home_ml},
+            "details_url": details,
         }
     return out
 
