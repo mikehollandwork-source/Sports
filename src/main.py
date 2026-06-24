@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers
+from . import covers, grade
 from .analysis import evaluate_game
 from .mlb_api import enrich_with_stats, schedule_for
 
@@ -98,6 +98,8 @@ def build_summary(payload: dict) -> str:
                            f"public on {m['team']} {m['moneyline']} ({m['consensus_pct']}%)")
             out.append("")
 
+    out.append("")
+    out.append(grade.bankroll_line())
     out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
     return "\n".join(out)
 

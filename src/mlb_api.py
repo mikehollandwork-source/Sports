@@ -102,6 +102,31 @@ def schedule_for(date: str) -> list[Game]:
     return games
 
 
+def results_for(date: str) -> dict[int, dict]:
+    """Final scores for a date, keyed by game_pk: {final, winner, home, away,
+    home_score, away_score}. `winner` is the winning team name ("" if tie/n.a.)."""
+    data = _get("schedule", sportId=SPORT_ID, date=date, hydrate="team,linescore")
+    out: dict[int, dict] = {}
+    for day in data.get("dates", []):
+        for g in day.get("games", []):
+            home, away = g["teams"]["home"], g["teams"]["away"]
+            final = g.get("status", {}).get("abstractGameState") == "Final"
+            hs, as_ = home.get("score"), away.get("score")
+            winner = ""
+            if home.get("isWinner"):
+                winner = home["team"].get("name", "")
+            elif away.get("isWinner"):
+                winner = away["team"].get("name", "")
+            elif final and hs is not None and as_ is not None:
+                winner = (home if hs > as_ else away)["team"].get("name", "")
+            out[g["gamePk"]] = {
+                "final": final, "winner": winner,
+                "home": home["team"].get("name", ""), "away": away["team"].get("name", ""),
+                "home_score": hs, "away_score": as_,
+            }
+    return out
+
+
 def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")

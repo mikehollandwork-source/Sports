@@ -129,6 +129,20 @@ other four counts are reported for context.
 - **SOS uses season opponent ratings**, not their form on the day they were played;
   it's clamped to ±25% so a soft/brutal stretch can't dominate.
 
+## Bankroll (paper trading)
+
+`src/grade.py` settles each flagged pick against the actual MLB final score and
+keeps a running **$1-per-pick bankroll** in `output/ledger.json`. The daily
+workflow grades the **prior day** (once its games are final) before generating
+today's picks, so the bankroll line shows up in the daily issue and the ledger
+is committed back. Grading is idempotent per pick (by `game_pk`), so re-running a
+partially-complete day safely catches late finishers without double-counting.
+
+We have no true historical closing odds (covers serves only current lines), so
+settlement assumes **even money (+100)**: a win is +$1.00, a loss −$1.00, and the
+bankroll is simply wins − losses. Run a specific date with
+`python -m src.grade --date YYYY-MM-DD` (or the `grade_date` workflow input).
+
 ## Running it
 
 ### On GitHub Actions (intended use)

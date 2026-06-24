@@ -15,6 +15,10 @@ on:
         type: boolean
         required: false
         default: false
+      grade_date:
+        description: "Date to grade for the bankroll (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
+        required: false
+        default: ""
   schedule:
     # 15:00 UTC ~= 11:00 ET, after lineups/probables are usually posted.
     - cron: "0 15 * * *"
@@ -35,6 +39,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Grade prior day's picks (running bankroll)
+        env:
+          GRADE_DATE: ${{ github.event.inputs.grade_date }}
+        run: python -m src.grade   # GRADE_DATE blank -> yesterday US/Eastern
 
       - name: Run edge finder
         env:
