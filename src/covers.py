@@ -178,6 +178,8 @@ def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
     counts = {name: 0 for name, _ in teams}
     if soup is None:
         return counts
+    if DEBUG:
+        _dump_forum_sample(soup)
 
     posts = _todays_posts(soup, date)
     if not posts:
@@ -231,6 +233,33 @@ def _post_moneyline_teams(low_text: str, matchers: dict) -> set[str]:
         if ML_RE.search(scope) or not SPREAD_RE.search(scope):
             out.add(name)
     return out
+
+
+def _abs_forum(href: str) -> str:
+    if href.startswith("http"):
+        return href
+    return "https://www.covers.com" + href if href.startswith("/") else href
+
+
+def _thread_links(soup: BeautifulSoup) -> list[str]:
+    """Thread URLs from the forum listing (slug ending in a long post id), in
+    page order (most-recently-active first). Pagination links are excluded."""
+    seen: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if re.search(r"/forum/mlb-betting-27/.+-\d{6,}/?$", href):
+            url = _abs_forum(href)
+            if url not in seen:
+                seen.append(url)
+    return seen
+
+
+def _dump_forum_sample(soup: BeautifulSoup) -> None:
+    """In DEBUG, fetch the first thread so its per-post date/body markup can be
+    inspected (the dump happens inside _fetch)."""
+    links = _thread_links(soup)
+    if links:
+        _fetch(links[0])
 
 
 def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
