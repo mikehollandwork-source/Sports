@@ -181,7 +181,7 @@ def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
     if DEBUG:
         _dump_forum_sample(soup)
 
-    posts = _todays_posts(soup, date)
+    posts = _todays_thread_posts(soup, date)
     if not posts:
         _fingerprint(text, final_url, soup, "forum")
 
@@ -190,6 +190,31 @@ def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
         for name in _post_moneyline_teams(body.lower(), matchers):
             counts[name] += 1
     return counts
+
+
+FORUM_MAX_THREADS = 20  # most-recent threads to crawl for today's posts
+
+
+def _todays_thread_posts(listing_soup: BeautifulSoup, date: str,
+                         max_threads: int = FORUM_MAX_THREADS) -> list[str]:
+    """Crawl the most-recent threads and return ONLY the post bodies whose own
+    timestamp is `date`. Each post on a thread page is a `postBrick` with its own
+    <time datetime> and a .raw-post-body, so this is strictly current-day - a
+    thread started days ago contributes only its posts made today."""
+    posts: list[str] = []
+    for url in _thread_links(listing_soup)[:max_threads]:
+        tsoup, _, _ = _fetch(url)
+        if tsoup is None:
+            continue
+        for brick in tsoup.select(".covers-CoversForum-postBrick"):
+            stamp = brick.find("time", attrs={"datetime": True})
+            if not stamp or stamp.get("datetime", "")[:10] != date:
+                continue
+            body_el = brick.select_one(".raw-post-body")
+            body = body_el.get_text(" ", strip=True) if body_el else ""
+            if body:
+                posts.append(body)
+    return posts
 
 
 # Run-line / spread language: a pick written next to one of these is a SPREAD
@@ -260,24 +285,6 @@ def _dump_forum_sample(soup: BeautifulSoup) -> None:
     links = _thread_links(soup)
     if links:
         _fetch(links[0])
-
-
-def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
-    """Extract post bodies dated `date` (YYYY-MM-DD). Best-effort."""
-    posts: list[str] = []
-    # Broad selector for post/thread rows; refine with real markup.
-    for node in soup.select("[class*=post], [class*=thread], article"):
-        stamp = node.find(attrs={"datetime": True})
-        node_date = ""
-        if stamp and stamp.get("datetime"):
-            node_date = stamp["datetime"][:10]
-        # If we can read a date and it doesn't match, skip; otherwise include.
-        if node_date and node_date != date:
-            continue
-        body = node.get_text(" ", strip=True)
-        if body:
-            posts.append(body)
-    return posts
 
 
 def _dated_posts(soup: BeautifulSoup) -> list[tuple[str, str]]:
