@@ -164,19 +164,17 @@ fetch right before first pitch — a possible follow-up.)*
 hits, stat-edge margin, each component's strength, underdog/favorite, odds). The
 ledger's `review` block compares wins vs losses and emits tuning **suggestions**.
 
-**Bankroll auto-tuning** (`src/tune.py`): after each grading, the decision params
-adapt to realized results and are written to `output/tuning.json`, which
-`analysis.py` loads on the next run. Two levers move:
-- **Selectivity** — `CONF_MIN` follows bankroll ROI: losing → raise the bar,
-  winning → lower it a touch (dead-band around break-even).
-- **Emphasis** — `W_EDGE/W_FADE/W_WC` shift slightly toward whichever signal best
-  separated past wins from losses, then renormalize.
+**Bankroll auto-tuning** (`src/tune.py`): after each grading, selectivity adapts
+to recent results and is written to `output/tuning.json`, which `analysis.py`
+loads on the next run. It's deliberately simple — **get stricter after losing
+days, ease back when it recovers**:
+- One losing day is ignored. After **back-to-back losing days** the pick bar
+  `CONF_MIN` rises by `STRICT_STEP` (0.03) per additional consecutive losing day,
+  capped at `CONF_MIN_MAX` (0.65) — e.g. 2 days → 0.53, 3 → 0.56.
+- The moment a day turns a **profit**, `CONF_MIN` snaps back to the 0.50 default.
 
-It is built to **not** overfit: **inactive until `TUNE_MIN_SAMPLE` (20) settled
-picks**, then only **tiny bounded steps** (±0.01), every param **clamped** to a
-sane range, every change **logged** to `tuning.json` history and **fully
-reversible** (delete the file to snap back to the `analysis.py` defaults). The
-daily issue shows the live tuning status.
+Nothing else changes (weights stay put), it's fully **reversible** (delete
+`tuning.json`), and the daily issue shows the current streak / bar.
 
 `src/backtest.py` is a point-in-time *historical* backtest (forum-only public
 signal, even money). **Known limitation:** the covers forum listing exposes only

@@ -98,7 +98,6 @@ def grade_date(date: str) -> list[dict]:
         odds = ml if ml is not None else ODDS
         sa = g.get("statistical_advantage", {})
         pc = g.get("pick_criteria", {})
-        comp = pc.get("components", {})
         settled.append({
             "key": f"{date}#{g['game_pk']}",
             "date": date,
@@ -109,12 +108,9 @@ def grade_date(date: str) -> list[dict]:
             "odds": odds,
             "odds_source": "pick-time moneyline" if ml is not None else "assumed even (+100)",
             "profit": round(american_profit(odds) if won else -STAKE, 2),
-            # context kept so losses can be reviewed / the formula auto-tuned
+            # context kept so losses can be reviewed
             "win_condition_hits": pc.get("win_condition_hits"),
             "confidence": pc.get("confidence"),
-            "edge_strength": comp.get("stat_edge", {}).get("strength"),
-            "fade_strength": comp.get("public_fade", {}).get("strength"),
-            "wc_strength": comp.get("win_condition", {}).get("strength"),
             "edge_margin": round(abs((sa.get("home_score") or 0) - (sa.get("away_score") or 0)), 3),
             "underdog": odds > 0,
         })
