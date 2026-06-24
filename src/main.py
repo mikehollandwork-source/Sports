@@ -78,6 +78,11 @@ def _edge_word(strength: float) -> str:
     return "strong" if strength >= 0.66 else "moderate" if strength >= 0.33 else "slight"
 
 
+def _c10(conf: float) -> str:
+    """Confidence on an intuitive /10 scale, e.g. 0.536 -> '5.4/10'."""
+    return f"{round((conf or 0.0) * 10, 1)}/10"
+
+
 def _public_evidence(g: dict) -> str:
     """Plain description of who the public is on and the evidence behind it,
     in away–home order to match the matchup."""
@@ -108,13 +113,14 @@ def _game_lines(g: dict) -> list[str]:
         bl = g.get("betting_lines")
         ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
         return [
-            f"✅ **{adv}** — {g['matchup']} · **confidence {conf}** ✓ (≥ {pc['threshold']}){ml}",
+            f"✅ **{adv}** — {g['matchup']} · **confidence {_c10(conf)}** ✓ "
+            f"(need {_c10(pc['threshold'])}){ml}",
             f"   • stat edge: {edge}",
             f"   • public is on: {pub} → **we fade them**",
             f"   • win condition: {wc}/5 games",
         ]
     return [
-        f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {conf}",
+        f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {_c10(conf)}",
         f"   • stat edge: {edge}",
         f"   • public is on: {pub}",
         f"   • win condition: {wc}/5 games",
@@ -179,11 +185,11 @@ def telegram_text(payload: dict) -> str:
         if g.get("flagged"):
             bl = g.get("betting_lines")
             ml = f" {bl['non_majority']['moneyline']}" if bl else ""
-            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {pc['confidence']}")
+            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {_c10(pc['confidence'])}")
             lines.append(f"   edge {_edge_word(pc['components']['stat_edge']['strength'])}, "
                          f"win-cond {wc}/5; public on {_public_evidence(g)} → we fade")
         else:
-            lines.append(f"🔸 {adv} ({g['matchup']}) conf {pc['confidence']}")
+            lines.append(f"🔸 {adv} ({g['matchup']}) conf {_c10(pc['confidence'])}")
             lines.append(f"   public on {_public_evidence(g)}; win-cond {wc}/5 — {pc['reason']}")
     lines.append(grade.bankroll_line().replace("**", ""))
     ts = tune.status_line().replace("**", "")
