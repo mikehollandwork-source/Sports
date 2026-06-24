@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, grade
+from . import covers, grade, tune
 from .analysis import evaluate_game
 from .mlb_api import enrich_with_stats, schedule_for
 
@@ -110,6 +110,10 @@ def build_summary(payload: dict) -> str:
     if rev:
         out.append("")
         out.append(rev)
+    tune_status = tune.status_line()
+    if tune_status:
+        out.append("")
+        out.append(tune_status)
     out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
     return "\n".join(out)
 

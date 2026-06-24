@@ -69,6 +69,27 @@ W_EDGE, W_FADE, W_WC = 0.34, 0.33, 0.33
 EDGE_FULL = 0.40    # team_score margin that counts as a full-strength stat edge
 CONF_MIN = 0.50     # minimum blended confidence to flag a pick
 
+
+def _apply_tuning() -> None:
+    """Override the decision params from output/tuning.json (written by the
+    bankroll auto-tuner). Absent/invalid file -> the defaults above stand."""
+    import json
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "output", "tuning.json")
+    try:
+        with open(path) as f:
+            params = json.load(f).get("params", {})
+    except (OSError, ValueError):
+        return
+    g = globals()
+    for k in ("CONF_MIN", "EDGE_FULL", "W_EDGE", "W_FADE", "W_WC"):
+        v = params.get(k)
+        if isinstance(v, (int, float)):
+            g[k] = float(v)
+
+
+_apply_tuning()
+
 # Small-sample guard for last-5 FIP: a 2-IP spot start with two homers posts an
 # absurd FIP that would otherwise dominate the pitching index. Regress each FIP
 # toward the league mean by innings pitched: weight = ip / (ip + FIP_PRIOR_IP),

@@ -161,11 +161,22 @@ source. Run a specific date with `python -m src.grade --date YYYY-MM-DD` (or the
 fetch right before first pitch — a possible follow-up.)*
 
 **Learning from losses:** every settled pick stores its context (win-condition
-hits, stat-edge margin, underdog/favorite, odds). The ledger's `review` block
-compares wins vs losses and, once enough losses accrue, emits concrete tuning
-**suggestions** (e.g. "losses skew to lower win-condition hits → raise `W_WC` or
-`CONF_MIN`"). It's a *reporting* aid that surfaces what to change — it does not
-silently rewrite the formula.
+hits, stat-edge margin, each component's strength, underdog/favorite, odds). The
+ledger's `review` block compares wins vs losses and emits tuning **suggestions**.
+
+**Bankroll auto-tuning** (`src/tune.py`): after each grading, the decision params
+adapt to realized results and are written to `output/tuning.json`, which
+`analysis.py` loads on the next run. Two levers move:
+- **Selectivity** — `CONF_MIN` follows bankroll ROI: losing → raise the bar,
+  winning → lower it a touch (dead-band around break-even).
+- **Emphasis** — `W_EDGE/W_FADE/W_WC` shift slightly toward whichever signal best
+  separated past wins from losses, then renormalize.
+
+It is built to **not** overfit: **inactive until `TUNE_MIN_SAMPLE` (20) settled
+picks**, then only **tiny bounded steps** (±0.01), every param **clamped** to a
+sane range, every change **logged** to `tuning.json` history and **fully
+reversible** (delete the file to snap back to the `analysis.py` defaults). The
+daily issue shows the live tuning status.
 
 `src/backtest.py` is a point-in-time *historical* backtest (forum-only public
 signal, even money). **Known limitation:** the covers forum listing exposes only
