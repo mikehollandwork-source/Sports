@@ -1,14 +1,18 @@
 """
-Grade the picks the edge finder made against actual MLB results and keep a
-running $1-per-pick bankroll in output/ledger.json.
+Grade the board against actual MLB results and keep two running $1/unit bankrolls
+in output/ledger.json:
 
-Each flagged pick is a $1 bet on that team's moneyline. We have no true
-historical closing odds (covers serves only current lines), so settlement uses
-an even-money (+100) assumption: a win is +$1.00, a loss is -$1.00. The ledger
-is idempotent per date, so re-running a day never double-counts it.
+  - Picks: every flagged pick (the public-vs-stats plays the system makes).
+  - Leans: every other game's advantage team (a hypothetical "what if I'd bet the
+    stat favorite every day" tracker).
+
+Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
+covers' odds page (pick_criteria.advantage_moneyline); even money (+100) if that
+price wasn't available. Each book keeps a W-L record and a dollar bankroll, and is
+idempotent per game (by game_pk) so re-running a day never double-counts.
 
 Runs on GitHub Actions (the MLB API is firewalled in the build sandbox). Default
-date is yesterday (US/Eastern) - i.e. grade the prior day once its games are final.
+date is yesterday (US/Eastern) - grade the prior day once its games are final.
 """
 
 from __future__ import annotations
@@ -31,43 +35,41 @@ LEDGER_PATH = OUTPUT_DIR / "ledger.json"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 STAKE = 1.0
-ODDS = 100  # even money (+100); see module docstring
+ODDS = 100  # even-money fallback when no pre-game price was captured
 
 
 def american_profit(odds: int, stake: float = STAKE) -> float:
-    """Win profit for a `stake` bet at American `odds` (loss is always -stake)."""
+    """Win profit for a `stake` bet at American `odds` (a loss is always -stake)."""
+    odds = int(odds)
     return stake * odds / 100.0 if odds > 0 else stake * 100.0 / abs(odds)
 
 
+def _empty_book() -> dict:
+    return {"bankroll": 0.0, "record": {"wins": 0, "losses": 0, "bets": 0}, "entries": []}
+
+
 def empty_ledger() -> dict:
-    return {"bankroll": 0.0, "stake": STAKE,
-            "odds_basis": "pick-time moneyline when recorded, else +100 (even money)",
-            "record": {"wins": 0, "losses": 0, "picks": 0},
-            "entries": []}
-
-
-def _pick_moneyline(g: dict) -> int | None:
-    """The pick's actual moneyline captured at pick time (from betting_lines),
-    as an int (+104, -115). None if this game had no recorded line."""
-    bl = g.get("betting_lines")
-    if not bl:
-        return None
-    for side in (bl.get("majority"), bl.get("non_majority")):
-        if side and side.get("team") == g.get("pick") and side.get("moneyline"):
-            try:
-                return int(str(side["moneyline"]).replace("+", ""))
-            except (ValueError, TypeError):
-                return None
-    return None
+    return {"stake": STAKE,
+            "odds_basis": "pre-game moneyline from covers odds page (even-money fallback)",
+            "picks": _empty_book(), "leans": _empty_book()}
 
 
 def load_ledger() -> dict:
-    if LEDGER_PATH.exists():
-        led = json.loads(LEDGER_PATH.read_text())
-        led.pop("odds_assumption", None)  # legacy key -> normalize to odds_basis
-        led.setdefault("odds_basis", empty_ledger()["odds_basis"])
+    led = empty_ledger()
+    try:
+        old = json.loads(LEDGER_PATH.read_text())
+    except (OSError, ValueError):
         return led
-    return empty_ledger()
+    if "picks" in old and "leans" in old:
+        return old
+    # migrate the old single-book schema (picks only) into the new layout
+    if old.get("entries") is not None:
+        led["picks"] = {"bankroll": old.get("bankroll", 0.0),
+                        "record": {"wins": old.get("record", {}).get("wins", 0),
+                                   "losses": old.get("record", {}).get("losses", 0),
+                                   "bets": old.get("record", {}).get("picks", 0)},
+                        "entries": old.get("entries", [])}
+    return led
 
 
 def save_ledger(ledger: dict) -> None:
@@ -75,136 +77,111 @@ def save_ledger(ledger: dict) -> None:
     LEDGER_PATH.write_text(json.dumps(ledger, indent=2))
 
 
-def grade_date(date: str) -> list[dict]:
-    """Settle the flagged picks in output/picks_<date>.json against final scores.
-    Returns one entry per graded pick (skips games not yet final)."""
+def _adv_odds(g: dict) -> tuple[int, str]:
+    ml = g.get("pick_criteria", {}).get("advantage_moneyline")
+    return (int(ml), "pre-game moneyline") if ml is not None else (ODDS, "even (+100)")
+
+
+def grade_date(date: str) -> tuple[list[dict], list[dict]]:
+    """Settle every final game's advantage team. Returns (pick_entries, lean_entries)."""
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         log.warning("no picks file for %s", date)
-        return []
+        return [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
 
-    settled: list[dict] = []
+    pick_entries: list[dict] = []
+    lean_entries: list[dict] = []
     for g in payload.get("games", []):
-        if not g.get("flagged"):
-            continue
-        res = results.get(g.get("game_pk"))
-        if not res or not res["final"] or not res["winner"]:
-            log.info("skip ungraded pick %s (%s)", g.get("pick"), g.get("matchup"))
-            continue
-        won = res["winner"] == g["pick"]
-        ml = _pick_moneyline(g)
-        odds = ml if ml is not None else ODDS
-        sa = g.get("statistical_advantage", {})
         pc = g.get("pick_criteria", {})
-        settled.append({
+        adv = pc.get("advantage_team")
+        res = results.get(g.get("game_pk"))
+        if not adv or not res or not res["final"] or not res["winner"]:
+            continue
+        won = res["winner"] == adv
+        odds, src = _adv_odds(g)
+        entry = {
             "key": f"{date}#{g['game_pk']}",
-            "date": date,
-            "matchup": g["matchup"],
-            "pick": g["pick"],
+            "date": date, "matchup": g["matchup"], "bet": adv,
             "result": "W" if won else "L",
             "score": f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}",
-            "odds": odds,
-            "odds_source": "pick-time moneyline" if ml is not None else "assumed even (+100)",
+            "odds": odds, "odds_source": src,
             "profit": round(american_profit(odds) if won else -STAKE, 2),
-            # context kept so losses can be reviewed
-            "win_condition_hits": pc.get("win_condition_hits"),
-            "confidence": pc.get("confidence"),
-            "edge_margin": round(abs((sa.get("home_score") or 0) - (sa.get("away_score") or 0)), 3),
-            "underdog": odds > 0,
-        })
-    return settled
+        }
+        (pick_entries if g.get("flagged") else lean_entries).append(entry)
+    return pick_entries, lean_entries
+
+
+def _add(book: dict, entries: list[dict]) -> int:
+    done = {e["key"] for e in book["entries"]}
+    added = 0
+    for e in entries:
+        if e["key"] in done:
+            continue
+        book["bankroll"] = round(book["bankroll"] + e["profit"], 2)
+        book["record"]["wins" if e["result"] == "W" else "losses"] += 1
+        book["record"]["bets"] += 1
+        e["bankroll_after"] = book["bankroll"]
+        book["entries"].append(e)
+        added += 1
+    return added
 
 
 def update_ledger(date: str) -> dict:
-    """Append a date's newly-final picks to the ledger. Idempotent per *pick*
-    (by game_pk), so re-running a partially-complete day safely catches the
-    games that have since gone final without double-counting settled ones."""
+    """Settle a date into both books. Idempotent per game (game_pk)."""
     ledger = load_ledger()
-    done = {e["key"] for e in ledger["entries"]}
-
-    added = 0
-    for e in grade_date(date):
-        if e["key"] in done:
-            continue
-        ledger["bankroll"] = round(ledger["bankroll"] + e["profit"], 2)
-        ledger["record"]["wins" if e["result"] == "W" else "losses"] += 1
-        ledger["record"]["picks"] += 1
-        e["bankroll_after"] = ledger["bankroll"]
-        ledger["entries"].append(e)
-        added += 1
-
+    pe, le = grade_date(date)
+    added = _add(ledger["picks"], pe) + _add(ledger["leans"], le)
     if added:
-        ledger["review"] = review(ledger)
+        ledger["review"] = review(ledger["picks"])
         save_ledger(ledger)
-        log.info("graded %s: +%d pick(s), bankroll now %+.2f",
-                 date, added, ledger["bankroll"])
+        log.info("graded %s: picks book %+.2f (%d-%d), leans book %+.2f (%d-%d)", date,
+                 ledger["picks"]["bankroll"], ledger["picks"]["record"]["wins"],
+                 ledger["picks"]["record"]["losses"], ledger["leans"]["bankroll"],
+                 ledger["leans"]["record"]["wins"], ledger["leans"]["record"]["losses"])
     else:
         log.info("nothing new to settle for %s", date)
     return ledger
 
 
+# --- loss review / tuning input (operates on the Picks book) ------------------
 def _avg(xs: list) -> float | None:
     xs = [x for x in xs if x is not None]
     return round(sum(xs) / len(xs), 2) if xs else None
 
 
-def review(ledger: dict) -> dict:
-    """Summarize wins vs losses so each loss makes the system tunable (item 3).
-    Reporting only - it surfaces what to change, it does not change the formula."""
-    e = ledger["entries"]
+def review(book: dict) -> dict:
+    e = book["entries"]
     wins = [x for x in e if x["result"] == "W"]
     losses = [x for x in e if x["result"] == "L"]
-    rev = {
-        "wins": len(wins), "losses": len(losses),
-        "avg_win_cond_hits_on_wins": _avg([x.get("win_condition_hits") for x in wins]),
-        "avg_win_cond_hits_on_losses": _avg([x.get("win_condition_hits") for x in losses]),
-        "avg_edge_margin_on_wins": _avg([x.get("edge_margin") for x in wins]),
-        "avg_edge_margin_on_losses": _avg([x.get("edge_margin") for x in losses]),
-        "losses_as_underdog": sum(1 for x in losses if x.get("underdog")),
-        "losses_as_favorite": sum(1 for x in losses if x.get("underdog") is False),
-    }
-    rev["suggestions"] = _suggestions(rev)
-    return rev
-
-
-def _suggestions(rev: dict) -> list[str]:
-    """Actionable tuning hints once enough losses have accrued (>= 4)."""
-    out: list[str] = []
-    if rev["losses"] < 4:
-        return out
-    wc_w, wc_l = rev["avg_win_cond_hits_on_wins"], rev["avg_win_cond_hits_on_losses"]
-    if wc_w is not None and wc_l is not None and wc_l + 0.5 < wc_w:
-        out.append("Losses skew to lower win-condition hits — raise W_WC or CONF_MIN.")
-    em_w, em_l = rev["avg_edge_margin_on_wins"], rev["avg_edge_margin_on_losses"]
-    if em_w is not None and em_l is not None and em_l + 0.05 < em_w:
-        out.append("Losses have thinner stat edges — raise W_EDGE or CONF_MIN.")
-    if rev["losses_as_favorite"] >= 4 and rev["losses_as_favorite"] >= 2 * max(1, rev["losses_as_underdog"]):
-        out.append("Most losses are favorites (-odds) — consider an underdog-only filter.")
-    return out
-
-
-def bankroll_line(ledger: dict | None = None) -> str:
-    """One-line bankroll summary for the daily issue."""
-    ledger = ledger or load_ledger()
-    r = ledger["record"]
-    return (f"**Running bankroll: {ledger['bankroll']:+.2f} units** "
-            f"({r['wins']}-{r['losses']} on {r['picks']} picks, $1/pick; "
-            f"pick-time moneyline odds, even-money fallback)")
+    return {"wins": len(wins), "losses": len(losses),
+            "losses_as_underdog": sum(1 for x in losses if x.get("odds", 0) > 0),
+            "losses_as_favorite": sum(1 for x in losses if x.get("odds", 0) < 0)}
 
 
 def review_line(ledger: dict | None = None) -> str:
-    """Loss-review note for the daily issue (empty until there are losses)."""
     ledger = ledger or load_ledger()
-    rev = ledger.get("review") or review(ledger)
+    rev = ledger.get("review") or review(ledger["picks"])
     if not rev["losses"]:
         return ""
-    parts = [f"**Loss review:** {rev['losses']} loss(es); "
-             f"avg win-condition hits — wins {rev['avg_win_cond_hits_on_wins']} "
-             f"vs losses {rev['avg_win_cond_hits_on_losses']}."]
-    parts += [f"→ {s}" for s in rev["suggestions"]]
-    return " ".join(parts)
+    return (f"**Loss review (picks):** {rev['losses']} loss(es) — "
+            f"{rev['losses_as_underdog']} as a dog, {rev['losses_as_favorite']} as a favorite.")
+
+
+def _book_line(name: str, book: dict, hypothetical: bool = False) -> str:
+    r = book["record"]
+    tag = " (hypothetical)" if hypothetical else ""
+    return (f"**{name}{tag}: {book['bankroll']:+.2f}u** "
+            f"({r['wins']}-{r['losses']} on {r['bets']} bets)")
+
+
+def bankroll_line(ledger: dict | None = None) -> str:
+    """One-line summary of both books for the daily issue."""
+    ledger = ledger or load_ledger()
+    return (_book_line("Picks", ledger["picks"]) + "  ·  "
+            + _book_line("Leans", ledger["leans"], hypothetical=True)
+            + "  _($1/bet at pre-game moneyline)_")
 
 
 def yesterday_eastern() -> str:
@@ -212,13 +189,13 @@ def yesterday_eastern() -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Grade picks + update the bankroll ledger")
+    parser = argparse.ArgumentParser(description="Grade the board + update the bankroll ledgers")
     parser.add_argument("--date", default=os.environ.get("GRADE_DATE") or yesterday_eastern(),
                         help="date to grade (YYYY-MM-DD); default = yesterday US/Eastern")
     args = parser.parse_args()
     ledger = update_ledger(args.date)
     from . import tune
-    state = tune.auto_tune(ledger)   # bankroll-driven param tuning (writes tuning.json)
+    state = tune.auto_tune(ledger)
     print(bankroll_line(ledger))
     print(tune.status_line(state))
 

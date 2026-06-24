@@ -323,10 +323,24 @@ def _match_consensus(game: Game, consensus: dict) -> dict | None:
     return None
 
 
-def consensus_details_url(game: Game, consensus: dict) -> str:
-    """covers matchup-details URL for this game (for line movement), or ''."""
-    sides = _match_consensus(game, consensus)
-    return sides.get("details_url", "") if sides else ""
+# covers odds-page abbreviations vs MLB abbreviations differ for a few teams;
+# canonicalize so the slate-line lookup matches.
+_ABBR_ALIAS = {"WAS": "WSH", "CHW": "CWS", "SDP": "SD", "SFG": "SF", "TBR": "TB",
+               "KCR": "KC", "AZ": "ARI", "WSN": "WSH"}
+
+
+def _canon_abbr(ab: str) -> str:
+    ab = (ab or "").upper()
+    return _ABBR_ALIAS.get(ab, ab)
+
+
+def find_slate_line(game: Game, slate: list) -> dict | None:
+    """The odds-page line entry for this game, matched by team abbreviation."""
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    for e in slate:
+        if _canon_abbr(e["away_abbr"]) == a and _canon_abbr(e["home_abbr"]) == h:
+            return e
+    return None
 
 
 def _implied(ml) -> float:

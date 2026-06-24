@@ -55,8 +55,8 @@ def conf_min_for_streak(streak: int) -> float:
 
 
 def auto_tune(ledger: dict) -> dict:
-    """Recompute CONF_MIN from the recent losing streak and persist tuning.json."""
-    daily = _daily_pnl(ledger.get("entries", []))
+    """Recompute CONF_MIN from the Picks book's recent losing streak; persist."""
+    daily = _daily_pnl(ledger.get("picks", {}).get("entries", []))
     streak = _losing_streak(daily)
     conf = conf_min_for_streak(streak)
 

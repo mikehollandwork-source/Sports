@@ -155,20 +155,19 @@ and the public-fade strength. The other four counts are reported for context.
 
 ## Bankroll (paper trading)
 
-`src/grade.py` settles each flagged pick against the actual MLB final score and
-keeps a running **$1-per-pick bankroll** in `output/ledger.json`. The daily
-workflow grades the **prior day** (once its games are final) before generating
-today's picks, so the bankroll line shows up in the daily issue and the ledger
-is committed back. Grading is idempotent per pick (by `game_pk`), so re-running a
-partially-complete day safely catches late finishers without double-counting.
+`src/grade.py` settles the board against actual MLB final scores and keeps **two**
+$1/unit bankrolls in `output/ledger.json`:
+- **Picks** — every flagged pick (the system's actual plays).
+- **Leans** — every other game's advantage team (a hypothetical "bet the stat
+  favorite every day" tracker), kept separately for comparison.
 
-Settlement uses each pick's **moneyline captured at pick time** (from
-`betting_lines`): a $1 win pays the American odds (e.g. +106 → +$1.06), a loss is
-−$1.00. Picks with no recorded line (forum-only games covers' consensus didn't
-list) fall back to **even money (+100)**. Each entry records the odds and its
-source. Run a specific date with `python -m src.grade --date YYYY-MM-DD` (or the
-`grade_date` workflow input). *(True closing odds would need a separate odds-page
-fetch right before first pitch — a possible follow-up.)*
+Each bet is $1 on the advantage team at its **pre-game moneyline**, captured from
+covers' odds page (`pick_criteria.advantage_moneyline`) — a +124 winner pays
++$1.24, even money (+100) only if no price was available. Each book has its own
+W-L record and dollar bankroll; settlement is idempotent per game (`game_pk`). The
+daily workflow grades the **prior day** before generating today's board, so both
+bankrolls show up in the daily issue. Run a date with
+`python -m src.grade --date YYYY-MM-DD` (or the `grade_date` workflow input).
 
 **Learning from losses:** every settled pick stores its context (win-condition
 hits, stat-edge margin, each component's strength, underdog/favorite, odds). The

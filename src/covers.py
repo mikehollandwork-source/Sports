@@ -122,10 +122,6 @@ def consensus() -> dict[str, dict]:
     out = _parse_consensus_rows(soup)
     if not out:
         _fingerprint(text, final_url, soup, "consensus")
-    elif DEBUG:
-        # dump full-slate odds/matchups pages to find a line source for EVERY game
-        _fetch("https://www.covers.com/sport/baseball/mlb/odds")
-        _fetch("https://www.covers.com/sports/mlb/matchups")
     return out
 
 
@@ -134,33 +130,46 @@ def _pct(text: str) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def line_movement(details_url: str) -> dict | None:
-    """Open->current moneyline per side from a matchup-details page. The
-    'Moneyline Consensus: Picks Per Line' series lists the moneylines the game was
-    offered at over time (first = opening, last = current). Returns
-    {away_open, away_current, home_open, home_current} (American odds ints) or None."""
-    if not details_url:
-        return None
-    url = (details_url if details_url.startswith("http")
-           else "https://contests.covers.com" + details_url)
-    soup, _, _ = _fetch(url)
+ODDS_URL = "https://www.covers.com/sport/baseball/mlb/odds"
+
+
+def slate_lines() -> list[dict]:
+    """Open->current moneyline for EVERY game on the slate, from covers' MLB odds
+    page (one fetch). Each row has the two team abbreviations, an opening-lines-div
+    (opening MLs, away then home) and the top current MLs. Returns a list of
+    {away_abbr, home_abbr, away_open, away_current, home_open, home_current}."""
+    soup, _, _ = _fetch(ODDS_URL)
     if soup is None:
-        return None
+        return []
+    out: list[dict] = []
+    seen: set = set()
+    for r in soup.select(".oddsGameRow"):
+        abbr = []
+        for a in r.select('a[href*="/mlb/matchup/"]'):
+            m = re.match(r"^([A-Z]{2,3})\b", a.get_text(" ", strip=True))
+            if m and m.group(1) not in abbr:
+                abbr.append(m.group(1))
+        if len(abbr) < 2 or (abbr[0], abbr[1]) in seen:
+            continue
+        op = r.select_one(".opening-lines-div")
+        opens = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", op.get_text(" ") if op else "")
+        if len(opens) < 2:
+            continue
 
-    def series(cls: str) -> list[int]:
-        vals = []
-        for e in soup.select("." + cls):
-            t = e.get_text(strip=True)
-            if re.fullmatch(r"[+-]\d{3,4}", t):  # valid moneyline (excludes '0'/labels)
-                vals.append(int(t))
-        return vals
+        def _cur(cls: str) -> int | None:
+            el = r.select_one("." + cls)
+            m = re.search(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", el.get_text(" ")) if el else None
+            return int(m.group(0)) if m else None
 
-    away = series("covers-CoversConsensusDetailsTable-awayLine")
-    home = series("covers-CoversConsensusDetailsTable-homeLine")
-    if not away or not home:
-        return None
-    return {"away_open": away[0], "away_current": away[-1],
-            "home_open": home[0], "home_current": home[-1]}
+        ca = _cur("covers-CoversMatchups-topOddsAway")
+        ch = _cur("covers-CoversMatchups-topOddsHome")
+        if ca is None or ch is None:
+            continue
+        seen.add((abbr[0], abbr[1]))
+        out.append({"away_abbr": abbr[0], "home_abbr": abbr[1],
+                    "away_open": int(opens[0]), "home_open": int(opens[1]),
+                    "away_current": ca, "home_current": ch})
+    return out
 
 
 def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
@@ -187,13 +196,10 @@ def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
         odds = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", tr.get_text(" "))
         away_ml = odds[0] if len(odds) >= 2 else None
         home_ml = odds[1] if len(odds) >= 2 else None
-        details = next((a.get("href", "") for a in tr.find_all("a")
-                        if "matchupconsensusdetails" in a.get("href", "")), "")
         key = f"{teams[0]}@{teams[1]}".lower()
         out[key] = {
             "away": {"abbr": teams[0], "pct": away_pct, "moneyline": away_ml},
             "home": {"abbr": teams[1], "pct": home_pct, "moneyline": home_ml},
-            "details_url": details,
         }
     return out
 

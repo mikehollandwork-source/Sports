@@ -22,7 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, grade, notify, tune
-from .analysis import consensus_details_url, evaluate_game, line_confirms
+from .analysis import evaluate_game, find_slate_line, line_confirms
 from .mlb_api import enrich_with_stats, schedule_for
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -55,10 +55,17 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        result = evaluate_game(g, consensus, forum_counts)
-        if result["flagged"]:
-            _apply_line_filter(g, result, consensus)  # sharp-money confirmation
-        results.append(result)
+        results.append(evaluate_game(g, consensus, forum_counts))
+
+    # one odds-page fetch: the open->current line for every game, used both for the
+    # sharp-money line filter and to capture each advantage team's pre-game price.
+    try:
+        slate = covers.slate_lines()
+    except Exception as exc:
+        log.warning("odds page (slate lines) failed: %s", exc)
+        slate = []
+    for g, r in zip(games, results):
+        _attach_line(g, r, slate)
 
     picks = [r["pick"] for r in results if r["flagged"]]
     log.info("Flagged %d edge game(s)", len(picks))
@@ -71,19 +78,18 @@ def run(date: str) -> dict:
     }
 
 
-def _apply_line_filter(game, result: dict, consensus: dict) -> None:
-    """Hard sharp-money gate: keep a candidate pick only if the line moved toward
-    it (reverse line movement confirms the fade). Otherwise downgrade to a lean."""
-    url = consensus_details_url(game, consensus)
-    lm = None
-    if url:
-        try:
-            lm = covers.line_movement(url)
-        except Exception as exc:
-            log.warning("line movement fetch failed for %s: %s", game.game_pk, exc)
-    side = "home" if result["pick"] == game.home.name else "away"
-    confirms, info = line_confirms(side, lm)
+def _attach_line(game, result: dict, slate: list) -> None:
+    """Capture the advantage team's current pre-game moneyline (for the tracker,
+    picks AND leans) and apply the sharp-money line filter to candidate picks."""
     pc = result["pick_criteria"]
+    adv = pc["advantage_team"]
+    side = "home" if adv == game.home.name else "away"
+    e = find_slate_line(game, slate)
+    pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
+
+    if not result["flagged"]:
+        return
+    confirms, info = line_confirms(side, e)  # e has {away/home}_open/_current
     pc["line_check"] = info
     if confirms is not True:
         result["flagged"] = False
