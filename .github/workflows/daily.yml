@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write  # allow committing the output JSON back to the repo
+  issues: write    # allow posting the daily picks issue
 
 jobs:
   build-picks:
@@ -40,6 +41,20 @@ jobs:
           PICKS_DATE: ${{ github.event.inputs.date }}
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
         run: python -m src.main
+
+      - name: Post daily picks issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(cat output/latest_date.txt)
+          BODY=output/latest_summary.md
+          existing=$(gh issue list --search "Picks $DATE in:title" --state all \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$BODY"
+          else
+            gh issue create --title "Picks $DATE" --body-file "$BODY"
+          fi
 
       - name: Commit results
         run: |

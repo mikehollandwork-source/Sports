@@ -68,6 +68,40 @@ def run(date: str) -> dict:
     }
 
 
+def build_summary(payload: dict) -> str:
+    """Human-readable markdown for the daily picks issue."""
+    date = payload["date"]
+    picks = payload.get("picks", [])
+    games = payload.get("games", [])
+    out = [f"# MLB Public-vs-Stats Picks — {date}", ""]
+
+    if not picks:
+        out.append("**No edge picks today.** No game had the public on the wrong "
+                   "side of a team that also met the win condition (≥ 3/5).")
+    else:
+        out.append(f"**{len(picks)} pick(s): {', '.join(picks)}**")
+        out.append("")
+        for g in games:
+            if not g.get("flagged"):
+                continue
+            sa, pm, pc = g["statistical_advantage"], g["public_majority"], g["pick_criteria"]
+            bl = g.get("betting_lines")
+            out.append(f"## ✅ {g['pick']} — {g['matchup']}")
+            out.append(f"- Statistical edge: **{sa['team']}** "
+                       f"(home {sa['home_score']} / away {sa['away_score']})")
+            out.append(f"- Public is on (and we fade): **{pm['team']}**")
+            out.append(f"- Win condition met **{pc['complete_win_condition_hits']}/5** "
+                       f"(threshold {pc['threshold']})")
+            if bl:
+                m, n = bl["majority"], bl["non_majority"]
+                out.append(f"- Moneyline: pick **{n['team']} {n['moneyline']}** — "
+                           f"public on {m['team']} {m['moneyline']} ({m['consensus_pct']}%)")
+            out.append("")
+
+    out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
+    return "\n".join(out)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="MLB public-vs-stats edge finder")
     parser.add_argument("--date", default=os.environ.get("PICKS_DATE") or today_eastern())
@@ -79,6 +113,11 @@ def main() -> None:
     out_path = OUTPUT_DIR / f"picks_{args.date}.json"
     out_path.write_text(json.dumps(payload, indent=2))
     log.info("Wrote %s", out_path)
+
+    # Artifacts for the workflow's "post daily picks issue" step (gitignored).
+    (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))
+    (OUTPUT_DIR / "latest_date.txt").write_text(args.date)
+
     print(json.dumps(payload.get("picks", []), indent=2))
 
 
