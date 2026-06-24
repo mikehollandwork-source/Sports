@@ -216,6 +216,53 @@ def _todays_posts(soup: BeautifulSoup, date: str) -> list[str]:
     return posts
 
 
+def _dated_posts(soup: BeautifulSoup) -> list[tuple[str, str]]:
+    """(date, body) for every post node carrying a parseable datetime."""
+    out: list[tuple[str, str]] = []
+    for node in soup.select("[class*=post], [class*=thread], article"):
+        stamp = node.find(attrs={"datetime": True})
+        if not (stamp and stamp.get("datetime")):
+            continue
+        body = node.get_text(" ", strip=True)
+        if body:
+            out.append((stamp["datetime"][:10], body))
+    return out
+
+
+def forum_day_counts(teams: list[tuple[str, str]], dates: list[str],
+                     max_pages: int = 25) -> dict[str, dict[str, int]]:
+    """Page back through the forum and tally team mentions per day, for the
+    backtest. Returns {date: {team_name: count}} for each date in `dates`.
+
+    Posts are newest-first, so we walk pages until we've passed the oldest date
+    we need (or hit max_pages / an empty page). Same name+abbr matching as the
+    live forum tally."""
+    want = set(dates)
+    counts = {d: {name: 0 for name, _ in teams} for d in dates}
+    if not want:
+        return counts
+    matchers = {name: _team_patterns(name, abbr) for name, abbr in teams}
+    earliest = min(want)
+
+    for page in range(1, max_pages + 1):
+        url = FORUM_URL if page == 1 else f"{FORUM_URL}/{page}"
+        soup, _, _ = _fetch(url)
+        if soup is None:
+            break
+        dated = _dated_posts(soup)
+        if not dated:
+            break
+        for d, body in dated:
+            if d in counts:
+                low = body.lower()
+                for name, pats in matchers.items():
+                    if _mentions(low, pats):
+                        counts[d][name] += 1
+        if min(d for d, _ in dated) < earliest:  # paged past our window
+            break
+    return counts
+
+
 def _team_patterns(name: str, abbr: str = "") -> dict:
     """Match patterns for a team. `subs` (full name, nickname, city) are matched
     as substrings; `words` (the abbreviation) are matched on word boundaries so a

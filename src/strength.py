@@ -25,8 +25,10 @@ POLITE_DELAY = 0.1
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
-_WINPCT: dict[int, float] = {}
-_CACHE: dict[int, dict] = {}
+# win% varies by as-of date (standings snapshot); season wOBA/FIP are cumulative
+# season totals (stable), cached separately so the backtest fetches each once.
+_WINPCT: dict[str, dict[int, float]] = {}   # as_of_key -> {team_id: win_pct}
+_SEASON: dict[int, dict] = {}               # team_id -> {woba, fip}
 
 
 def _get(path: str, **params) -> dict:
@@ -36,11 +38,18 @@ def _get(path: str, **params) -> dict:
     return resp.json()
 
 
-def _load_winpct(season: int) -> None:
-    if _WINPCT:
-        return
+def _winpct(season: int, as_of: str | None) -> dict[int, float]:
+    """{team_id: win_pct} as of `as_of` (or current). Standings supports a date
+    snapshot, so the backtest gets point-in-time records."""
+    key = as_of or "now"
+    if key in _WINPCT:
+        return _WINPCT[key]
+    table: dict[int, float] = {}
     try:
-        data = _get("standings", leagueId="103,104", season=season)
+        params = {"leagueId": "103,104", "season": season}
+        if as_of:
+            params["date"] = as_of
+        data = _get("standings", **params)
         for rec in data.get("records", []):
             for tr in rec.get("teamRecords", []):
                 tid = tr["team"]["id"]
@@ -48,9 +57,11 @@ def _load_winpct(season: int) -> None:
                 if pct is None:
                     w, l = tr.get("wins", 0), tr.get("losses", 0)
                     pct = w / (w + l) if (w + l) else 0.5
-                _WINPCT[tid] = float(pct)
+                table[tid] = float(pct)
     except Exception as exc:
-        log.warning("standings (win%%) load failed: %s", exc)
+        log.warning("standings (win%%) load failed for %s: %s", key, exc)
+    _WINPCT[key] = table
+    return table
 
 
 def _woba(stat: dict) -> float | None:
@@ -88,17 +99,13 @@ def _fip(stat: dict) -> float | None:
     return (13 * hr + 3 * (bb + hbp) - 2 * k) / ip + FIP_CONSTANT
 
 
-def team_strength(team_id: int | None, season: int) -> dict:
-    """
-    {win_pct, woba, fip} for a team's season-to-date. Cached. Neutral defaults
-    (win_pct 0.5, woba/fip None) on any failure or unknown team.
-    """
-    if not team_id:
-        return {"win_pct": 0.5, "woba": None, "fip": None}
-    if team_id in _CACHE:
-        return _CACHE[team_id]
-    _load_winpct(season)
-    out = {"win_pct": _WINPCT.get(team_id, 0.5), "woba": None, "fip": None}
+def _season_stats(team_id: int, season: int) -> dict:
+    """{woba, fip} cumulative season totals for a team. Cached. NOTE: these are
+    current totals, not as-of-date - a small forward-looking bias in the backtest's
+    SOS (opponent-quality) term over a short window; win% is the as-of part."""
+    if team_id in _SEASON:
+        return _SEASON[team_id]
+    out = {"woba": None, "fip": None}
     try:
         data = _get(f"teams/{team_id}/stats", stats="season",
                     group="hitting,pitching", season=season)
@@ -113,6 +120,18 @@ def team_strength(team_id: int | None, season: int) -> dict:
             elif grp == "pitching":
                 out["fip"] = _fip(stat)
     except Exception as exc:
-        log.warning("team strength load failed for %s: %s", team_id, exc)
-    _CACHE[team_id] = out
+        log.warning("team season stats load failed for %s: %s", team_id, exc)
+    _SEASON[team_id] = out
     return out
+
+
+def team_strength(team_id: int | None, season: int, as_of: str | None = None) -> dict:
+    """
+    {win_pct, woba, fip} for a team. win_pct is as of `as_of` (or current);
+    woba/fip are season totals. Neutral defaults (0.5 / None) on any failure.
+    """
+    if not team_id:
+        return {"win_pct": 0.5, "woba": None, "fip": None}
+    stats = _season_stats(team_id, season)
+    return {"win_pct": _winpct(season, as_of).get(team_id, 0.5),
+            "woba": stats["woba"], "fip": stats["fip"]}
