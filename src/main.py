@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, grade, tune
+from . import covers, grade, notify, tune
 from .analysis import evaluate_game
 from .mlb_api import enrich_with_stats, schedule_for
 
@@ -118,22 +118,51 @@ def build_summary(payload: dict) -> str:
     return "\n".join(out)
 
 
+def write_outputs(payload: dict, date: str) -> None:
+    """Persist the picks JSON + the daily-issue artifacts (used by main and the
+    pre-game refresh)."""
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    (OUTPUT_DIR / f"picks_{date}.json").write_text(json.dumps(payload, indent=2))
+    (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))  # gitignored
+    (OUTPUT_DIR / "latest_date.txt").write_text(date)                      # gitignored
+    log.info("Wrote picks for %s (%d pick(s))", date, len(payload.get("picks", [])))
+
+
+def telegram_text(payload: dict) -> str:
+    """Plain-text picks summary for Telegram (no markdown that the API would garble)."""
+    date = payload["date"]
+    picks = payload.get("picks", [])
+    lines = [f"⚾ MLB Picks — {date}"]
+    if not picks:
+        lines.append("No edge picks today.")
+    else:
+        lines.append(f"{len(picks)} pick(s): {', '.join(picks)}")
+        for g in payload.get("games", []):
+            if not g.get("flagged"):
+                continue
+            pc = g["pick_criteria"]
+            c = pc["components"]
+            bl = g.get("betting_lines")
+            ml = f" {bl['non_majority']['moneyline']}" if bl else ""
+            lines.append(
+                f"• {g['pick']}{ml} — conf {pc['confidence']} "
+                f"(edge {c['stat_edge']['strength']}/fade {c['public_fade']['strength']}/"
+                f"wc {c['win_condition']['strength']}); fading {g['public_majority']['team']}")
+    lines.append(grade.bankroll_line().replace("**", ""))
+    ts = tune.status_line().replace("**", "")
+    if ts:
+        lines.append(ts)
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="MLB public-vs-stats edge finder")
     parser.add_argument("--date", default=os.environ.get("PICKS_DATE") or today_eastern())
     args = parser.parse_args()
 
     payload = run(args.date)
-
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    out_path = OUTPUT_DIR / f"picks_{args.date}.json"
-    out_path.write_text(json.dumps(payload, indent=2))
-    log.info("Wrote %s", out_path)
-
-    # Artifacts for the workflow's "post daily picks issue" step (gitignored).
-    (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))
-    (OUTPUT_DIR / "latest_date.txt").write_text(args.date)
-
+    write_outputs(payload, args.date)
+    notify.send_telegram(telegram_text(payload))
     print(json.dumps(payload.get("picks", []), indent=2))
 
 

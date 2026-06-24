@@ -184,6 +184,26 @@ currently finds ~0 picks. The forward bankroll above is the real measure of
 performance; the backtest's point-in-time machinery is correct and waits on that
 thread crawler.
 
+## Pre-game refresh + Telegram
+
+`.github/workflows/pregame.yml` polls every ~15 min during game hours and, **~30
+minutes before each distinct first-pitch time, regenerates the day's picks once**
+so they use confirmed lineups and the latest lines. `src/pregame.py` groups games
+by start time, so **simultaneous games are one "slot" = one run** (no double
+runs), and a per-day `output/pregame_state_<date>.json` dedupes each slot across
+polls. (Actions cron is ~15-min granular and can be delayed, so "30 min before" is
+approximate — it fires roughly T-15 to T-45.)
+
+**Telegram delivery** (`src/notify.py`): both the daily run and each pre-game
+refresh send the picks to Telegram (the pre-game refresh only when the pick set
+changed). To enable it, add two repo **secrets**:
+- `TELEGRAM_BOT_TOKEN` — create a bot via [@BotFather](https://t.me/BotFather).
+- `TELEGRAM_CHAT_ID` — message your bot once, then read your id from
+  `https://api.telegram.org/bot<token>/getUpdates`.
+
+Until those secrets are set, Telegram sending no-ops quietly and everything else
+runs normally.
+
 ## Running it
 
 ### On GitHub Actions (intended use)
