@@ -437,6 +437,21 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf + W_WC * wc_conf, 3)
     flagged = public_edge and confidence >= CONF_MIN
 
+    # status + plain reason for the board (every game is shown; picks pass, the
+    # rest are leans with why they missed)
+    if flagged:
+        status, reason = "pick", "public fading the favorite + confidence cleared"
+    elif not public_edge:
+        if not majority:
+            status, reason = "lean", "no public lean on this game"
+        else:
+            status, reason = "lean", f"public is also on {adv_team.name} (no fade)"
+    else:
+        comps = {"stat edge": edge_conf, "public fade": fade_conf, "win condition": wc_conf}
+        weakest = min(comps, key=comps.get)
+        status, reason = "lean", (f"confidence {confidence} < {CONF_MIN} "
+                                  f"(weakest: {weakest} {round(comps[weakest], 2)})")
+
     return {
         "game_pk": game.game_pk,
         "matchup": f"{game.away.name} @ {game.home.name}",
@@ -457,6 +472,9 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "away": wc_away,
         },
         "pick_criteria": {
+            "status": status,
+            "reason": reason,
+            "advantage_team": adv_team.name,
             "public_edge": public_edge,
             "confidence": confidence,
             "threshold": CONF_MIN,
