@@ -130,6 +130,54 @@ def _pct(text: str) -> float | None:
     return float(m.group(1)) if m else None
 
 
+ODDS_URL = "https://www.covers.com/sport/baseball/mlb/odds"
+
+
+def slate_lines() -> list[dict]:
+    """Open->current moneyline for EVERY game on the slate, from covers' MLB odds
+    page (one fetch). Each row has the two team abbreviations, an opening-lines-div
+    (opening MLs, away then home) and the top current MLs. Returns a list of
+    {away_abbr, home_abbr, away_open, away_current, home_open, home_current}."""
+    soup, _, _ = _fetch(ODDS_URL)
+    if soup is None:
+        return []
+    out: list[dict] = []
+    seen: set = set()
+    for r in soup.select(".oddsGameRow"):
+        abbr = []
+        for a in r.select('a[href*="/mlb/matchup/"]'):
+            m = re.match(r"^([A-Z]{2,3})\b", a.get_text(" ", strip=True))
+            if m and m.group(1) not in abbr:
+                abbr.append(m.group(1))
+        if len(abbr) < 2 or (abbr[0], abbr[1]) in seen:
+            if len(abbr) < 2:
+                log.warning("slate: row dropped — couldn't read 2 team abbreviations (got %s)", abbr)
+            continue
+        op = r.select_one(".opening-lines-div")
+        opens = re.findall(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", op.get_text(" ") if op else "")
+        ao, ho = (int(opens[0]), int(opens[1])) if len(opens) >= 2 else (None, None)
+
+        def _cur(cls: str) -> int | None:
+            el = r.select_one("." + cls)
+            m = re.search(r"(?<![\d.])[+-]\d{3,4}(?![\d.])", el.get_text(" ")) if el else None
+            return int(m.group(0)) if m else None
+
+        ca = _cur("covers-CoversMatchups-topOddsAway")
+        ch = _cur("covers-CoversMatchups-topOddsHome")
+        # Keep the row as long as we have a usable price: current is what the
+        # tracker needs; opens (for the sharp-money line filter) can be missing.
+        if (ca is None or ch is None) and (ao is None or ho is None):
+            log.warning("slate: row dropped — no usable odds for %s@%s", abbr[0], abbr[1])
+            continue
+        seen.add((abbr[0], abbr[1]))
+        out.append({"away_abbr": abbr[0], "home_abbr": abbr[1],
+                    "away_open": ao, "home_open": ho,
+                    "away_current": ca if ca is not None else ao,
+                    "home_current": ch if ch is not None else ho})
+    log.info("slate: parsed %d game line(s) from the odds page", len(out))
+    return out
+
+
 def _parse_consensus_rows(soup: BeautifulSoup) -> dict[str, dict]:
     """Each matchup row holds two team anchors (href /consensus/pickleadersbyteam/,
     text = abbreviation, e.g. 'Bos'), two bet-% spans

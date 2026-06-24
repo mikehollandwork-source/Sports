@@ -69,6 +69,10 @@ W_EDGE, W_FADE, W_WC = 0.34, 0.33, 0.33
 EDGE_FULL = 0.40    # team_score margin that counts as a full-strength stat edge
 CONF_MIN = 0.50     # minimum blended confidence to flag a pick
 
+# Line-movement gate: a pick is only kept if the moneyline moved TOWARD it (the
+# market/sharps confirming the fade) by at least this implied-probability shift.
+LINE_CONFIRM_MIN = 0.0
+
 
 def _apply_tuning() -> None:
     """Override the decision params from output/tuning.json (written by the
@@ -317,6 +321,49 @@ def _match_consensus(game: Game, consensus: dict) -> dict | None:
         if _matches(game, [sides["away"]["abbr"], sides["home"]["abbr"]]):
             return sides
     return None
+
+
+# covers odds-page abbreviations vs MLB abbreviations differ for a few teams;
+# canonicalize so the slate-line lookup matches.
+_ABBR_ALIAS = {"WAS": "WSH", "CHW": "CWS", "SDP": "SD", "SFG": "SF", "TBR": "TB",
+               "KCR": "KC", "AZ": "ARI", "WSN": "WSH"}
+
+
+def _canon_abbr(ab: str) -> str:
+    ab = (ab or "").upper()
+    return _ABBR_ALIAS.get(ab, ab)
+
+
+def find_slate_line(game: Game, slate: list) -> dict | None:
+    """The odds-page line entry for this game, matched by team abbreviation."""
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    for e in slate:
+        if _canon_abbr(e["away_abbr"]) == a and _canon_abbr(e["home_abbr"]) == h:
+            return e
+    return None
+
+
+def _implied(ml) -> float:
+    """American moneyline -> implied win probability."""
+    ml = int(ml)
+    return 100.0 / (ml + 100) if ml > 0 else (-ml) / (float(-ml) + 100)
+
+
+def line_confirms(side: str, lm: dict | None) -> tuple[bool | None, dict]:
+    """Did the line move TOWARD a pick on `side` ('away'/'home')? Reverse line
+    movement (the pick's price shortening) = sharp money confirming the fade.
+    Returns (confirms, detail). confirms is None when the line is unavailable."""
+    if not lm or lm.get(f"{side}_open") is None or lm.get(f"{side}_current") is None:
+        return None, {"status": "unknown", "reason": "no line data"}
+    o, c = lm[f"{side}_open"], lm[f"{side}_current"]
+    shift = round(_implied(c) - _implied(o), 3)
+    ok = shift > LINE_CONFIRM_MIN
+    return ok, {
+        "status": "confirms" if ok else "contradicts",
+        "open": o, "current": c, "implied_shift": shift,
+        "reason": (f"line moved toward the pick ({o:+d}→{c:+d})" if ok
+                   else f"line moved away from the pick ({o:+d}→{c:+d})"),
+    }
 
 
 def _consensus_home_lean(game: Game, sides: dict) -> float | None:
