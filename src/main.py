@@ -219,31 +219,62 @@ def write_outputs(payload: dict, date: str) -> None:
     log.info("Wrote picks for %s (%d pick(s))", date, len(payload.get("picks", [])))
 
 
+def _ml_str(pc: dict) -> str:
+    ml = pc.get("advantage_moneyline")
+    return f" ({ml:+d})" if isinstance(ml, int) else ""
+
+
+def _telegram_records_lines() -> list[str]:
+    """Day/Week/Month/YTD records for both books, laid out one window per line."""
+    ledger = grade.load_ledger()
+    today = dt.datetime.now(EASTERN).date()
+    out: list[str] = []
+    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True)):
+        tag = " (hypothetical)" if hyp else ""
+        rec = grade.windowed_records(ledger[key], today)
+        if not rec:
+            out.append(f"{name}{tag}: no settled bets yet")
+            continue
+        out.append(f"{name}{tag}:")
+        for label, (w, l, u) in rec:
+            out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
+    return out
+
+
 def telegram_text(payload: dict) -> str:
-    """Plain-text board for Telegram (every matchup; ✅ pick, 🔸 lean + reason)."""
+    """Readable phone layout for Telegram: the pick(s) up top, then leans, then
+    the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
     date = payload["date"]
+    games = _ranked(payload.get("games", []))
     picks = payload.get("picks", [])
-    head = f"⚾ MLB Board — {date} ({len(picks)} pick(s)"
-    head += f": {', '.join(picks)})" if picks else ")"
-    lines = [head]
-    for g in _ranked(payload.get("games", [])):
+    flagged = [g for g in games if g.get("flagged")]
+    leans = [g for g in games if not g.get("flagged")]
+
+    L = [f"⚾ MLB BOARD — {date}",
+         f"{len(picks)} pick(s)" + (f": {', '.join(picks)}" if picks else " today")]
+
+    for g in flagged:
         pc = g["pick_criteria"]
-        adv = pc["advantage_team"]
         wc = pc["components"]["win_condition"]["hits"]
-        if g.get("flagged"):
-            bl = g.get("betting_lines")
-            ml = f" {bl['non_majority']['moneyline']}" if bl else ""
-            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {_c10(pc['confidence'])}")
-            lines.append(f"   edge {_edge_word(pc['components']['stat_edge']['strength'])}, "
-                         f"win-cond {wc}/5; public on {_public_evidence(g)} → we fade")
-        else:
-            lines.append(f"🔸 {adv} ({g['matchup']}) conf {_c10(pc['confidence'])}")
-            lines.append(f"   public on {_public_evidence(g)}; win-cond {wc}/5 — {pc['reason']}")
-    lines.append(grade.records_block().replace("**", "").replace("_", ""))
+        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
+        L += ["",
+              f"✅ PICK: {pc['advantage_team']}{_ml_str(pc)}",
+              f"   {g['matchup']}",
+              f"   confidence {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
+              f"   public on {_public_evidence(g)} → we fade"]
+
+    if leans:
+        L += ["", "— LEANS (advantage team, not a play) —"]
+        for g in leans:
+            pc = g["pick_criteria"]
+            L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])}",
+                  f"   {g['matchup']} — {pc['reason']}"]
+
+    L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     ts = tune.status_line().replace("**", "")
     if ts:
-        lines.append(ts)
-    return "\n".join(lines)
+        L += ["", ts]
+    return "\n".join(L)
 
 
 def main() -> None:

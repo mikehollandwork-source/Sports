@@ -1,0 +1,81 @@
+name: Telegram "go" listener
+
+# Polls Telegram every minute; when you text the bot "go" (or "run"), it builds
+# today's board and sends it back. GitHub's cron is best-effort (often a 1-5 min
+# delay), so "go" is not instant — it fires on the next poll. Only messages from
+# the configured TELEGRAM_CHAT_ID can trigger it.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "* * * * *"
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: telegram-go
+  cancel-in-progress: false
+
+jobs:
+  listen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Telegram for "go"
+        id: listen
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m src.listen
+
+      - name: Grade prior day's picks
+        if: steps.listen.outputs.should_run == 'true'
+        run: python -m src.grade
+
+      - name: Run edge finder
+        if: steps.listen.outputs.should_run == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m src.main
+
+      - name: Post daily picks issue
+        if: steps.listen.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(cat output/latest_date.txt)
+          BODY=output/latest_summary.md
+          existing=$(gh issue list --search "Picks $DATE in:title" --state all \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$BODY"
+          else
+            gh issue create --title "Picks $DATE" --body-file "$BODY"
+          fi
+
+      - name: Commit results
+        if: steps.listen.outputs.should_run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Telegram 'go' board ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
