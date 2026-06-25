@@ -1,13 +1,13 @@
 name: Telegram "go" listener
 
-# Polls Telegram every minute; when you text the bot "go" (or "run"), it builds
-# today's board and sends it back. GitHub's cron is best-effort (often a 1-5 min
-# delay), so "go" is not instant — it fires on the next poll. Only messages from
-# the configured TELEGRAM_CHAT_ID can trigger it.
+# Polls Telegram every 5 minutes; when you text the bot "go" (or "run"), it builds
+# today's board and sends it back. GitHub ignores sub-5-minute crons and even a
+# 5-minute cron is best-effort (can be delayed under load), so "go" is not instant
+# — it fires on the next poll. Only messages from TELEGRAM_CHAT_ID can trigger it.
 on:
   workflow_dispatch:
   schedule:
-    - cron: "* * * * *"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
