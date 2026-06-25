@@ -186,6 +186,49 @@ def bankroll_line(ledger: dict | None = None) -> str:
             + "  _($1/bet at pre-game moneyline)_")
 
 
+# --- windowed records (Day / Week / Month / YTD) ------------------------------
+def _tally(entries: list[dict]) -> tuple[int, int, float]:
+    w = sum(1 for e in entries if e["result"] == "W")
+    l = sum(1 for e in entries if e["result"] == "L")
+    return w, l, round(sum(e.get("profit", 0.0) for e in entries), 2)
+
+
+def windowed_records(book: dict, today: dt.date) -> list[tuple[str, tuple[int, int, float]]]:
+    """W-L-units for a book over Day / Week / Month / YTD. Day = the most recent
+    settled date; Week/Month/YTD are calendar windows (since Monday / since the
+    1st / since Jan 1) ending today. Empty list when the book has no settled bets."""
+    e = book["entries"]
+    if not e:
+        return []
+    last = max(x["date"] for x in e)
+    monday = (today - dt.timedelta(days=today.weekday())).isoformat()
+    first = today.replace(day=1).isoformat()
+    jan1 = today.replace(month=1, day=1).isoformat()
+    windows = [
+        (f"Day ({last})", [x for x in e if x["date"] == last]),
+        ("Week", [x for x in e if x["date"] >= monday]),
+        ("Month", [x for x in e if x["date"] >= first]),
+        ("YTD", [x for x in e if x["date"] >= jan1]),
+    ]
+    return [(label, _tally(rows)) for label, rows in windows]
+
+
+def _fmt_windows(rec: list) -> str:
+    return " · ".join(f"{label} {w}-{l} {u:+.2f}u" for label, (w, l, u) in rec)
+
+
+def records_block(ledger: dict | None = None, today: dt.date | None = None) -> str:
+    """Multi-line Day/Week/Month/YTD records for BOTH books (markdown)."""
+    ledger = ledger or load_ledger()
+    today = today or dt.datetime.now(EASTERN).date()
+    lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
+    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True)):
+        tag = " (hypothetical)" if hyp else ""
+        rec = windowed_records(ledger[key], today)
+        lines.append(f"- **{name}{tag}:** " + (_fmt_windows(rec) if rec else "no settled bets yet"))
+    return "\n".join(lines)
+
+
 def yesterday_eastern() -> str:
     return (dt.datetime.now(EASTERN).date() - dt.timedelta(days=1)).isoformat()
 

@@ -196,7 +196,7 @@ def build_summary(payload: dict) -> str:
                "public agrees with the stats (no one to fade) or confidence fell short._")
 
     out.append("")
-    out.append(grade.bankroll_line())
+    out.append(grade.records_block())
     rev = grade.review_line()
     if rev:
         out.append("")
@@ -239,7 +239,7 @@ def telegram_text(payload: dict) -> str:
         else:
             lines.append(f"🔸 {adv} ({g['matchup']}) conf {_c10(pc['confidence'])}")
             lines.append(f"   public on {_public_evidence(g)}; win-cond {wc}/5 — {pc['reason']}")
-    lines.append(grade.bankroll_line().replace("**", ""))
+    lines.append(grade.records_block().replace("**", "").replace("_", ""))
     ts = tune.status_line().replace("**", "")
     if ts:
         lines.append(ts)
