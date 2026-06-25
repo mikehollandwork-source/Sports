@@ -267,7 +267,8 @@ def telegram_text(payload: dict) -> str:
         L += ["", "— LEANS (advantage team, not a play) —"]
         for g in leans:
             pc = g["pick_criteria"]
-            L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])}",
+            wc = pc["components"]["win_condition"]["hits"]
+            L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
                   f"   {g['matchup']} — {pc['reason']}"]
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
