@@ -66,6 +66,13 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("odds page (slate lines) failed: %s", exc)
         slate = []
+    if os.environ.get("COVERS_DEBUG") == "1":   # also capture ESPN's odds JSON
+        try:
+            from . import espn
+            espn.dump_debug(date)
+        except Exception as exc:
+            log.warning("espn debug dump failed: %s", exc)
+
     baseline = _load_baseline(date)
     for g, r in zip(games, results):
         _attach_line(g, r, slate, baseline)
