@@ -69,9 +69,14 @@ W_EDGE, W_FADE, W_WC = 0.34, 0.33, 0.33
 EDGE_FULL = 0.40    # team_score margin that counts as a full-strength stat edge
 CONF_MIN = 0.50     # minimum blended confidence to flag a pick
 
-# Line-movement gate: a pick is only kept if the moneyline moved TOWARD it (the
-# market/sharps confirming the fade) by at least this implied-probability shift.
-LINE_CONFIRM_MIN = 0.0
+# Line-movement gate (implied-probability shift of OUR side, open->current):
+#   < LINE_CONFIRM_MIN : noise / too small to mean anything (does not confirm)
+#   LINE_CONFIRM_MIN..  : confirms the fade; "strong" once it clears LINE_STRONG
+#   >= LINE_BIG         : suspiciously large - usually a pitcher change / news, not
+#                         value, so we DON'T auto-confirm; flag it for a manual look.
+LINE_CONFIRM_MIN = 0.02   # ~10c on the moneyline; below this is market noise
+LINE_STRONG = 0.05        # a clearly strong sharp move
+LINE_BIG = 0.08           # ~30c+; treat as news, verify before trusting
 
 
 def _apply_tuning() -> None:
@@ -357,13 +362,23 @@ def line_confirms(side: str, lm: dict | None) -> tuple[bool | None, dict]:
         return None, {"status": "unknown", "reason": "no line data"}
     o, c = lm[f"{side}_open"], lm[f"{side}_current"]
     shift = round(_implied(c) - _implied(o), 3)
-    ok = shift > LINE_CONFIRM_MIN
-    status = "flat" if shift == 0 else ("confirms" if ok else "contradicts")
-    reason = {"flat": f"line hasn't moved ({o:+d}→{c:+d})",
-              "confirms": f"line moved toward the pick ({o:+d}→{c:+d})",
-              "contradicts": f"line moved away from the pick ({o:+d}→{c:+d})"}[status]
-    return ok, {"status": status, "open": o, "current": c,
-                "implied_shift": shift, "reason": reason}
+    arrow = f"{o:+d}→{c:+d}"
+    info = {"open": o, "current": c, "implied_shift": shift}
+    if shift == 0:
+        info.update(status="flat", reason=f"line hasn't moved ({arrow})")
+    elif shift < 0:
+        info.update(status="contradicts", reason=f"line moved away from the pick ({arrow}, {shift:+.1%})")
+    elif shift < LINE_CONFIRM_MIN:
+        info.update(status="soft",
+                    reason=f"only a slight move our way, below the {LINE_CONFIRM_MIN:.0%} signal floor ({arrow}, {shift:+.1%})")
+    elif shift >= LINE_BIG:
+        info.update(status="caution",
+                    reason=f"big move our way ({arrow}, {shift:+.1%}) — usually a pitcher change/news, verify before trusting")
+    else:
+        tier = "strong" if shift >= LINE_STRONG else "moderate"
+        info.update(status="confirms", tier=tier,
+                    reason=f"{tier} sharp move toward the pick ({arrow}, {shift:+.1%})")
+    return info["status"] == "confirms", info
 
 
 def _consensus_home_lean(game: Game, sides: dict) -> float | None:

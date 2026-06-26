@@ -7,8 +7,9 @@ in output/ledger.json:
     stat favorite every day" tracker).
 
 Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
-covers' odds page (pick_criteria.advantage_moneyline); even money (+100) if that
-price wasn't available. Each book keeps a W-L record and a dollar bankroll, and is
+covers' odds page (pick_criteria.advantage_moneyline). A game whose real price
+wasn't captured is **skipped, not booked at even money**, so every settled bet
+reflects a real price. Each book keeps a W-L record and a dollar bankroll, and is
 idempotent per game (by game_pk) so re-running a day never double-counts.
 
 Runs on GitHub Actions (the MLB API is firewalled in the build sandbox). Default
@@ -35,7 +36,6 @@ LEDGER_PATH = OUTPUT_DIR / "ledger.json"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 STAKE = 1.0
-ODDS = 100  # even-money fallback when no pre-game price was captured
 
 
 def american_profit(odds: int, stake: float = STAKE) -> float:
@@ -50,7 +50,7 @@ def _empty_book() -> dict:
 
 def empty_ledger() -> dict:
     return {"stake": STAKE,
-            "odds_basis": "pre-game moneyline from covers odds page (even-money fallback)",
+            "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "picks": _empty_book(), "leans": _empty_book(),
             "leans_faded": _empty_book()}
 
@@ -79,18 +79,20 @@ def save_ledger(ledger: dict) -> None:
     LEDGER_PATH.write_text(json.dumps(ledger, indent=2))
 
 
-def _odds(g: dict, key: str) -> tuple[int, str]:
+def _price(g: dict, key: str) -> int | None:
+    """The captured pre-game moneyline for a side, or None if it wasn't recorded
+    (in which case we DON'T book the bet - no fake even-money entries)."""
     ml = g.get("pick_criteria", {}).get(key)
-    return (int(ml), "pre-game moneyline") if ml is not None else (ODDS, "even (+100)")
+    return int(ml) if ml is not None else None
 
 
-def _settle(date, g, res, bet, won, odds, src) -> dict:
+def _settle(date, g, res, bet, won, odds) -> dict:
     return {
         "key": f"{date}#{g['game_pk']}",
         "date": date, "matchup": g["matchup"], "bet": bet,
         "result": "W" if won else "L",
         "score": f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}",
-        "odds": odds, "odds_source": src,
+        "odds": odds, "odds_source": "pre-game moneyline",
         "profit": round(american_profit(odds) if won else -STAKE, 2),
     }
 
@@ -115,16 +117,19 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
         res = results.get(g.get("game_pk"))
         if not adv or not res or not res["final"] or not res["winner"]:
             continue
-        odds, src = _odds(g, "advantage_moneyline")
-        entry = _settle(date, g, res, adv, res["winner"] == adv, odds, src)
+        odds = _price(g, "advantage_moneyline")
+        if odds is None:
+            continue  # no real captured price -> skip, don't book a fake even-money bet
+        entry = _settle(date, g, res, adv, res["winner"] == adv, odds)
         if g.get("flagged"):
             pick_entries.append(entry)
             continue
         lean_entries.append(entry)
-        # the fade: bet the OTHER team at its pre-game price
+        # the fade: bet the OTHER team at its pre-game price (skip if we didn't capture it)
         opp = res["home"] if adv == res["away"] else res["away"]
-        f_odds, f_src = _odds(g, "opponent_moneyline")
-        fade_entries.append(_settle(date, g, res, opp, res["winner"] == opp, f_odds, f_src))
+        f_odds = _price(g, "opponent_moneyline")
+        if f_odds is not None:
+            fade_entries.append(_settle(date, g, res, opp, res["winner"] == opp, f_odds))
     return pick_entries, lean_entries, fade_entries
 
 

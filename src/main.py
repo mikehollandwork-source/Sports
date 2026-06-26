@@ -174,7 +174,7 @@ def _attach_line(game, result: dict, slate: list, baseline: dict) -> None:
         result["pick"] = None
         pc["status"] = "lean"
         pc["reason"] = (f"line did not confirm the fade — {info['reason']}"
-                        if info["status"] in ("contradicts", "flat")
+                        if info["status"] != "unknown"
                         else "line movement unavailable — can't confirm the fade")
 
 
@@ -215,11 +215,18 @@ def _line_phrase(lc: dict | None) -> str:
     if not lc or lc.get("status") == "unknown":
         return "line movement unavailable"
     arrow = f"{lc['open']:+d}→{lc['current']:+d}"
-    if lc["status"] == "flat":
+    shift = lc.get("implied_shift", 0.0)
+    status = lc["status"]
+    if status == "flat":
         return f"no movement yet ({arrow})"
-    if lc["status"] == "confirms":
-        return f"moved IN OUR FAVOR ✓ ({arrow}, {lc['implied_shift']:+.1%})"
-    return f"moved AGAINST us ✗ ({arrow}, {lc['implied_shift']:+.1%})"
+    if status == "contradicts":
+        return f"moved AGAINST us ✗ ({arrow}, {shift:+.1%})"
+    if status == "soft":
+        return f"slight move our way, below signal ({arrow}, {shift:+.1%})"
+    if status == "caution":
+        return f"⚠️ big move our way ({arrow}, {shift:+.1%}) — check for a pitcher change"
+    label = "STRONG" if lc.get("tier") == "strong" else "moderate"
+    return f"moved IN OUR FAVOR ✓ ({label}, {arrow}, {shift:+.1%})"
 
 
 def _line_bullet(pc: dict) -> str | None:
