@@ -21,8 +21,9 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, tune
-from .analysis import _canon_abbr, evaluate_game, find_slate_line, line_confirms
+from . import covers, espn, grade, notify, public_sources, tune
+from .analysis import (LINE_CONFIRM_MIN, _canon_abbr, _implied, evaluate_game,
+                       find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -48,6 +49,11 @@ def run(date: str) -> dict:
     consensus = covers.consensus()
     teams = [(t.name, t.abbreviation) for g in games for t in (g.home, g.away)]
     forum_counts = covers.forum_majority(teams, date)
+    try:
+        extra_public = public_sources.all_sources()  # 2 more public-% sources to cross-check
+    except Exception as exc:
+        log.warning("extra public sources failed: %s", exc)
+        extra_public = {}
 
     results = []
     for g in games:
@@ -55,7 +61,7 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        r = evaluate_game(g, consensus, forum_counts)
+        r = evaluate_game(g, consensus, forum_counts, extra_public)
         r["game_datetime"] = g.start_time
         results.append(r)
 
@@ -202,6 +208,20 @@ def _attach_line(game, result: dict, slate: list) -> None:
     confirms, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
     pc["line_check"] = info
 
+    # Cross-check the public read against the money: did the line move WITH the
+    # stated public side (public money real) or AGAINST it (reverse line move — the
+    # % doesn't match where the money is, and a tailwind for our fade)?
+    cc = result.get("public_check")
+    if cc and cc.get("majority_side") and e:
+        ps = cc["majority_side"]
+        po, pcur = e.get(f"{ps}_open"), e.get(f"{ps}_current")
+        if po is not None and pcur is not None:
+            shift = round(_implied(pcur) - _implied(po), 3)
+            cc["line"] = ("with public" if shift >= LINE_CONFIRM_MIN
+                          else "against public" if shift <= -LINE_CONFIRM_MIN else "flat")
+            if cc["line"] == "against public":
+                cc["flags"].append("reverse line move — money went against the public %")
+
     if not result["flagged"]:
         return
     if confirms is not True:
@@ -282,6 +302,28 @@ def _line_bullet(pc: dict) -> str | None:
     return None if lc is None else f"   • line: {_line_phrase(lc)}"
 
 
+def _public_check_phrase(g: dict) -> str | None:
+    """One-line public-consensus cross-check: the verdict, how many sources agree,
+    whether the money moved with or against the public, and any anomaly flags.
+    None when there's no public read to check."""
+    cc = g.get("public_check")
+    if not cc or not cc.get("majority_side"):
+        return None
+    parts = [cc.get("verdict", "unconfirmed")]
+    n = len(cc.get("sources", []))
+    if n:
+        parts.append(f"{cc.get('agree', 0)}/{n} sources")
+    line = cc.get("line", "unknown")
+    if line == "with public":
+        parts.append("money with public")
+    elif line == "against public":
+        parts.append("money AGAINST public (RLM)")
+    s = " · ".join(parts)
+    if cc.get("flags"):
+        s += " · ⚠️ " + "; ".join(cc["flags"])
+    return s
+
+
 def _situational_phrase(g: dict) -> str | None:
     """'NYY 24-15 home · BOS 18-21 road' — this-season straight-up situational
     records (display-only context). None when unavailable."""
@@ -320,6 +362,9 @@ def _game_lines(g: dict) -> list[str]:
             f"   • consistency: {cons}/5 games _(context)_",
             f"   • why not a pick: {pc['reason']}",
         ]
+    pcheck = _public_check_phrase(g)
+    if pcheck:
+        lines.append(f"   • public check: {pcheck}")
     sit = _situational_phrase(g)
     if sit:
         lines.append(f"   • this season: {sit} _(context)_")
@@ -432,6 +477,9 @@ def telegram_text(payload: dict) -> str:
               f"   stat edge: {edge} (margin {emargin}) · consistency {cons}/5",
               f"   👥 public: {_public_evidence(g)}",
               f"   🦈 sharp/line: {_line_phrase(pc.get('line_check'))}{frozen}"]
+        pcheck = _public_check_phrase(g)
+        if pcheck:
+            L.append(f"   🔍 public check: {pcheck}")
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 this season: {sit}")

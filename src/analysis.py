@@ -472,6 +472,84 @@ def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
     return majority, detail
 
 
+def _source_side(game: Game, row: dict) -> tuple[str | None, tuple[int, int] | None]:
+    """Which side ('home'/'away') a public-% row says the public is on, matched to
+    this game by abbreviation (orientation-agnostic). (None, None) if it isn't this
+    game or the percentages are missing."""
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    ra, rh = _canon_abbr(row.get("away_abbr", "")), _canon_abbr(row.get("home_abbr", ""))
+    if {ra, rh} != {a, h}:
+        return None, None
+    ap, hp = row.get("away_pct"), row.get("home_pct")
+    if ap is None or hp is None:
+        return None, None
+    if ra == h:                      # row lists the teams home-first; reorient
+        ap, hp = hp, ap
+    return ("away" if ap >= hp else "home"), (round(ap), round(hp))
+
+
+def public_crosscheck(game: Game, majority: Team | None, detail: dict,
+                      extra_public: dict | None) -> dict:
+    """Corroborate the public read across every available source (covers consensus,
+    the covers forum tally, and each extra public-% site) and sanity-check it.
+
+    A single book's public % can be misleading, so we only TRUST the read enough to
+    fade it when at least two independent sources agree on the side. With fewer than
+    two opinions we can't cross-check, so we don't penalize it (keeps the system live
+    while new-source selectors are still being tuned) — but we mark it unconfirmed.
+
+    Returns {sources, majority_side, agree, dissent, trusted, verdict, note, flags}.
+    `line` is filled in later (main._attach_line) from the slate.
+    """
+    out = {"sources": [], "majority_side": None, "agree": 0, "dissent": 0,
+           "trusted": True, "verdict": "no public read",
+           "note": "no public lean to check", "flags": [], "line": "unknown"}
+    if majority is None:
+        return out
+    out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
+
+    opinions: list[tuple[str, str, tuple | None]] = []
+    if detail.get("consensus_lean"):
+        opinions.append(("covers", "home" if detail["consensus_lean"] > 0 else "away",
+                         tuple((detail.get("consensus") or {}).get("pcts", {}).values()) or None))
+    if detail.get("forum_lean"):
+        opinions.append(("forum", "home" if detail["forum_lean"] > 0 else "away", None))
+    for name, rows in (extra_public or {}).items():
+        for row in rows:
+            side, pcts = _source_side(game, row)
+            if side:
+                opinions.append((name, side, pcts))
+                break
+
+    ms = out["majority_side"]
+    out["sources"] = [{"name": n, "side": s, "agrees": s == ms} for n, s, _ in opinions]
+    out["agree"] = sum(1 for _, s, _ in opinions if s == ms)
+    out["dissent"] = sum(1 for _, s, _ in opinions if s != ms)
+
+    # sanity: a source whose two percentages don't roughly complement (sum ~100) is
+    # suspect markup or a bad read - surface it rather than silently trusting it.
+    for n, _, pcts in opinions:
+        if pcts and len(pcts) >= 2:
+            tot = sum(pcts[:2])
+            if not 80 <= tot <= 120:
+                out["flags"].append(f"{n} % looks off (sums {int(tot)}%)")
+
+    n = len(opinions)
+    out["trusted"] = (n < 2) or (out["agree"] > out["dissent"])
+    dis_names = [s["name"] for s in out["sources"] if not s["agrees"]]
+    if n < 2:
+        out["verdict"], out["note"] = "unconfirmed", "only one public source — can't cross-check"
+    elif out["dissent"] == 0:
+        out["verdict"], out["note"] = "corroborated", f"all {n} sources agree on the public side"
+    elif out["trusted"]:
+        out["verdict"] = "mostly agrees"
+        out["note"] = f"{out['agree']}/{n} sources agree ({', '.join(dis_names)} differ)"
+    else:
+        out["verdict"] = "sources split"
+        out["note"] = f"sources disagree on the public side ({', '.join(dis_names)} differ)"
+    return out
+
+
 def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None) -> dict | None:
     """Each side's moneyline, split into the public-majority side and the side the
     public is fading. The majority side follows the overall public read
@@ -499,7 +577,8 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
     return {"majority": fmt(majority), "non_majority": fmt(non_majority)}
 
 
-def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
+def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
+                  extra_public: dict | None = None) -> dict:
     # platoon depends on the matchup, so set it before scoring
     home_opp = game.away.probable_pitcher.hand if game.away.probable_pitcher else ""
     away_opp = game.home.probable_pitcher.hand if game.home.probable_pitcher else ""
@@ -511,6 +590,11 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
 
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
+
+    # Cross-check the public read across all sources (covers % + forum + extras);
+    # we only fade a read that's corroborated (see public_crosscheck).
+    crosscheck = public_crosscheck(game, majority, majority_detail, extra_public)
+    public_trusted = crosscheck["trusted"]
 
     # Precondition: there's a public read AND the statistical favorite is the side
     # the public is fading (keeps the public-vs-stats thesis).
@@ -528,7 +612,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     # in our favor) is applied in main._attach_line, which downgrades a flagged
     # pick whose line doesn't confirm.
     edge_strong = edge_margin >= EDGE_THRESHOLD
-    flagged = public_edge and edge_strong
+    flagged = public_edge and edge_strong and public_trusted
 
     if flagged:
         status, reason = "pick", "public fade + stat edge cleared (pending line confirm)"
@@ -537,9 +621,11 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             status, reason = "lean", "no public lean on this game"
         else:
             status, reason = "lean", f"public is also on {adv_team.name} (no fade)"
-    else:
+    elif not edge_strong:
         status, reason = "lean", (f"stat edge too small (margin {round(edge_margin, 2)} "
                                   f"< {EDGE_THRESHOLD} threshold)")
+    else:
+        status, reason = "lean", f"public read not corroborated — {crosscheck['note']}"
 
     return {
         "game_pk": game.game_pk,
@@ -555,6 +641,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "team": majority.name if majority else None,
             "detail": majority_detail,
         },
+        "public_check": crosscheck,
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,
@@ -565,6 +652,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "reason": reason,
             "advantage_team": adv_team.name,
             "public_edge": public_edge,
+            "public_trusted": public_trusted,
             "edge_strong": edge_strong,
             "confidence": confidence,
             "edge_threshold": EDGE_THRESHOLD,
