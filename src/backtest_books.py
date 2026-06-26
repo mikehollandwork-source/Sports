@@ -67,7 +67,7 @@ def _settle(book: dict, won: bool, ml: int | None) -> None:
 
 def run(end: str, days: int) -> dict:
     leans, faded = _book(), _book()
-    pool = 0  # games clearing the stat-edge gate (pick-eligible, fade unknown)
+    leans_big, faded_big = _book(), _book()   # restricted to a >=EDGE_THRESHOLD edge
     entries: list[dict] = []
     for d in _date_range(end, days):
         try:
@@ -87,9 +87,7 @@ def run(end: str, days: int) -> dict:
                 log.warning("enrich %s failed: %s", g.game_pk, exc)
                 continue
             fav, hs, as_ = statistical_favorite(g)
-            opp = g.away if fav.team_id == g.home.team_id else g.home
-            if abs(hs - as_) >= EDGE_THRESHOLD:
-                pool += 1
+            big = abs(hs - as_) >= EDGE_THRESHOLD
             side = "home" if fav.team_id == g.home.team_id else "away"
             e = find_slate_line(g, slate)
             fav_ml = e.get(f"{side}_current") if e else None
@@ -97,11 +95,17 @@ def run(end: str, days: int) -> dict:
             fav_won = res["winner"] == fav.name
             _settle(leans, fav_won, fav_ml)
             _settle(faded, not fav_won, opp_ml)
+            if big:
+                _settle(leans_big, fav_won, fav_ml)
+                _settle(faded_big, not fav_won, opp_ml)
             entries.append({"date": d, "matchup": f"{g.away.name} @ {g.home.name}",
-                            "favorite": fav.name, "won": fav_won})
+                            "favorite": fav.name, "won": fav_won,
+                            "edge_margin": round(abs(hs - as_), 3)})
     return {"window": f"{_date_range(end, days)[0]} → {end} ({days} days)",
             "settled_games": leans["wins"] + leans["losses"],
-            "leans": leans, "leans_faded": faded, "pick_eligible_pool": pool,
+            "leans": leans, "leans_faded": faded,
+            "leans_big_edge": leans_big, "leans_faded_big_edge": faded_big,
+            "pick_eligible_pool": leans_big["wins"] + leans_big["losses"],
             "entries": entries}
 
 
@@ -114,13 +118,18 @@ def summary_md(rep: dict) -> str:
     out = [f"# Books backtest — {rep['window']}", ""]
     out.append(f"**{rep['settled_games']} settled games** · $1/bet")
     out.append("")
-    out.append(book_line("Leans (bet the stat favorite)", rep["leans"]))
+    out.append("**All games** (every stat favorite):")
+    out.append(book_line("Leans (bet the favorite)", rep["leans"]))
     out.append(book_line("Leans faded (bet against)", rep["leans_faded"]))
     out.append("")
-    out.append(f"**Picks: not backtestable** — a pick needs the public-fade gate and "
-               f"there's no historical public-betting data. (Pick-eligible pool: "
-               f"{rep['pick_eligible_pool']} games cleared the {EDGE_THRESHOLD} edge gate, "
-               f"but whether the public was fading them can't be reconstructed.)")
+    out.append(f"**Only big edges (≥{EDGE_THRESHOLD})** — the games your system actually plays "
+               f"(minus the public-fade gate):")
+    out.append(book_line("Follow the favorite", rep["leans_big_edge"]))
+    out.append(book_line("Fade the favorite", rep["leans_faded_big_edge"]))
+    out.append("")
+    out.append(f"**Picks: not backtestable** — a pick also needs the public-fade gate, and "
+               f"there's no historical public-betting data, so the fade's effect can't be "
+               f"reconstructed. The big-edge rows above are the closest proxy.")
     out.append("")
     out.append("_Stats point-in-time (no lookahead); odds from ESPN/covers, even money "
                "where unavailable; SOS uses season totals (small forward bias)._")
