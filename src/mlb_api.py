@@ -376,6 +376,26 @@ def team_home_away_split(team_id: int, season: int, as_of: str | None = None) ->
     return out
 
 
+def team_season_form(team_id: int, season: int, as_of: str | None = None) -> dict:
+    """Point-in-time season quality: games, run-diff/game, win%. With as_of, only
+    games strictly before it count (no lookahead). Wins derived from each game's
+    run diff (no ties in baseball)."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    g = wins = rd = 0
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        rs = int(sp.get("stat", {}).get("runs", 0) or 0)
+        ra = int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
+        g += 1
+        rd += rs - ra
+        wins += 1 if rs > ra else 0
+    return {"games": g,
+            "rd_per_g": round(rd / g, 3) if g else None,
+            "win_pct": round(wins / g, 3) if g else None}
+
+
 _DIVISION_CACHE: dict[int, dict[int, int]] = {}
 
 
