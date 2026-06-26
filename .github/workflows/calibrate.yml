@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       signal:
-        description: "Which signal to calibrate."
+        description: "wincond / edge / line calibration, or books = backtest Leans & Leans-faded."
         required: false
         default: "wincond"
         type: choice
-        options: ["wincond", "edge"]
+        options: ["wincond", "edge", "line", "books"]
       days:
         description: "How many days back to analyze (wincond can do the season; edge is heavier, use ~14)."
         required: false
@@ -37,6 +37,8 @@ jobs:
         run: |
           MODULE=src.wc_calibrate
           [ "${{ github.event.inputs.signal }}" = "edge" ] && MODULE=src.edge_calibrate
+          [ "${{ github.event.inputs.signal }}" = "line" ] && MODULE=src.line_calibrate
+          [ "${{ github.event.inputs.signal }}" = "books" ] && MODULE=src.backtest_books
           python -m "$MODULE" --days "${{ github.event.inputs.days }}" \
             ${{ github.event.inputs.end && format('--end {0}', github.event.inputs.end) || '' }}
 
@@ -45,7 +47,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add output/wc_calibration.json output/wc_calibration.md \
-                  output/edge_calibration.json output/edge_calibration.md 2>/dev/null || true
+                  output/edge_calibration.json output/edge_calibration.md \
+                  output/line_analysis.json output/line_analysis.md \
+                  output/books_backtest.json output/books_backtest.md 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No change."
           else
