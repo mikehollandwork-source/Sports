@@ -158,6 +158,14 @@ def _attach_line(game, result: dict, slate: list, baseline: dict) -> None:
     adv = pc["advantage_team"]
     side = "home" if adv == game.home.name else "away"
     opp = "away" if side == "home" else "home"
+
+    # Stop tracking the line the moment the game starts: we only want pre-game
+    # movement, never live in-game odds. A started game is restored from its locked
+    # snapshot just after this, so we simply don't recompute its line here.
+    start = _parse_iso(getattr(game, "start_time", ""))
+    if start is not None and dt.datetime.now(dt.timezone.utc) >= start:
+        return
+
     e = find_slate_line(game, slate)
     cur = e.get(f"{side}_current") if e else None
     pc["advantage_moneyline"] = cur
@@ -289,7 +297,7 @@ def _game_lines(g: dict) -> list[str]:
         ]
     lb = _line_bullet(pc)
     if lb:
-        lines.append(lb)
+        lines.append(lb + (" — frozen at first pitch" if g.get("state") == "live" else ""))
     return lines
 
 
@@ -350,6 +358,13 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
+def _tg_line(g: dict) -> str:
+    s = _line_phrase(g["pick_criteria"].get("line_check"))
+    if g.get("state") == "live":
+        s += " (frozen at first pitch)"
+    return f"   line: {s}"
+
+
 def _telegram_records_lines() -> list[str]:
     """Day/Week/Month/YTD records for both books, laid out one window per line."""
     ledger = grade.load_ledger()
@@ -392,12 +407,12 @@ def telegram_text(payload: dict) -> str:
                   f"   {g['matchup']}",
                   f"   conf {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
                   f"   public on {_public_evidence(g)} → we fade",
-                  f"   line: {_line_phrase(pc.get('line_check'))}"]
+                  _tg_line(g)]
         else:
             L += ["",
                   f"🔸 {tag}{pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
                   f"   {g['matchup']} — {pc['reason']}",
-                  f"   line: {_line_phrase(pc.get('line_check'))}"]
+                  _tg_line(g)]
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
