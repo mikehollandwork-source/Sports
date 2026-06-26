@@ -60,14 +60,19 @@ SOS_CLAMP = (0.80, 1.25)
 PUBLIC_W_FORUM = 0.65
 PUBLIC_W_CONSENSUS = 0.35
 
-# Pick decision: blend every signal's STRENGTH into one confidence in [0, 1] so no
-# single step dominates. A game is picked when the statistical favorite is also the
-# side the public is fading (the precondition that keeps the public-vs-stats
-# thesis) AND the blended confidence >= CONF_MIN. Each component is scaled to
-# [0, 1] then combined with these ~equal weights (sum 1):
-W_EDGE, W_FADE, W_WC = 0.34, 0.33, 0.33
-EDGE_FULL = 0.40    # team_score margin that counts as a full-strength stat edge
-CONF_MIN = 0.50     # minimum blended confidence to flag a pick
+# Pick decision: a hard gate of THREE must-haves (calibrated against a season of
+# results - see src/wc_calibrate.py & src/edge_calibrate.py):
+#   1. public fade    - the statistical favorite is the side the public is fading
+#   2. stat edge      - the favorite's team_score margin >= EDGE_THRESHOLD, the
+#                       level where the edge actually predicts winners (~62% at
+#                       >=0.40; below it the favorite is a coin flip)
+#   3. line in favor  - the moneyline moved toward our side (applied in main).
+# `confidence` is a DISPLAY-ONLY strength = blend of the stat edge + public fade.
+# The old "win condition" calibrated to ~0 predictive lift, so it no longer votes -
+# it's renamed "consistency" and kept on the board as context only.
+W_EDGE, W_FADE = 0.55, 0.45   # confidence display blend (sum 1)
+EDGE_FULL = 0.40       # team_score margin that counts as a full-strength stat edge
+EDGE_THRESHOLD = 0.40  # calibrated bar: the favorite only wins (~62%) at >= this
 
 # Line-movement gate (implied-probability shift of OUR side, open->current):
 #   < LINE_CONFIRM_MIN : noise / too small to mean anything (does not confirm)
@@ -91,7 +96,7 @@ def _apply_tuning() -> None:
     except (OSError, ValueError):
         return
     g = globals()
-    for k in ("CONF_MIN", "EDGE_FULL", "W_EDGE", "W_FADE", "W_WC"):
+    for k in ("EDGE_THRESHOLD", "EDGE_FULL", "W_EDGE", "W_FADE"):
         v = params.get(k)
         if isinstance(v, (int, float)):
             g[k] = float(v)
@@ -496,32 +501,30 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     # the public is fading (keeps the public-vs-stats thesis).
     public_edge = bool(majority) and adv_team.team_id != majority.team_id
 
-    # Confidence = weighted blend of every signal's STRENGTH (each scaled to [0,1]),
-    # so a thin edge can be carried by a strong fade + win condition and vice versa
-    # - no single step decides on its own.
+    # consistency (the former win condition) - kept for the board as context only.
     adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
-    wc_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
+    cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
     edge_margin = abs(hs - as_)
     edge_conf = _clamp01(edge_margin / EDGE_FULL)
     fade_conf = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
-    wc_conf = (wc_hits / 5.0) if adv_wc else 0.0
-    confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf + W_WC * wc_conf, 3)
-    flagged = public_edge and confidence >= CONF_MIN
+    confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf, 3)  # display strength
 
-    # status + plain reason for the board (every game is shown; picks pass, the
-    # rest are leans with why they missed)
+    # Hard gate: public fade AND a real stat edge. The third must-have (line moved
+    # in our favor) is applied in main._attach_line, which downgrades a flagged
+    # pick whose line doesn't confirm.
+    edge_strong = edge_margin >= EDGE_THRESHOLD
+    flagged = public_edge and edge_strong
+
     if flagged:
-        status, reason = "pick", "public fading the favorite + confidence cleared"
+        status, reason = "pick", "public fade + stat edge cleared (pending line confirm)"
     elif not public_edge:
         if not majority:
             status, reason = "lean", "no public lean on this game"
         else:
             status, reason = "lean", f"public is also on {adv_team.name} (no fade)"
     else:
-        comps = {"stat edge": edge_conf, "public fade": fade_conf, "win condition": wc_conf}
-        weakest = min(comps, key=comps.get)
-        status, reason = "lean", (f"confidence {confidence} < {CONF_MIN} "
-                                  f"(weakest: {weakest} {round(comps[weakest], 2)})")
+        status, reason = "lean", (f"stat edge too small (margin {round(edge_margin, 2)} "
+                                  f"< {EDGE_THRESHOLD} threshold)")
 
     return {
         "game_pk": game.game_pk,
@@ -538,7 +541,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "detail": majority_detail,
         },
         "betting_lines": betting_lines(game, consensus, majority),
-        "win_condition": {
+        "consistency": {
             "home": wc_home,
             "away": wc_away,
         },
@@ -547,16 +550,17 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "reason": reason,
             "advantage_team": adv_team.name,
             "public_edge": public_edge,
+            "edge_strong": edge_strong,
             "confidence": confidence,
-            "threshold": CONF_MIN,
+            "edge_threshold": EDGE_THRESHOLD,
             "components": {
                 "stat_edge": {"margin": round(edge_margin, 3), "strength": round(edge_conf, 3),
                               "weight": W_EDGE},
                 "public_fade": {"blended_lean": majority_detail.get("blended_lean"),
                                 "strength": round(fade_conf, 3), "weight": W_FADE},
-                "win_condition": {"hits": wc_hits, "strength": round(wc_conf, 3), "weight": W_WC},
+                "consistency": {"hits": cons_hits, "context_only": True},
             },
-            "win_condition_hits": wc_hits,
+            "consistency_hits": cons_hits,
         },
         "flagged": flagged,
         "pick": adv_team.name if flagged else None,

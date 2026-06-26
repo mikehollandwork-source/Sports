@@ -268,25 +268,24 @@ def _game_lines(g: dict) -> list[str]:
     adv, conf = pc["advantage_team"], pc["confidence"]
     e = c["stat_edge"]
     edge = f"{adv} ({_edge_word(e['strength'])}, margin {e['margin']})"
-    wc = c["win_condition"]["hits"]
+    cons = c["consistency"]["hits"]
     pub = _public_evidence(g)
     tag = _state_tag(g)
     if g.get("flagged"):
         bl = g.get("betting_lines")
         ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
         lines = [
-            f"✅ **{adv}** — {tag}{g['matchup']} · **confidence {_c10(conf)}** ✓ "
-            f"(need {_c10(pc['threshold'])}){ml}",
-            f"   • stat edge: {edge}",
-            f"   • public is on: {pub} → **we fade them**",
-            f"   • win condition: {wc}/5 games",
+            f"✅ **{adv}** — {tag}{g['matchup']} · all 3 gates ✓ · confidence {_c10(conf)}{ml}",
+            f"   • stat edge: {edge} ✓",
+            f"   • public is on: {pub} → **we fade them** ✓",
+            f"   • consistency: {cons}/5 games _(context)_",
         ]
     else:
         lines = [
             f"🔸 **{adv}** (lean) — {tag}{g['matchup']} · confidence {_c10(conf)}",
             f"   • stat edge: {edge}",
             f"   • public is on: {pub}",
-            f"   • win condition: {wc}/5 games",
+            f"   • consistency: {cons}/5 games _(context)_",
             f"   • why not a pick: {pc['reason']}",
         ]
     lb = _line_bullet(pc)
@@ -297,7 +296,7 @@ def _game_lines(g: dict) -> list[str]:
 
 def build_summary(payload: dict) -> str:
     """Markdown board for the daily issue: every matchup broken down — advantage
-    team, the public read + evidence, win condition, and a check (pick) or the
+    team, the public read + evidence, consistency, and a check (pick) or the
     specific reason it's only a lean."""
     date = payload["date"]
     picks = payload.get("picks", [])
@@ -392,19 +391,19 @@ def telegram_text(payload: dict) -> str:
 
     for g in board:
         pc = g["pick_criteria"]
-        wc = pc["components"]["win_condition"]["hits"]
+        cons = pc["components"]["consistency"]["hits"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
         if g.get("flagged"):
             edge = _edge_word(pc["components"]["stat_edge"]["strength"])
             L += ["",
                   f"✅ {tag}PICK: {pc['advantage_team']}{_ml_str(pc)}",
                   f"   {g['matchup']}",
-                  f"   conf {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
+                  f"   conf {_c10(pc['confidence'])} · edge {edge} · consistency {cons}/5",
                   f"   public on {_public_evidence(g)} → we fade",
                   _tg_line(g)]
         else:
             L += ["",
-                  f"🔸 {tag}{pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
+                  f"🔸 {tag}{pc['advantage_team']} · {_c10(pc['confidence'])} · consistency {cons}/5",
                   f"   {g['matchup']} — {pc['reason']}",
                   _tg_line(g)]
     if not board:

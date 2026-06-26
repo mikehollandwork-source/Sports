@@ -1,10 +1,11 @@
 """
 Get stricter after losing days; relax when it recovers.
 
-Simple, intuitive risk control: the only thing that adapts is selectivity
-(CONF_MIN). After back-to-back losing days the bar to make a pick rises; each
-additional consecutive losing day raises it a bit more (capped). The moment a day
-turns a profit, it snaps back to the default. Nothing else changes.
+Simple, intuitive risk control: the only thing that adapts is selectivity - the
+required stat-edge threshold (EDGE_THRESHOLD). After back-to-back losing days the
+edge a pick must clear rises; each additional consecutive losing day raises it a
+bit more (capped). The moment a day turns a profit, it snaps back to the default.
+Nothing else changes.
 
 State is written to output/tuning.json, which analysis.py loads on the next run.
 Fully reversible: delete that file to return to the analysis.py default.
@@ -22,10 +23,10 @@ log = logging.getLogger("tune")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 TUNING_PATH = OUTPUT_DIR / "tuning.json"
 
-DEFAULT_CONF_MIN = 0.50    # baseline bar (matches analysis.py)
-STREAK_TO_TIGHTEN = 2      # losing days in a row before tightening kicks in
-STRICT_STEP = 0.03         # CONF_MIN bump per consecutive losing day
-CONF_MIN_MAX = 0.65        # how strict it can ever get
+DEFAULT_EDGE_THRESHOLD = 0.40   # baseline stat-edge bar (matches analysis.py)
+STREAK_TO_TIGHTEN = 2           # losing days in a row before tightening kicks in
+STRICT_STEP = 0.03              # raise the required edge per consecutive losing day
+EDGE_THRESHOLD_MAX = 0.55       # how strict it can ever get
 
 
 def _daily_pnl(entries: list) -> list[tuple[str, float]]:
@@ -47,39 +48,41 @@ def _losing_streak(daily: list[tuple[str, float]]) -> int:
     return streak
 
 
-def conf_min_for_streak(streak: int) -> float:
-    """Default until a back-to-back losing streak, then +STRICT_STEP per day, capped."""
+def edge_threshold_for_streak(streak: int) -> float:
+    """Default until a back-to-back losing streak, then demand a bigger edge each
+    consecutive losing day (+STRICT_STEP), capped."""
     if streak < STREAK_TO_TIGHTEN:
-        return DEFAULT_CONF_MIN
-    return round(min(CONF_MIN_MAX, DEFAULT_CONF_MIN + STRICT_STEP * (streak - 1)), 3)
+        return DEFAULT_EDGE_THRESHOLD
+    return round(min(EDGE_THRESHOLD_MAX, DEFAULT_EDGE_THRESHOLD + STRICT_STEP * (streak - 1)), 3)
 
 
 def auto_tune(ledger: dict) -> dict:
-    """Recompute CONF_MIN from the Picks book's recent losing streak; persist."""
+    """Recompute the required stat-edge threshold from the Picks book's recent
+    losing streak (stricter = bigger edge demanded); persist."""
     daily = _daily_pnl(ledger.get("picks", {}).get("entries", []))
     streak = _losing_streak(daily)
-    conf = conf_min_for_streak(streak)
+    thr = edge_threshold_for_streak(streak)
 
     prev = None
     history: list = []
     try:
         old = json.loads(TUNING_PATH.read_text())
-        prev = old.get("params", {}).get("CONF_MIN")
+        prev = old.get("params", {}).get("EDGE_THRESHOLD")
         history = old.get("history", [])
     except (OSError, ValueError):
         pass
-    if prev != conf:
-        verb = "tightened" if conf > DEFAULT_CONF_MIN else "reset to default"
+    if prev != thr:
+        verb = "tightened" if thr > DEFAULT_EDGE_THRESHOLD else "reset to default"
         history.append({"date": dt.date.today().isoformat(), "losing_streak": streak,
-                        "conf_min": conf, "note": verb})
-        log.info("auto-tune: %d losing day(s) in a row -> CONF_MIN %s (%s)", streak, conf, verb)
+                        "edge_threshold": thr, "note": verb})
+        log.info("auto-tune: %d losing day(s) in a row -> EDGE_THRESHOLD %s (%s)", streak, thr, verb)
     else:
-        log.info("auto-tune: streak %d, CONF_MIN %s (no change)", streak, conf)
+        log.info("auto-tune: streak %d, EDGE_THRESHOLD %s (no change)", streak, thr)
 
     state = {
-        "params": {"CONF_MIN": conf},
+        "params": {"EDGE_THRESHOLD": thr},
         "losing_streak": streak,
-        "default_conf_min": DEFAULT_CONF_MIN,
+        "default_edge_threshold": DEFAULT_EDGE_THRESHOLD,
         "daily_pnl": daily[-10:],
         "history": history[-50:],
     }
@@ -96,8 +99,10 @@ def status_line(state: dict | None = None) -> str:
         except (OSError, ValueError):
             return ""
     streak = state.get("losing_streak", 0)
-    conf = state["params"]["CONF_MIN"]
-    if conf > state.get("default_conf_min", DEFAULT_CONF_MIN):
+    thr = state.get("params", {}).get("EDGE_THRESHOLD")
+    if thr is None:   # pre-rewrite (old CONF_MIN schema) - skip until next grade
+        return ""
+    if thr > state.get("default_edge_threshold", DEFAULT_EDGE_THRESHOLD):
         return (f"**Auto-tune:** {streak} losing day(s) in a row → stricter, "
-                f"CONF_MIN raised to {conf}.")
-    return f"**Auto-tune:** no losing streak → CONF_MIN at default {conf}."
+                f"stat-edge bar raised to {thr}.")
+    return f"**Auto-tune:** no losing streak → stat-edge bar at default {thr}."
