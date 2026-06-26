@@ -51,6 +51,7 @@ def _empty_book() -> dict:
 def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
+            "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
             "picks": _empty_book(), "leans": _empty_book(),
             "leans_faded": _empty_book()}
 
@@ -63,6 +64,7 @@ def load_ledger() -> dict:
         return led
     if "picks" in old and "leans" in old:
         old.setdefault("leans_faded", _empty_book())  # added after the two-book schema
+        old.setdefault("grade_from", None)
         return old
     # migrate the old single-book schema (picks only) into the new layout
     if old.get("entries") is not None:
@@ -149,8 +151,14 @@ def _add(book: dict, entries: list[dict]) -> int:
 
 
 def update_ledger(date: str) -> dict:
-    """Settle a date into all books. Idempotent per game (game_pk)."""
+    """Settle a date into all books. Idempotent per game (game_pk). Dates before
+    the ledger's grade_from cutoff (if set) are never booked."""
     ledger = load_ledger()
+    gf = ledger.get("grade_from")
+    if gf and date < gf:
+        log.info("skip grading %s (before grade_from %s)", date, gf)
+        save_ledger(ledger)
+        return ledger
     pe, le, fe = grade_date(date)
     added = (_add(ledger["picks"], pe) + _add(ledger["leans"], le)
              + _add(ledger["leans_faded"], fe))
