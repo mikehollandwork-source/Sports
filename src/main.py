@@ -244,22 +244,19 @@ def _public_evidence(g: dict) -> str:
 
 
 def _line_phrase(lc: dict | None) -> str:
-    """Plain description of line movement toward our side, for picks and leans."""
+    """Line movement boiled down to what matters for the pick: in our favor,
+    against us, too much (likely news), or no real movement."""
     if not lc or lc.get("status") == "unknown":
-        return "line movement unavailable"
+        return "unavailable"
     arrow = f"{lc['open']:+d}→{lc['current']:+d}"
-    shift = lc.get("implied_shift", 0.0)
     status = lc["status"]
-    if status == "flat":
-        return f"no movement yet ({arrow})"
-    if status == "contradicts":
-        return f"moved AGAINST us ✗ ({arrow}, {shift:+.1%})"
-    if status == "soft":
-        return f"slight move our way, below signal ({arrow}, {shift:+.1%})"
-    if status == "caution":
-        return f"⚠️ big move our way ({arrow}, {shift:+.1%}) — check for a pitcher change"
-    label = "STRONG" if lc.get("tier") == "strong" else "moderate"
-    return f"moved IN OUR FAVOR ✓ ({label}, {arrow}, {shift:+.1%})"
+    if status == "caution":            # big move our way -> usually a pitcher change/news
+        return f"⚠️ TOO MUCH ({arrow}) — likely news, verify"
+    if status == "confirms":           # a real move toward our side
+        return f"IN OUR FAVOR ✓ ({arrow})"
+    if status == "contradicts":        # moved toward the other side
+        return f"AGAINST us ✗ ({arrow})"
+    return f"no real movement ({arrow})"   # flat, or a sub-signal wiggle (soft)
 
 
 def _line_bullet(pc: dict) -> str | None:
