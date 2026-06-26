@@ -158,6 +158,25 @@ def _ip_to_innings(ip) -> float:
         return 0.0
 
 
+def batter_vs_pitcher(batter_id: int, pitcher_id: int) -> dict:
+    """A batter's CAREER line vs a specific pitcher: {pa, ops}. Career (not season)
+    because per-season BvP samples are near-zero. Empty when never faced."""
+    try:
+        data = _get(f"people/{batter_id}/stats", stats="vsPlayerTotal",
+                    group="hitting", opposingPlayerId=pitcher_id)
+    except Exception:
+        return {"pa": 0, "ops": 0.0}
+    for s in data.get("stats", []):
+        for sp in s.get("splits", []):
+            st = sp.get("stat", {})
+            try:
+                return {"pa": int(st.get("plateAppearances", 0) or 0),
+                        "ops": float(st.get("ops", 0) or 0)}
+            except (ValueError, TypeError):
+                return {"pa": 0, "ops": 0.0}
+    return {"pa": 0, "ops": 0.0}
+
+
 def pitcher_season_line(pitcher_id: int, season: int, as_of: str | None = None) -> dict:
     """A pitcher's season-to-date totals (point-in-time): {ip, hr, bb, hbp, k, gs}.
     Caller computes FIP so the FIP constant stays in one place (analysis)."""
