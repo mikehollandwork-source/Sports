@@ -73,6 +73,11 @@ PUBLIC_W_CONSENSUS = 0.35
 W_EDGE, W_FADE = 0.55, 0.45   # confidence display blend (sum 1)
 EDGE_FULL = 0.40       # team_score margin that counts as a full-strength stat edge
 EDGE_THRESHOLD = 0.40  # calibrated bar: the favorite only wins (~62%) at >= this
+# Home field is a real, season-calibrated edge (home teams win ~53%) that the
+# last-5 stat indices miss - add it to the home side's team_score. ~0.10 in
+# team_score units = the ~3% win-prob bump under the 0.40->62% mapping. (Splitting
+# the stats by venue added ~nothing, so we use a flat bump, not home/road splits.)
+HOME_FIELD = 0.10
 
 # Line-movement gate (implied-probability shift of OUR side, open->current):
 #   < LINE_CONFIRM_MIN : noise / too small to mean anything (does not confirm)
@@ -329,7 +334,7 @@ def win_condition_core(team_games_last5: list, team_fip: float | None,
 
 # --- decision -----------------------------------------------------------------
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
-    hs, as_ = team_score(game.home), team_score(game.away)
+    hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
     winner = game.home if hs >= as_ else game.away
     return winner, hs, as_
 
