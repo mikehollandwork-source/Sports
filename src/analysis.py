@@ -43,6 +43,11 @@ LEAGUE_SB_RATE = 0.018   # SB per PA
 W_WOBA, W_ISO, W_DISC, W_SPEED = 0.55, 0.20, 0.15, 0.10
 # pitching weights: starters throw ~55% of innings, bullpen ~45%
 W_SP, W_BP = 0.55, 0.45
+# The probable starter's season FIP is the single biggest single-game lever
+# (calibrated: the better starter's team wins ~55%). Blend it with the noisier
+# last-5 team-starter FIP - season is the stable anchor, last-5 catches recent
+# form. Falls back to last-5 only when the season sample is too thin.
+SEASON_SP_WEIGHT = 0.60
 # league-average platoon swing applied per handedness matchup
 PLATOON = 0.03
 
@@ -230,9 +235,14 @@ def _adjusted_fip(fip: float | None, ip: float, opp_woba, opp_win) -> float | No
 
 
 def combined_fip(team: Team) -> float | None:
-    """Starter+bullpen FIP, each sample-shrunk then SOS-adjusted for offenses faced."""
+    """Starter+bullpen FIP, each sample-shrunk then SOS-adjusted for offenses faced.
+    The starter side blends the SOS-adjusted last-5 FIP with the probable starter's
+    season FIP (the stable anchor) when a real season sample exists."""
     sp = _adjusted_fip(team.starter_fip_last5, team.starter_ip_last5,
                        team.sos.get("sp_opp_woba"), team.sos.get("sp_opp_win"))
+    if team.starter_fip_season is not None:
+        sp = (SEASON_SP_WEIGHT * team.starter_fip_season + (1 - SEASON_SP_WEIGHT) * sp
+              if sp is not None else team.starter_fip_season)
     bp = _adjusted_fip(team.bullpen_fip_last5, team.bullpen_ip_last5,
                        team.sos.get("bp_opp_woba"), team.sos.get("bp_opp_win"))
     if sp is not None and bp is not None:

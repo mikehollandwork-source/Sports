@@ -34,6 +34,7 @@ BASE = "https://statsapi.mlb.com/api/v1"
 SPORT_ID = 1
 TIMEOUT = 20
 POLITE_DELAY = 0.1
+SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
@@ -63,6 +64,7 @@ class Team:
     # Filled by enrich_with_stats():
     offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
     starter_fip_last5: float | None = None
+    starter_fip_season: float | None = None  # probable starter's season FIP (stable anchor)
     bullpen_fip_last5: float | None = None
     starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
     bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
@@ -572,6 +574,16 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
             except Exception as exc:
                 log.warning("starter FIP failed for %s: %s", team.name, exc)
+            # season-to-date starter FIP (stable anchor; calibrated 55% lever)
+            try:
+                t = pitcher_season_line(team.probable_pitcher.player_id, season, as_of=as_of)
+                if t["ip"] >= SEASON_FIP_MIN_IP:
+                    from .analysis import FIP_CONSTANT
+                    team.starter_fip_season = round(
+                        (13 * t["hr"] + 3 * (t["bb"] + t["hbp"]) - 2 * t["k"]) / t["ip"]
+                        + FIP_CONSTANT, 3)
+            except Exception as exc:
+                log.warning("starter season FIP failed for %s: %s", team.name, exc)
 
         try:
             starter_id = team.probable_pitcher.player_id if team.probable_pitcher else None
