@@ -55,7 +55,9 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        results.append(evaluate_game(g, consensus, forum_counts))
+        r = evaluate_game(g, consensus, forum_counts)
+        r["game_datetime"] = g.start_time
+        results.append(r)
 
     # one odds-page fetch: the open->current line for every game, used both for the
     # sharp-money line filter and to capture each advantage team's pre-game price.
@@ -66,6 +68,11 @@ def run(date: str) -> dict:
         slate = []
     for g, r in zip(games, results):
         _attach_line(g, r, slate)
+
+    # Lock games that have already started: a started game keeps the pick/lean
+    # status and the odds it had at first pitch (the closing line), so later polls
+    # can't flip a pick to a lean or move the price after the game is underway.
+    results = _lock_started_games(date, results)
 
     picks = [r["pick"] for r in results if r["flagged"]]
     log.info("Flagged %d edge game(s)", len(picks))
@@ -78,14 +85,54 @@ def run(date: str) -> dict:
     }
 
 
+def _parse_iso(s: str | None) -> dt.datetime | None:
+    if not s:
+        return None
+    try:
+        return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _lock_started_games(date: str, results: list) -> list:
+    """Freeze any game whose first pitch has passed: replace the fresh computation
+    with the previously committed snapshot so a started pick stays a pick (and is
+    graded as one) and its captured line is the closing price, not a live one.
+    Games not yet underway keep the fresh computation. First-ever capture of an
+    already-started game has no snapshot to fall back to, so it stays fresh."""
+    prev_path = OUTPUT_DIR / f"picks_{date}.json"
+    if not prev_path.exists():
+        return results
+    try:
+        prev = {g["game_pk"]: g for g in json.loads(prev_path.read_text()).get("games", [])}
+    except (ValueError, KeyError):
+        return results
+
+    now = dt.datetime.now(dt.timezone.utc)
+    out, locked = [], 0
+    for r in results:
+        start = _parse_iso(r.get("game_datetime"))
+        snap = prev.get(r.get("game_pk"))
+        if snap is not None and start is not None and now >= start:
+            out.append(snap)   # underway -> keep the frozen pre-game snapshot
+            locked += 1
+        else:
+            out.append(r)
+    if locked:
+        log.info("locked %d already-started game(s) to their pre-game snapshot", locked)
+    return out
+
+
 def _attach_line(game, result: dict, slate: list) -> None:
     """Capture the advantage team's current pre-game moneyline (for the tracker,
     picks AND leans) and apply the sharp-money line filter to candidate picks."""
     pc = result["pick_criteria"]
     adv = pc["advantage_team"]
     side = "home" if adv == game.home.name else "away"
+    opp = "away" if side == "home" else "home"
     e = find_slate_line(game, slate)
     pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
+    pc["opponent_moneyline"] = e.get(f"{opp}_current") if e else None  # for the faded-leans book
 
     if not result["flagged"]:
         return
@@ -196,7 +243,7 @@ def build_summary(payload: dict) -> str:
                "public agrees with the stats (no one to fade) or confidence fell short._")
 
     out.append("")
-    out.append(grade.bankroll_line())
+    out.append(grade.records_block())
     rev = grade.review_line()
     if rev:
         out.append("")
@@ -219,31 +266,64 @@ def write_outputs(payload: dict, date: str) -> None:
     log.info("Wrote picks for %s (%d pick(s))", date, len(payload.get("picks", [])))
 
 
+def _ml_str(pc: dict) -> str:
+    ml = pc.get("advantage_moneyline")
+    return f" ({ml:+d})" if isinstance(ml, int) else ""
+
+
+def _telegram_records_lines() -> list[str]:
+    """Day/Week/Month/YTD records for both books, laid out one window per line."""
+    ledger = grade.load_ledger()
+    today = dt.datetime.now(EASTERN).date()
+    out: list[str] = []
+    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True),
+                           ("Leans faded", "leans_faded", True)):
+        tag = " (hypothetical)" if hyp else ""
+        rec = grade.windowed_records(ledger[key], today)
+        if not rec:
+            out.append(f"{name}{tag}: no settled bets yet")
+            continue
+        out.append(f"{name}{tag}:")
+        for label, (w, l, u) in rec:
+            out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
+    return out
+
+
 def telegram_text(payload: dict) -> str:
-    """Plain-text board for Telegram (every matchup; ✅ pick, 🔸 lean + reason)."""
+    """Readable phone layout for Telegram: the pick(s) up top, then leans, then
+    the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
     date = payload["date"]
+    games = _ranked(payload.get("games", []))
     picks = payload.get("picks", [])
-    head = f"⚾ MLB Board — {date} ({len(picks)} pick(s)"
-    head += f": {', '.join(picks)})" if picks else ")"
-    lines = [head]
-    for g in _ranked(payload.get("games", [])):
+    flagged = [g for g in games if g.get("flagged")]
+    leans = [g for g in games if not g.get("flagged")]
+
+    L = [f"⚾ MLB BOARD — {date}",
+         f"{len(picks)} pick(s)" + (f": {', '.join(picks)}" if picks else " today")]
+
+    for g in flagged:
         pc = g["pick_criteria"]
-        adv = pc["advantage_team"]
         wc = pc["components"]["win_condition"]["hits"]
-        if g.get("flagged"):
-            bl = g.get("betting_lines")
-            ml = f" {bl['non_majority']['moneyline']}" if bl else ""
-            lines.append(f"✅ {adv}{ml} ({g['matchup']}) conf {_c10(pc['confidence'])}")
-            lines.append(f"   edge {_edge_word(pc['components']['stat_edge']['strength'])}, "
-                         f"win-cond {wc}/5; public on {_public_evidence(g)} → we fade")
-        else:
-            lines.append(f"🔸 {adv} ({g['matchup']}) conf {_c10(pc['confidence'])}")
-            lines.append(f"   public on {_public_evidence(g)}; win-cond {wc}/5 — {pc['reason']}")
-    lines.append(grade.bankroll_line().replace("**", ""))
+        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
+        L += ["",
+              f"✅ PICK: {pc['advantage_team']}{_ml_str(pc)}",
+              f"   {g['matchup']}",
+              f"   confidence {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
+              f"   public on {_public_evidence(g)} → we fade"]
+
+    if leans:
+        L += ["", "— LEANS (advantage team, not a play) —"]
+        for g in leans:
+            pc = g["pick_criteria"]
+            wc = pc["components"]["win_condition"]["hits"]
+            L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
+                  f"   {g['matchup']} — {pc['reason']}"]
+
+    L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     ts = tune.status_line().replace("**", "")
     if ts:
-        lines.append(ts)
-    return "\n".join(lines)
+        L += ["", ts]
+    return "\n".join(L)
 
 
 def main() -> None:
