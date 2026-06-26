@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import covers, espn, grade, notify, tune
 from .analysis import _canon_abbr, evaluate_game, find_slate_line, line_confirms
-from .mlb_api import enrich_with_stats, results_for, schedule_for
+from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("main")
@@ -80,6 +80,7 @@ def run(date: str) -> dict:
 
     for g, r in zip(games, results):
         _attach_line(g, r, slate)
+        _attach_situational(g, r, date)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
@@ -142,6 +143,26 @@ def _lock_started_games(date: str, results: list) -> list:
     if locked:
         log.info("locked %d already-started game(s) to their pre-game snapshot", locked)
     return out
+
+
+def _attach_situational(g, r: dict, date: str) -> None:
+    """This-season straight-up situational record, display-only context (no effect
+    on the pick). Home team's home record + away team's road record, point-in-time
+    (only games before today) — the one situational split calibration showed is
+    real (home field, ~53%). Fails soft: on any error the board just omits it."""
+    try:
+        season = int(date[:4])
+        hs = team_home_away_split(g.home.team_id, season, as_of=date)["home"]
+        aw = team_home_away_split(g.away.team_id, season, as_of=date)["away"]
+    except Exception as exc:
+        log.warning("situational record failed for %s: %s", g.game_pk, exc)
+        return
+    r["situational"] = {
+        "home": {"abbr": g.home.abbreviation or g.home.name,
+                 "wins": hs["wins"], "losses": hs["losses"]},
+        "away": {"abbr": g.away.abbreviation or g.away.name,
+                 "wins": aw["wins"], "losses": aw["losses"]},
+    }
 
 
 def _merge_slates(primary: list, secondary: list) -> list:
@@ -261,6 +282,17 @@ def _line_bullet(pc: dict) -> str | None:
     return None if lc is None else f"   • line: {_line_phrase(lc)}"
 
 
+def _situational_phrase(g: dict) -> str | None:
+    """'NYY 24-15 home · BOS 18-21 road' — this-season straight-up situational
+    records (display-only context). None when unavailable."""
+    s = g.get("situational")
+    if not s:
+        return None
+    h, a = s["home"], s["away"]
+    return (f"{h['abbr']} {h['wins']}-{h['losses']} home · "
+            f"{a['abbr']} {a['wins']}-{a['losses']} road")
+
+
 def _game_lines(g: dict) -> list[str]:
     """Readable lines breaking down one matchup for the board."""
     pc = g["pick_criteria"]
@@ -288,6 +320,9 @@ def _game_lines(g: dict) -> list[str]:
             f"   • consistency: {cons}/5 games _(context)_",
             f"   • why not a pick: {pc['reason']}",
         ]
+    sit = _situational_phrase(g)
+    if sit:
+        lines.append(f"   • this season: {sit} _(context)_")
     lb = _line_bullet(pc)
     if lb:
         lines.append(lb + (" — frozen at first pitch" if g.get("state") == "live" else ""))
@@ -397,6 +432,9 @@ def telegram_text(payload: dict) -> str:
               f"   stat edge: {edge} (margin {emargin}) · consistency {cons}/5",
               f"   👥 public: {_public_evidence(g)}",
               f"   🦈 sharp/line: {_line_phrase(pc.get('line_check'))}{frozen}"]
+        sit = _situational_phrase(g)
+        if sit:
+            L.append(f"   📅 this season: {sit}")
         L.append("   ✅ all 3 gates — WE FADE" if g.get("flagged")
                  else f"   → lean: {pc['reason']}")
     if not board:

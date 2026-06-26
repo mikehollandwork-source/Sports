@@ -405,23 +405,31 @@ def _team_gamelog(team_id: int, season: int) -> tuple[list[dict], dict[str, dict
 
 
 def team_home_away_split(team_id: int, season: int, as_of: str | None = None) -> dict:
-    """Point-in-time home vs away run differential per game. With as_of, only games
-    strictly before it count (no lookahead). {home/away: {games, rd_per_g}}."""
+    """Point-in-time home vs away run differential per game AND straight-up W-L.
+    With as_of, only games strictly before it count (no lookahead). Wins derived
+    from each game's run diff (no ties in baseball).
+    {home/away: {games, rd_per_g, wins, losses}}."""
     hit_splits, pit_by_date = _team_gamelog(team_id, season)
-    acc = {"home": {"g": 0, "rs": 0, "ra": 0}, "away": {"g": 0, "rs": 0, "ra": 0}}
+    acc = {"home": {"g": 0, "rs": 0, "ra": 0, "w": 0},
+           "away": {"g": 0, "rs": 0, "ra": 0, "w": 0}}
     for sp in hit_splits:
         date = sp.get("date", "")
         if as_of and date >= as_of:
             continue
         side = "home" if sp.get("isHome") else "away"
+        rs = int(sp.get("stat", {}).get("runs", 0) or 0)
+        ra = int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
         acc[side]["g"] += 1
-        acc[side]["rs"] += int(sp.get("stat", {}).get("runs", 0) or 0)
-        acc[side]["ra"] += int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
+        acc[side]["rs"] += rs
+        acc[side]["ra"] += ra
+        if rs > ra:
+            acc[side]["w"] += 1
     out = {}
     for s in ("home", "away"):
-        g = acc[s]["g"]
+        g, w = acc[s]["g"], acc[s]["w"]
         out[s] = {"games": g,
-                  "rd_per_g": round((acc[s]["rs"] - acc[s]["ra"]) / g, 3) if g else None}
+                  "rd_per_g": round((acc[s]["rs"] - acc[s]["ra"]) / g, 3) if g else None,
+                  "wins": w, "losses": g - w}
     return out
 
 
