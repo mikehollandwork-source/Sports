@@ -266,9 +266,18 @@ def win_condition(team: Team, opp: Team) -> dict | None:
     """
     if not team.games_last5 or not opp.games_last5:
         return None
-    team_rpg, opp_rpg = _rpg(team.games_last5), _rpg(opp.games_last5)
-    team_fip = combined_fip(team) or LEAGUE_FIP
-    opp_fip = combined_fip(opp) or LEAGUE_FIP
+    return win_condition_core(team.games_last5, combined_fip(team),
+                              _rpg(opp.games_last5), combined_fip(opp))
+
+
+def win_condition_core(team_games_last5: list, team_fip: float | None,
+                       opp_rpg: float, opp_fip: float | None) -> dict:
+    """The bars + SOS-adjusted last-5 back-test from raw inputs. Shared by the live
+    path (win_condition, fed starter+bullpen FIP) and the calibration tool (fed a
+    season-FIP stand-in). FIPs fall back to the league average when unknown."""
+    team_rpg = _rpg(team_games_last5)
+    team_fip = team_fip or LEAGUE_FIP
+    opp_fip = opp_fip or LEAGUE_FIP
 
     exp_opp_runs = opp_rpg * (team_fip / LEAGUE_FIP)
     exp_own_runs = team_rpg * (opp_fip / LEAGUE_FIP)
@@ -277,7 +286,7 @@ def win_condition(team: Team, opp: Team) -> dict | None:
 
     scored = prevent = complete = won = outhit = 0
     per_game = []
-    for g in team.games_last5:
+    for g in team_games_last5:
         f_pit = opp_pitching_factor(g.get("opp_fip"), g.get("opp_win"))
         f_off = opp_offense_factor(g.get("opp_woba"), g.get("opp_win"))
         adj_scored = g["runs_scored"] * f_pit
@@ -294,7 +303,7 @@ def win_condition(team: Team, opp: Team) -> dict | None:
             "adj_scored": round(adj_scored, 2), "adj_allowed": round(adj_allowed, 2),
             "opp_win_pct": round(g.get("opp_win", 0.5), 3),
         })
-    n = len(team.games_last5)
+    n = len(team_games_last5)
     return {
         "runs_to_win": runs_to_win,
         "runs_to_allow": runs_to_allow,
@@ -308,7 +317,7 @@ def win_condition(team: Team, opp: Team) -> dict | None:
             "actually_won": won,
             "out_hit": outhit,
         },
-        "avg_opp_win_pct_faced": round(sum(g.get("opp_win", 0.5) for g in team.games_last5) / n, 3),
+        "avg_opp_win_pct_faced": round(sum(g.get("opp_win", 0.5) for g in team_games_last5) / n, 3),
         "per_game": per_game,
     }
 
