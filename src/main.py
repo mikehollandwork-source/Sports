@@ -55,7 +55,9 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        results.append(evaluate_game(g, consensus, forum_counts))
+        r = evaluate_game(g, consensus, forum_counts)
+        r["game_datetime"] = g.start_time
+        results.append(r)
 
     # one odds-page fetch: the open->current line for every game, used both for the
     # sharp-money line filter and to capture each advantage team's pre-game price.
@@ -67,6 +69,11 @@ def run(date: str) -> dict:
     for g, r in zip(games, results):
         _attach_line(g, r, slate)
 
+    # Lock games that have already started: a started game keeps the pick/lean
+    # status and the odds it had at first pitch (the closing line), so later polls
+    # can't flip a pick to a lean or move the price after the game is underway.
+    results = _lock_started_games(date, results)
+
     picks = [r["pick"] for r in results if r["flagged"]]
     log.info("Flagged %d edge game(s)", len(picks))
 
@@ -76,6 +83,44 @@ def run(date: str) -> dict:
         "games": results,
         "picks": picks,
     }
+
+
+def _parse_iso(s: str | None) -> dt.datetime | None:
+    if not s:
+        return None
+    try:
+        return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _lock_started_games(date: str, results: list) -> list:
+    """Freeze any game whose first pitch has passed: replace the fresh computation
+    with the previously committed snapshot so a started pick stays a pick (and is
+    graded as one) and its captured line is the closing price, not a live one.
+    Games not yet underway keep the fresh computation. First-ever capture of an
+    already-started game has no snapshot to fall back to, so it stays fresh."""
+    prev_path = OUTPUT_DIR / f"picks_{date}.json"
+    if not prev_path.exists():
+        return results
+    try:
+        prev = {g["game_pk"]: g for g in json.loads(prev_path.read_text()).get("games", [])}
+    except (ValueError, KeyError):
+        return results
+
+    now = dt.datetime.now(dt.timezone.utc)
+    out, locked = [], 0
+    for r in results:
+        start = _parse_iso(r.get("game_datetime"))
+        snap = prev.get(r.get("game_pk"))
+        if snap is not None and start is not None and now >= start:
+            out.append(snap)   # underway -> keep the frozen pre-game snapshot
+            locked += 1
+        else:
+            out.append(r)
+    if locked:
+        log.info("locked %d already-started game(s) to their pre-game snapshot", locked)
+    return out
 
 
 def _attach_line(game, result: dict, slate: list) -> None:

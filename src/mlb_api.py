@@ -79,6 +79,7 @@ class Game:
     away: Team
     venue: str = ""
     park_factor: float = 1.0
+    start_time: str = ""   # first-pitch ISO datetime (UTC), e.g. "2026-06-25T23:10:00Z"
 
 
 # --- schedule -----------------------------------------------------------------
@@ -97,6 +98,7 @@ def schedule_for(date: str) -> list[Game]:
                     home=home,
                     away=away,
                     park_factor=factor_for(home.name),
+                    start_time=g.get("gameDate", ""),
                 )
             )
     return games
