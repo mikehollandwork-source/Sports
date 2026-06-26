@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, grade, notify, tune
+from . import covers, espn, grade, notify, tune
 from .analysis import evaluate_game, find_slate_line, line_confirms
 from .mlb_api import enrich_with_stats, results_for, schedule_for
 
@@ -59,24 +59,29 @@ def run(date: str) -> dict:
         r["game_datetime"] = g.start_time
         results.append(r)
 
-    # one odds-page fetch: the open->current line for every game, used both for the
-    # sharp-money line filter and to capture each advantage team's pre-game price.
+    # Line source = ESPN (true open + current moneyline for every game); covers'
+    # odds page is the fallback. Used for the sharp-money filter and the captured
+    # pre-game price.
     try:
-        slate = covers.slate_lines()
+        slate = espn.lines(date)
     except Exception as exc:
-        log.warning("odds page (slate lines) failed: %s", exc)
+        log.warning("espn odds failed: %s", exc)
         slate = []
-    if os.environ.get("COVERS_DEBUG") == "1":   # also capture ESPN's odds JSON
+    if not slate:
         try:
-            from . import espn
+            slate = covers.slate_lines()
+        except Exception as exc:
+            log.warning("covers slate fallback failed: %s", exc)
+            slate = []
+
+    if os.environ.get("COVERS_DEBUG") == "1":   # capture raw ESPN JSON for debugging
+        try:
             espn.dump_debug(date)
         except Exception as exc:
             log.warning("espn debug dump failed: %s", exc)
 
-    baseline = _load_baseline(date)
     for g, r in zip(games, results):
-        _attach_line(g, r, slate, baseline)
-    _save_baseline(date, baseline)
+        _attach_line(g, r, slate)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
@@ -141,26 +146,10 @@ def _lock_started_games(date: str, results: list) -> list:
     return out
 
 
-def _load_baseline(date: str) -> dict:
-    """First line we recorded for each game today, keyed by game_pk. Persisted in
-    output/ so the baseline is stable across the day's polls."""
-    try:
-        return json.loads((OUTPUT_DIR / f"line_baseline_{date}.json").read_text())
-    except (OSError, ValueError):
-        return {}
-
-
-def _save_baseline(date: str, baseline: dict) -> None:
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    (OUTPUT_DIR / f"line_baseline_{date}.json").write_text(json.dumps(baseline, indent=2))
-
-
-def _attach_line(game, result: dict, slate: list, baseline: dict) -> None:
+def _attach_line(game, result: dict, slate: list) -> None:
     """Capture the advantage team's current pre-game moneyline (for the tracker,
-    picks AND leans) and the line movement toward our side. Movement is measured
-    against a baseline we record once per game (covers' true open when the odds
-    page exposes it, otherwise the first price we see), since covers doesn't show
-    an opening number for every game. Also applies the sharp-money pick filter."""
+    picks AND leans) and the open->current line movement toward our side, straight
+    from ESPN's open/current. Also applies the sharp-money pick filter."""
     pc = result["pick_criteria"]
     adv = pc["advantage_team"]
     side = "home" if adv == game.home.name else "away"
@@ -174,21 +163,11 @@ def _attach_line(game, result: dict, slate: list, baseline: dict) -> None:
         return
 
     e = find_slate_line(game, slate)
-    cur = e.get(f"{side}_current") if e else None
-    pc["advantage_moneyline"] = cur
+    pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
     pc["opponent_moneyline"] = e.get(f"{opp}_current") if e else None  # for the faded-leans book
 
-    # seed/lookup the per-game baseline (prefer covers' open; else first price seen)
-    key = str(game.game_pk)
-    if e and key not in baseline:
-        baseline[key] = {s: (e.get(f"{s}_open") if e.get(f"{s}_open") is not None
-                             else e.get(f"{s}_current")) for s in ("away", "home")}
-    base = baseline.get(key)
-    lm = ({f"{side}_open": base[side], f"{side}_current": cur}
-          if base is not None and cur is not None else None)
-
     # line movement toward our side (the advantage team) for EVERY game, pick or lean
-    confirms, info = line_confirms(side, lm)
+    confirms, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
     pc["line_check"] = info
 
     if not result["flagged"]:

@@ -67,6 +67,54 @@ def _events(date: str) -> list[dict]:
     return out
 
 
+def _american(ml: dict | None) -> int | None:
+    """ESPN moneyLine object -> american int. 'EVEN' = +100; OFF/blank = None."""
+    if not isinstance(ml, dict):
+        return None
+    a = ml.get("american")
+    if a in (None, "", "OFF"):
+        return None
+    if str(a).upper() == "EVEN":
+        return 100
+    try:
+        return int(str(a).replace("+", ""))
+    except ValueError:
+        return None
+
+
+def _side(team_odds: dict | None) -> tuple[int | None, int | None]:
+    """(open, current) american moneyline for one team's odds block."""
+    t = team_odds or {}
+    op = _american(t.get("open", {}).get("moneyLine"))
+    cur = _american(t.get("current", {}).get("moneyLine"))
+    if cur is None and isinstance(t.get("moneyLine"), (int, float)):
+        cur = int(t["moneyLine"])
+    return op, cur
+
+
+def lines(date: str) -> list[dict]:
+    """Open + current moneyline for every game on the date, from ESPN. Same shape as
+    covers.slate_lines: {away_abbr, home_abbr, away_open, home_open, away_current,
+    home_current}. One request per game (plus the scoreboard)."""
+    out: list[dict] = []
+    for e in _events(date):
+        data = _get(EVENT_ODDS.format(eid=e["eid"]))
+        items = (data or {}).get("items") or []
+        if not items:
+            continue
+        it = items[0]  # primary provider
+        ao, ac = _side(it.get("awayTeamOdds"))
+        ho, hc = _side(it.get("homeTeamOdds"))
+        if ac is None and hc is None:
+            continue
+        out.append({"away_abbr": e["away_abbr"], "home_abbr": e["home_abbr"],
+                    "away_open": ao, "home_open": ho,
+                    "away_current": ac, "home_current": hc})
+        time.sleep(0.3)
+    log.info("espn: parsed %d game line(s)", len(out))
+    return out
+
+
 def dump_debug(date: str) -> None:
     """Fetch the scoreboard + a couple events' odds and dump the JSON. Forces the
     dump on regardless of the ESPN_DEBUG env (this function is debug-only)."""
