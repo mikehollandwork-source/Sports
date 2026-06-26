@@ -68,7 +68,10 @@ def _events(date: str) -> list[dict]:
 
 
 def dump_debug(date: str) -> None:
-    """Fetch the scoreboard + a couple events' odds and dump the JSON (ESPN_DEBUG)."""
+    """Fetch the scoreboard + a couple events' odds and dump the JSON. Forces the
+    dump on regardless of the ESPN_DEBUG env (this function is debug-only)."""
+    global DEBUG
+    DEBUG = True
     evs = _events(date)
     log.info("espn debug: %d events for %s", len(evs), date)
     for e in evs[:3]:
