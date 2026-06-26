@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import covers, grade, notify, tune
 from .analysis import evaluate_game, find_slate_line, line_confirms
-from .mlb_api import enrich_with_stats, schedule_for
+from .mlb_api import enrich_with_stats, results_for, schedule_for
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("main")
@@ -75,6 +75,15 @@ def run(date: str) -> dict:
     # status and the odds it had at first pitch (the closing line), so later polls
     # can't flip a pick to a lean or move the price after the game is underway.
     results = _lock_started_games(date, results)
+
+    # Tag each game's live state (upcoming / live / final) for the board.
+    try:
+        states = results_for(date)
+    except Exception as exc:
+        log.warning("game-state fetch failed: %s", exc)
+        states = {}
+    for r in results:
+        r["state"] = states.get(r.get("game_pk"), {}).get("state", "upcoming")
 
     picks = [r["pick"] for r in results if r["flagged"]]
     log.info("Flagged %d edge game(s)", len(picks))
@@ -184,6 +193,22 @@ def _ranked(games: list) -> list:
                   reverse=True)
 
 
+def _board_games(games: list) -> list:
+    """Games to show on the live board: upcoming + live only (finals drop off into
+    the record), ordered by first pitch with live games pinned to the top."""
+    shown = [g for g in games if g.get("state") != "final"]
+    return sorted(shown, key=lambda g: (0 if g.get("state") == "live" else 1,
+                                        g.get("game_datetime") or ""))
+
+
+def _finals(games: list) -> list:
+    return [g for g in games if g.get("state") == "final"]
+
+
+def _state_tag(g: dict) -> str:
+    return "🔴 LIVE NOW · " if g.get("state") == "live" else ""
+
+
 def _edge_word(strength: float) -> str:
     return "strong" if strength >= 0.66 else "moderate" if strength >= 0.33 else "slight"
 
@@ -243,11 +268,12 @@ def _game_lines(g: dict) -> list[str]:
     edge = f"{adv} ({_edge_word(e['strength'])}, margin {e['margin']})"
     wc = c["win_condition"]["hits"]
     pub = _public_evidence(g)
+    tag = _state_tag(g)
     if g.get("flagged"):
         bl = g.get("betting_lines")
         ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
         lines = [
-            f"✅ **{adv}** — {g['matchup']} · **confidence {_c10(conf)}** ✓ "
+            f"✅ **{adv}** — {tag}{g['matchup']} · **confidence {_c10(conf)}** ✓ "
             f"(need {_c10(pc['threshold'])}){ml}",
             f"   • stat edge: {edge}",
             f"   • public is on: {pub} → **we fade them**",
@@ -255,7 +281,7 @@ def _game_lines(g: dict) -> list[str]:
         ]
     else:
         lines = [
-            f"🔸 **{adv}** (lean) — {g['matchup']} · confidence {_c10(conf)}",
+            f"🔸 **{adv}** (lean) — {tag}{g['matchup']} · confidence {_c10(conf)}",
             f"   • stat edge: {edge}",
             f"   • public is on: {pub}",
             f"   • win condition: {wc}/5 games",
@@ -273,18 +299,27 @@ def build_summary(payload: dict) -> str:
     specific reason it's only a lean."""
     date = payload["date"]
     picks = payload.get("picks", [])
+    games = payload.get("games", [])
+    board, finals = _board_games(games), _finals(games)
     out = [f"# MLB Board — {date}", ""]
     out.append(f"**{len(picks)} pick(s)"
                + (f": {', '.join(picks)}**" if picks else " — no game cleared the bar today.**"))
+    if finals:
+        out.append(f"\n_{len(finals)} game(s) final — moved into the record below._")
     out.append("")
 
-    for g in _ranked(payload.get("games", [])):
-        out.extend(_game_lines(g))
+    if board:
+        for g in board:
+            out.extend(_game_lines(g))
+            out.append("")
+    else:
+        out.append("_No upcoming or live games — full slate is final (see the record below)._")
         out.append("")
 
     out.append("_✅ = pick (the public is fading the stat favorite and confidence ≥ threshold). "
                "🔸 = lean: the advantage team is shown, but it's not a play — usually because the "
-               "public agrees with the stats (no one to fade) or confidence fell short._")
+               "public agrees with the stats (no one to fade) or confidence fell short. "
+               "🔴 = live; final games drop off into the record._")
 
     out.append("")
     out.append(grade.records_block())
@@ -337,33 +372,34 @@ def telegram_text(payload: dict) -> str:
     """Readable phone layout for Telegram: the pick(s) up top, then leans, then
     the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
     date = payload["date"]
-    games = _ranked(payload.get("games", []))
+    games = payload.get("games", [])
+    board, finals = _board_games(games), _finals(games)
     picks = payload.get("picks", [])
-    flagged = [g for g in games if g.get("flagged")]
-    leans = [g for g in games if not g.get("flagged")]
 
     L = [f"⚾ MLB BOARD — {date}",
          f"{len(picks)} pick(s)" + (f": {', '.join(picks)}" if picks else " today")]
+    if finals:
+        L.append(f"({len(finals)} final → moved to the record)")
 
-    for g in flagged:
+    for g in board:
         pc = g["pick_criteria"]
         wc = pc["components"]["win_condition"]["hits"]
-        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
-        L += ["",
-              f"✅ PICK: {pc['advantage_team']}{_ml_str(pc)}",
-              f"   {g['matchup']}",
-              f"   confidence {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
-              f"   public on {_public_evidence(g)} → we fade",
-              f"   line: {_line_phrase(pc.get('line_check'))}"]
-
-    if leans:
-        L += ["", "— LEANS (advantage team, not a play) —"]
-        for g in leans:
-            pc = g["pick_criteria"]
-            wc = pc["components"]["win_condition"]["hits"]
-            L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
+        tag = "🔴 LIVE · " if g.get("state") == "live" else ""
+        if g.get("flagged"):
+            edge = _edge_word(pc["components"]["stat_edge"]["strength"])
+            L += ["",
+                  f"✅ {tag}PICK: {pc['advantage_team']}{_ml_str(pc)}",
+                  f"   {g['matchup']}",
+                  f"   conf {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
+                  f"   public on {_public_evidence(g)} → we fade",
+                  f"   line: {_line_phrase(pc.get('line_check'))}"]
+        else:
+            L += ["",
+                  f"🔸 {tag}{pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
                   f"   {g['matchup']} — {pc['reason']}",
                   f"   line: {_line_phrase(pc.get('line_check'))}"]
+    if not board:
+        L += ["", "No upcoming or live games — slate is final (see record)."]
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     ts = tune.status_line().replace("**", "")
@@ -379,6 +415,7 @@ def main() -> None:
 
     payload = run(args.date)
     write_outputs(payload, args.date)
+    grade.update_ledger(args.date)  # record any games that just went final (idempotent)
     notify.send_telegram(telegram_text(payload))
     print(json.dumps(payload.get("picks", []), indent=2))
 

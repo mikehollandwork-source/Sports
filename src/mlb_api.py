@@ -104,15 +104,23 @@ def schedule_for(date: str) -> list[Game]:
     return games
 
 
+def _state(abstract: str) -> str:
+    """Normalize MLB's abstractGameState to upcoming / live / final."""
+    a = (abstract or "").lower()
+    return "final" if a == "final" else "live" if a == "live" else "upcoming"
+
+
 def results_for(date: str) -> dict[int, dict]:
-    """Final scores for a date, keyed by game_pk: {final, winner, home, away,
-    home_score, away_score}. `winner` is the winning team name ("" if tie/n.a.)."""
+    """Per-game state + scores for a date, keyed by game_pk: {state, final, winner,
+    home, away, home_score, away_score}. state is upcoming/live/final; `winner` is
+    the winning team name ("" if tie/n.a.)."""
     data = _get("schedule", sportId=SPORT_ID, date=date, hydrate="team,linescore")
     out: dict[int, dict] = {}
     for day in data.get("dates", []):
         for g in day.get("games", []):
             home, away = g["teams"]["home"], g["teams"]["away"]
-            final = g.get("status", {}).get("abstractGameState") == "Final"
+            abstract = g.get("status", {}).get("abstractGameState")
+            final = abstract == "Final"
             hs, as_ = home.get("score"), away.get("score")
             winner = ""
             if home.get("isWinner"):
@@ -122,7 +130,7 @@ def results_for(date: str) -> dict[int, dict]:
             elif final and hs is not None and as_ is not None:
                 winner = (home if hs > as_ else away)["team"].get("name", "")
             out[g["gamePk"]] = {
-                "final": final, "winner": winner,
+                "state": _state(abstract), "final": final, "winner": winner,
                 "home": home["team"].get("name", ""), "away": away["team"].get("name", ""),
                 "home_score": hs, "away_score": as_,
             }

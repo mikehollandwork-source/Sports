@@ -22,7 +22,7 @@ import datetime as dt
 import json
 import logging
 
-from . import main as picks_main, notify
+from . import grade, main as picks_main, notify
 from .mlb_api import SPORT_ID, _get
 
 log = logging.getLogger("pregame")
@@ -91,6 +91,7 @@ def run() -> bool:
 
     payload = picks_main.run(date)
     picks_main.write_outputs(payload, date)
+    grade.update_ledger(date)  # move any now-final games into the record
 
     processed |= set(due)
     OUTPUT_DIR.mkdir(exist_ok=True)
