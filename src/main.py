@@ -351,13 +351,6 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
-def _tg_line(g: dict) -> str:
-    s = _line_phrase(g["pick_criteria"].get("line_check"))
-    if g.get("state") == "live":
-        s += " (frozen at first pitch)"
-    return f"   line: {s}"
-
-
 def _telegram_records_lines() -> list[str]:
     """Day/Week/Month/YTD records for both books, laid out one window per line."""
     ledger = grade.load_ledger()
@@ -392,20 +385,20 @@ def telegram_text(payload: dict) -> str:
     for g in board:
         pc = g["pick_criteria"]
         cons = pc["components"]["consistency"]["hits"]
+        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
+        emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        if g.get("flagged"):
-            edge = _edge_word(pc["components"]["stat_edge"]["strength"])
-            L += ["",
-                  f"✅ {tag}PICK: {pc['advantage_team']}{_ml_str(pc)}",
-                  f"   {g['matchup']}",
-                  f"   conf {_c10(pc['confidence'])} · edge {edge} · consistency {cons}/5",
-                  f"   public on {_public_evidence(g)} → we fade",
-                  _tg_line(g)]
-        else:
-            L += ["",
-                  f"🔸 {tag}{pc['advantage_team']} · {_c10(pc['confidence'])} · consistency {cons}/5",
-                  f"   {g['matchup']} — {pc['reason']}",
-                  _tg_line(g)]
+        head = (f"✅ {tag}PICK: {pc['advantage_team']}{_ml_str(pc)}"
+                if g.get("flagged") else f"🔸 {tag}{pc['advantage_team']}")
+        frozen = " [frozen]" if g.get("state") == "live" else ""
+        L += ["",
+              f"{head} · conf {_c10(pc['confidence'])}",
+              f"   {g['matchup']}",
+              f"   stat edge: {edge} (margin {emargin}) · consistency {cons}/5",
+              f"   👥 public: {_public_evidence(g)}",
+              f"   🦈 sharp/line: {_line_phrase(pc.get('line_check'))}{frozen}"]
+        L.append("   ✅ all 3 gates — WE FADE" if g.get("flagged")
+                 else f"   → lean: {pc['reason']}")
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
