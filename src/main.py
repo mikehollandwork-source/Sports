@@ -134,10 +134,12 @@ def _attach_line(game, result: dict, slate: list) -> None:
     pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
     pc["opponent_moneyline"] = e.get(f"{opp}_current") if e else None  # for the faded-leans book
 
-    if not result["flagged"]:
-        return
+    # line movement toward our side (the advantage team) for EVERY game, pick or lean
     confirms, info = line_confirms(side, e)  # e has {away/home}_open/_current
     pc["line_check"] = info
+
+    if not result["flagged"]:
+        return
     if confirms is not True:
         result["flagged"] = False
         result["pick"] = None
@@ -179,15 +181,19 @@ def _public_evidence(g: dict) -> str:
     return f"{team}" + (f" [{', '.join(bits)}]" if bits else "")
 
 
+def _line_phrase(lc: dict | None) -> str:
+    """Plain description of line movement toward our side, for picks and leans."""
+    if not lc or lc.get("status") == "unknown":
+        return "line movement unavailable"
+    arrow = f"{lc['open']:+d}→{lc['current']:+d}"
+    if lc["status"] == "confirms":
+        return f"moved IN OUR FAVOR ✓ ({arrow}, {lc['implied_shift']:+.1%})"
+    return f"moved AGAINST us ✗ ({arrow}, {lc['implied_shift']:+.1%})"
+
+
 def _line_bullet(pc: dict) -> str | None:
     lc = pc.get("line_check")
-    if not lc:
-        return None
-    if lc["status"] == "unknown":
-        return "   • line: unavailable (couldn't verify movement)"
-    mark = "confirms ✓" if lc["status"] == "confirms" else "did NOT confirm ✗"
-    return (f"   • line: {mark} ({lc['open']:+d}→{lc['current']:+d}, "
-            f"{lc['implied_shift']:+.1%} to the pick)")
+    return None if lc is None else f"   • line: {_line_phrase(lc)}"
 
 
 def _game_lines(g: dict) -> list[str]:
@@ -309,7 +315,8 @@ def telegram_text(payload: dict) -> str:
               f"✅ PICK: {pc['advantage_team']}{_ml_str(pc)}",
               f"   {g['matchup']}",
               f"   confidence {_c10(pc['confidence'])} · edge {edge} · win-cond {wc}/5",
-              f"   public on {_public_evidence(g)} → we fade"]
+              f"   public on {_public_evidence(g)} → we fade",
+              f"   line: {_line_phrase(pc.get('line_check'))}"]
 
     if leans:
         L += ["", "— LEANS (advantage team, not a play) —"]
@@ -317,7 +324,8 @@ def telegram_text(payload: dict) -> str:
             pc = g["pick_criteria"]
             wc = pc["components"]["win_condition"]["hits"]
             L += [f"🔸 {pc['advantage_team']} · {_c10(pc['confidence'])} · win-cond {wc}/5",
-                  f"   {g['matchup']} — {pc['reason']}"]
+                  f"   {g['matchup']} — {pc['reason']}",
+                  f"   line: {_line_phrase(pc.get('line_check'))}"]
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     ts = tune.status_line().replace("**", "")
