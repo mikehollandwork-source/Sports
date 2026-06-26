@@ -376,6 +376,46 @@ def team_home_away_split(team_id: int, season: int, as_of: str | None = None) ->
     return out
 
 
+_DIVISION_CACHE: dict[int, dict[int, int]] = {}
+
+
+def team_divisions(season: int) -> dict[int, int]:
+    """{team_id: division_id} for the season (fetched once)."""
+    if season not in _DIVISION_CACHE:
+        data = _get("teams", sportId=SPORT_ID, season=season)
+        _DIVISION_CACHE[season] = {t["id"]: t["division"]["id"]
+                                   for t in data.get("teams", []) if t.get("division", {}).get("id")}
+    return _DIVISION_CACHE[season]
+
+
+def team_division_form(team_id: int, season: int, opp_division: int,
+                       as_of: str | None = None) -> dict:
+    """Point-in-time run-diff/game vs `opp_division` and overall, plus the delta
+    (vs-division minus overall) - i.e. does this team over/under-perform vs that
+    division beyond its usual self. {vs_div_games, vs_div_rd, overall_rd, delta}."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    divs = team_divisions(season)
+    tot = {"g": 0, "rd": 0}
+    vsd = {"g": 0, "rd": 0}
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        rd = (int(sp.get("stat", {}).get("runs", 0) or 0)
+              - int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0))
+        tot["g"] += 1
+        tot["rd"] += rd
+        if divs.get(sp.get("opponent", {}).get("id")) == opp_division:
+            vsd["g"] += 1
+            vsd["rd"] += rd
+    overall = tot["rd"] / tot["g"] if tot["g"] else None
+    vsdiv = vsd["rd"] / vsd["g"] if vsd["g"] else None
+    return {"vs_div_games": vsd["g"],
+            "vs_div_rd": round(vsdiv, 3) if vsdiv is not None else None,
+            "overall_rd": round(overall, 3) if overall is not None else None,
+            "delta": round(vsdiv - overall, 3) if vsdiv is not None and overall is not None else None}
+
+
 def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> list[dict]:
     """
     Last 5 completed games as per-game dicts with runs/hits scored & allowed and
