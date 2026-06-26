@@ -84,8 +84,10 @@ def _attach_line(game, result: dict, slate: list) -> None:
     pc = result["pick_criteria"]
     adv = pc["advantage_team"]
     side = "home" if adv == game.home.name else "away"
+    opp = "away" if side == "home" else "home"
     e = find_slate_line(game, slate)
     pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
+    pc["opponent_moneyline"] = e.get(f"{opp}_current") if e else None  # for the faded-leans book
 
     if not result["flagged"]:
         return
@@ -229,7 +231,8 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True)):
+    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True),
+                           ("Leans faded", "leans_faded", True)):
         tag = " (hypothetical)" if hyp else ""
         rec = grade.windowed_records(ledger[key], today)
         if not rec:
