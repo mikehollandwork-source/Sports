@@ -358,12 +358,12 @@ def line_confirms(side: str, lm: dict | None) -> tuple[bool | None, dict]:
     o, c = lm[f"{side}_open"], lm[f"{side}_current"]
     shift = round(_implied(c) - _implied(o), 3)
     ok = shift > LINE_CONFIRM_MIN
-    return ok, {
-        "status": "confirms" if ok else "contradicts",
-        "open": o, "current": c, "implied_shift": shift,
-        "reason": (f"line moved toward the pick ({o:+d}→{c:+d})" if ok
-                   else f"line moved away from the pick ({o:+d}→{c:+d})"),
-    }
+    status = "flat" if shift == 0 else ("confirms" if ok else "contradicts")
+    reason = {"flat": f"line hasn't moved ({o:+d}→{c:+d})",
+              "confirms": f"line moved toward the pick ({o:+d}→{c:+d})",
+              "contradicts": f"line moved away from the pick ({o:+d}→{c:+d})"}[status]
+    return ok, {"status": status, "open": o, "current": c,
+                "implied_shift": shift, "reason": reason}
 
 
 def _consensus_home_lean(game: Game, sides: dict) -> float | None:
