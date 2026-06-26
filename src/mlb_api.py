@@ -336,15 +336,8 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
 _TEAM_GAMELOG_CACHE: dict[tuple, tuple] = {}
 
 
-def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> list[dict]:
-    """
-    Last 5 completed games as per-game dicts with runs/hits scored & allowed and
-    the opponent's season strength (for the SOS-adjusted win-condition back-test).
-    With as_of, only games strictly before that date count (point-in-time).
-
-    Team-level hitting game-log gives runs/hits scored; pitching gives runs/hits
-    allowed; the two are aligned by date.
-    """
+def _team_gamelog(team_id: int, season: int) -> tuple[list[dict], dict[str, dict]]:
+    """(hitting splits, pitching-by-date) for a team-season, fetched once & cached."""
     key = (team_id, season)
     if key not in _TEAM_GAMELOG_CACHE:
         data = _get(f"teams/{team_id}/stats", stats="gameLog",
@@ -359,8 +352,37 @@ def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> l
                 elif grp == "pitching":
                     pit_by_date[sp.get("date", "")] = sp
         _TEAM_GAMELOG_CACHE[key] = (hit_splits, pit_by_date)
-    hit_splits, pit_by_date = _TEAM_GAMELOG_CACHE[key]
+    return _TEAM_GAMELOG_CACHE[key]
 
+
+def team_home_away_split(team_id: int, season: int, as_of: str | None = None) -> dict:
+    """Point-in-time home vs away run differential per game. With as_of, only games
+    strictly before it count (no lookahead). {home/away: {games, rd_per_g}}."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    acc = {"home": {"g": 0, "rs": 0, "ra": 0}, "away": {"g": 0, "rs": 0, "ra": 0}}
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        side = "home" if sp.get("isHome") else "away"
+        acc[side]["g"] += 1
+        acc[side]["rs"] += int(sp.get("stat", {}).get("runs", 0) or 0)
+        acc[side]["ra"] += int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
+    out = {}
+    for s in ("home", "away"):
+        g = acc[s]["g"]
+        out[s] = {"games": g,
+                  "rd_per_g": round((acc[s]["rs"] - acc[s]["ra"]) / g, 3) if g else None}
+    return out
+
+
+def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> list[dict]:
+    """
+    Last 5 completed games as per-game dicts with runs/hits scored & allowed and
+    the opponent's season strength (for the SOS-adjusted win-condition back-test).
+    With as_of, only games strictly before that date count (point-in-time).
+    """
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
     games = [sp for sp in hit_splits if not as_of or sp.get("date", "") < as_of]
     out: list[dict] = []
     for sp in games[-5:]:
