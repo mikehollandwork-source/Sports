@@ -22,7 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, tune
-from .analysis import evaluate_game, find_slate_line, line_confirms
+from .analysis import _canon_abbr, evaluate_game, find_slate_line, line_confirms
 from .mlb_api import enrich_with_stats, results_for, schedule_for
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -59,20 +59,18 @@ def run(date: str) -> dict:
         r["game_datetime"] = g.start_time
         results.append(r)
 
-    # Line source = ESPN (true open + current moneyline for every game); covers'
-    # odds page is the fallback. Used for the sharp-money filter and the captured
-    # pre-game price.
+    # Line source = ESPN (true open + current moneyline for every game). For any
+    # game ESPN hasn't posted a line for yet, fill the gap from covers' odds page.
     try:
         slate = espn.lines(date)
     except Exception as exc:
         log.warning("espn odds failed: %s", exc)
         slate = []
-    if not slate:
+    if sum(1 for g in games if find_slate_line(g, slate)) < len(games):
         try:
-            slate = covers.slate_lines()
+            slate = _merge_slates(slate, covers.slate_lines())
         except Exception as exc:
-            log.warning("covers slate fallback failed: %s", exc)
-            slate = []
+            log.warning("covers gap-fill failed: %s", exc)
 
     if os.environ.get("COVERS_DEBUG") == "1":   # capture raw ESPN JSON for debugging
         try:
@@ -144,6 +142,19 @@ def _lock_started_games(date: str, results: list) -> list:
     if locked:
         log.info("locked %d already-started game(s) to their pre-game snapshot", locked)
     return out
+
+
+def _merge_slates(primary: list, secondary: list) -> list:
+    """ESPN (primary) preferred; append covers (secondary) rows for any game-pair
+    the primary doesn't already cover, matched on canonical abbreviations."""
+    have = {(_canon_abbr(e["away_abbr"]), _canon_abbr(e["home_abbr"])) for e in primary}
+    merged = list(primary)
+    for e in secondary:
+        key = (_canon_abbr(e["away_abbr"]), _canon_abbr(e["home_abbr"]))
+        if key not in have:
+            merged.append(e)
+            have.add(key)
+    return merged
 
 
 def _attach_line(game, result: dict, slate: list) -> None:
