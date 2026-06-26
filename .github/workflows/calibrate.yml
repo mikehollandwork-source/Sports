@@ -5,8 +5,14 @@ name: Win-condition calibration
 on:
   workflow_dispatch:
     inputs:
+      signal:
+        description: "Which signal to calibrate."
+        required: false
+        default: "wincond"
+        type: choice
+        options: ["wincond", "edge"]
       days:
-        description: "How many days back to analyze."
+        description: "How many days back to analyze (wincond can do the season; edge is heavier, use ~14)."
         required: false
         default: "21"
       end:
@@ -27,16 +33,19 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements.txt
 
-      - name: Run win-condition calibration
+      - name: Run calibration
         run: |
-          python -m src.wc_calibrate --days "${{ github.event.inputs.days }}" \
+          MODULE=src.wc_calibrate
+          [ "${{ github.event.inputs.signal }}" = "edge" ] && MODULE=src.edge_calibrate
+          python -m "$MODULE" --days "${{ github.event.inputs.days }}" \
             ${{ github.event.inputs.end && format('--end {0}', github.event.inputs.end) || '' }}
 
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/wc_calibration.json output/wc_calibration.md
+          git add output/wc_calibration.json output/wc_calibration.md \
+                  output/edge_calibration.json output/edge_calibration.md 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No change."
           else
