@@ -1,6 +1,6 @@
 {
   "date": "2026-06-26",
-  "generated_at": "2026-06-26T22:10:41.684340+00:00",
+  "generated_at": "2026-06-26T22:29:07.459990+00:00",
   "games": [
     {
       "game_pk": 824255,
@@ -106,25 +106,47 @@
           },
           "forum": {
             "pick": "Detroit Tigers",
-            "home": 3,
-            "away": 1
+            "home": 4,
+            "away": 2
           },
           "agree": true,
-          "forum_lean": 0.5,
+          "forum_lean": 0.333,
           "consensus_lean": 0.1,
-          "blended_lean": 0.36
+          "blended_lean": 0.252
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 2,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "Detroit Tigers",
           "consensus_pct": 55.0,
-          "moneyline": "-116"
+          "moneyline": "-110"
         },
         "non_majority": {
           "team": "Houston Astros",
           "consensus_pct": 45.0,
-          "moneyline": "-105"
+          "moneyline": "-115"
         }
       },
       "consistency": {
@@ -278,8 +300,9 @@
         "reason": "public is also on Detroit Tigers (no fade)",
         "advantage_team": "Detroit Tigers",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.284,
+        "confidence": 0.236,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -288,8 +311,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.36,
-            "strength": 0.36,
+            "blended_lean": 0.252,
+            "strength": 0.252,
             "weight": 0.45
           },
           "consistency": {
@@ -323,7 +346,7 @@
           "losses": 22
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 823363,
@@ -423,31 +446,53 @@
           "consensus": {
             "pick": "Pit",
             "pcts": {
-              "Cin": 38.0,
-              "Pit": 62.0
+              "Cin": 39.0,
+              "Pit": 61.0
             }
           },
           "forum": {
             "pick": "Cincinnati Reds",
             "home": 0,
-            "away": 3
+            "away": 4
           },
           "agree": false,
           "forum_lean": -1.0,
-          "consensus_lean": 0.24,
-          "blended_lean": -0.566
+          "consensus_lean": 0.22,
+          "blended_lean": -0.573
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": false
+          },
+          {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 1,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers differ)",
+        "flags": [],
+        "line": "with public"
       },
       "betting_lines": {
         "majority": {
           "team": "Cincinnati Reds",
-          "consensus_pct": 38.0,
-          "moneyline": "+150"
+          "consensus_pct": 39.0,
+          "moneyline": "+161"
         },
         "non_majority": {
           "team": "Pittsburgh Pirates",
-          "consensus_pct": 62.0,
-          "moneyline": "-186"
+          "consensus_pct": 61.0,
+          "moneyline": "-171"
         }
       },
       "consistency": {
@@ -598,11 +643,12 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "line did not confirm the fade \u2014 line moved away from the pick (-219\u2192-185, -3.7%)",
+        "reason": "public read not corroborated \u2014 sources disagree on the public side (covers differ)",
         "advantage_team": "Pittsburgh Pirates",
         "public_edge": true,
+        "public_trusted": false,
         "edge_strong": true,
-        "confidence": 0.805,
+        "confidence": 0.808,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -611,8 +657,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.566,
-            "strength": 0.566,
+            "blended_lean": -0.573,
+            "strength": 0.573,
             "weight": 0.45
           },
           "consistency": {
@@ -646,7 +692,7 @@
           "losses": 20
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 824824,
@@ -746,14 +792,31 @@
           "consensus": null,
           "forum": {
             "pick": "Washington Nationals",
-            "home": 3,
+            "home": 4,
             "away": 6
           },
           "agree": null,
-          "forum_lean": -0.333,
+          "forum_lean": -0.2,
           "consensus_lean": null,
-          "blended_lean": -0.333
+          "blended_lean": -0.2
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": null,
       "consistency": {
@@ -907,8 +970,9 @@
         "reason": "stat edge too small (margin 0.11 < 0.4 threshold)",
         "advantage_team": "Baltimore Orioles",
         "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.295,
+        "confidence": 0.235,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -917,8 +981,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.333,
-            "strength": 0.333,
+            "blended_lean": -0.2,
+            "strength": 0.2,
             "weight": 0.45
           },
           "consistency": {
@@ -1058,25 +1122,47 @@
           },
           "forum": {
             "pick": "Texas Rangers",
-            "home": 5,
-            "away": 8
+            "home": 4,
+            "away": 6
           },
           "agree": true,
-          "forum_lean": -0.231,
+          "forum_lean": -0.2,
           "consensus_lean": -0.06,
-          "blended_lean": -0.171
+          "blended_lean": -0.151
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "away",
+            "agrees": true
+          },
+          {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 2,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "Texas Rangers",
           "consensus_pct": 53.0,
-          "moneyline": "-102"
+          "moneyline": "-108"
         },
         "non_majority": {
           "team": "Toronto Blue Jays",
           "consensus_pct": 47.0,
-          "moneyline": "-107"
+          "moneyline": "-112"
         }
       },
       "consistency": {
@@ -1230,8 +1316,9 @@
         "reason": "public is also on Texas Rangers (no fade)",
         "advantage_team": "Texas Rangers",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.334,
+        "confidence": 0.325,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1240,8 +1327,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.171,
-            "strength": 0.171,
+            "blended_lean": -0.151,
+            "strength": 0.151,
             "weight": 0.45
           },
           "consistency": {
@@ -1381,25 +1468,42 @@
           },
           "forum": {
             "pick": "Cleveland Guardians",
-            "home": 1,
-            "away": 0
+            "home": 2,
+            "away": 2
           },
-          "agree": true,
-          "forum_lean": 1.0,
+          "agree": null,
+          "forum_lean": 0.0,
           "consensus_lean": 0.22,
-          "blended_lean": 0.727
+          "blended_lean": 0.22
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 61.0,
-          "moneyline": "-110"
+          "moneyline": "-107"
         },
         "non_majority": {
           "team": "Seattle Mariners",
           "consensus_pct": 39.0,
-          "moneyline": "-115"
+          "moneyline": "-103"
         }
       },
       "consistency": {
@@ -1553,8 +1657,9 @@
         "reason": "stat edge too small (margin 0.02 < 0.4 threshold)",
         "advantage_team": "Seattle Mariners",
         "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.351,
+        "confidence": 0.123,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1563,8 +1668,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.727,
-            "strength": 0.727,
+            "blended_lean": 0.22,
+            "strength": 0.22,
             "weight": 0.45
           },
           "consistency": {
@@ -1573,14 +1678,14 @@
           }
         },
         "consistency_hits": 0,
-        "advantage_moneyline": -109,
+        "advantage_moneyline": -110,
         "opponent_moneyline": -110,
         "line_check": {
           "open": -105,
-          "current": -109,
-          "implied_shift": 0.009,
+          "current": -110,
+          "implied_shift": 0.012,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-105\u2192-109, +0.9%)"
+          "reason": "only a slight move our way, below the 2% signal floor (-105\u2192-110, +1.2%)"
         }
       },
       "flagged": false,
@@ -1713,16 +1818,38 @@
           "blended_lean": 0.407
         }
       },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 2,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [],
+        "line": "with public"
+      },
       "betting_lines": {
         "majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 71.0,
-          "moneyline": "-148"
+          "moneyline": "-129"
         },
         "non_majority": {
           "team": "Arizona Diamondbacks",
           "consensus_pct": 29.0,
-          "moneyline": "+117"
+          "moneyline": "+120"
         }
       },
       "consistency": {
@@ -1876,6 +2003,7 @@
         "reason": "public is also on Tampa Bay Rays (no fade)",
         "advantage_team": "Tampa Bay Rays",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": true,
         "confidence": 0.733,
         "edge_threshold": 0.4,
@@ -2022,31 +2150,53 @@
           "consensus": {
             "pick": "Phi",
             "pcts": {
-              "Phi": 73.0,
-              "Nym": 27.0
+              "Phi": 72.0,
+              "Nym": 28.0
             }
           },
           "forum": {
             "pick": "New York Mets",
-            "home": 11,
+            "home": 13,
             "away": 6
           },
           "agree": false,
-          "forum_lean": 0.294,
-          "consensus_lean": -0.46,
-          "blended_lean": 0.03
+          "forum_lean": 0.368,
+          "consensus_lean": -0.44,
+          "blended_lean": 0.085
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "away",
+            "agrees": false
+          },
+          {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 1,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers differ)",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "New York Mets",
-          "consensus_pct": 27.0,
-          "moneyline": "+133"
+          "consensus_pct": 28.0,
+          "moneyline": "+144"
         },
         "non_majority": {
           "team": "Philadelphia Phillies",
-          "consensus_pct": 73.0,
-          "moneyline": "-167"
+          "consensus_pct": 72.0,
+          "moneyline": "-157"
         }
       },
       "consistency": {
@@ -2200,8 +2350,9 @@
         "reason": "stat edge too small (margin 0.11 < 0.4 threshold)",
         "advantage_team": "Philadelphia Phillies",
         "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.161,
+        "confidence": 0.185,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -2210,8 +2361,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.03,
-            "strength": 0.03,
+            "blended_lean": 0.085,
+            "strength": 0.085,
             "weight": 0.45
           },
           "consistency": {
@@ -2340,36 +2491,60 @@
         }
       },
       "public_majority": {
-        "team": "Boston Red Sox",
+        "team": "New York Yankees",
         "detail": {
           "consensus": {
             "pick": "Nyy",
             "pcts": {
-              "Nyy": 64.0,
-              "Bos": 36.0
+              "Nyy": 65.0,
+              "Bos": 35.0
             }
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 3,
-            "away": 2
+            "home": 4,
+            "away": 3
           },
           "agree": false,
-          "forum_lean": 0.2,
-          "consensus_lean": -0.28,
-          "blended_lean": 0.032
+          "forum_lean": 0.143,
+          "consensus_lean": -0.3,
+          "blended_lean": -0.012
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "away",
+            "agrees": true
+          },
+          {
+            "name": "forum",
+            "side": "home",
+            "agrees": false
+          }
+        ],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 1,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (forum differ)",
+        "flags": [
+          "reverse line move \u2014 money went against the public %"
+        ],
+        "line": "against public"
       },
       "betting_lines": {
         "majority": {
-          "team": "Boston Red Sox",
-          "consensus_pct": 36.0,
-          "moneyline": "-110"
+          "team": "New York Yankees",
+          "consensus_pct": 65.0,
+          "moneyline": "-114"
         },
         "non_majority": {
-          "team": "New York Yankees",
-          "consensus_pct": 64.0,
-          "moneyline": "-110"
+          "team": "Boston Red Sox",
+          "consensus_pct": 35.0,
+          "moneyline": "-109"
         }
       },
       "consistency": {
@@ -2520,11 +2695,12 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "stat edge too small (margin 0.06 < 0.4 threshold)",
+        "reason": "public is also on New York Yankees (no fade)",
         "advantage_team": "New York Yankees",
-        "public_edge": true,
+        "public_edge": false,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.101,
+        "confidence": 0.092,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -2533,8 +2709,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.032,
-            "strength": 0.032,
+            "blended_lean": -0.012,
+            "strength": 0.012,
             "weight": 0.45
           },
           "consistency": {
@@ -2668,14 +2844,31 @@
           "consensus": null,
           "forum": {
             "pick": "Kansas City Royals",
-            "home": 4,
-            "away": 5
+            "home": 3,
+            "away": 4
           },
           "agree": null,
-          "forum_lean": -0.111,
+          "forum_lean": -0.143,
           "consensus_lean": null,
-          "blended_lean": -0.111
+          "blended_lean": -0.143
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": null,
       "consistency": {
@@ -2829,8 +3022,9 @@
         "reason": "public is also on Kansas City Royals (no fade)",
         "advantage_team": "Kansas City Royals",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.44,
+        "confidence": 0.455,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -2839,8 +3033,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.111,
-            "strength": 0.111,
+            "blended_lean": -0.143,
+            "strength": 0.143,
             "weight": 0.45
           },
           "consistency": {
@@ -2974,27 +3168,48 @@
           "consensus": {
             "pick": "Mil",
             "pcts": {
-              "Chc": 33.0,
-              "Mil": 67.0
+              "Chc": 34.0,
+              "Mil": 66.0
             }
           },
-          "forum": null,
+          "forum": {
+            "pick": "Milwaukee Brewers",
+            "home": 1,
+            "away": 1
+          },
           "agree": null,
-          "forum_lean": null,
-          "consensus_lean": 0.34,
-          "blended_lean": 0.34
+          "forum_lean": 0.0,
+          "consensus_lean": 0.32,
+          "blended_lean": 0.32
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "Milwaukee Brewers",
-          "consensus_pct": 67.0,
-          "moneyline": "-228"
+          "consensus_pct": 66.0,
+          "moneyline": "-250"
         },
         "non_majority": {
           "team": "Chicago Cubs",
-          "consensus_pct": 33.0,
-          "moneyline": "+217"
+          "consensus_pct": 34.0,
+          "moneyline": "+205"
         }
       },
       "consistency": {
@@ -3148,8 +3363,9 @@
         "reason": "public is also on Milwaukee Brewers (no fade)",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": true,
-        "confidence": 0.703,
+        "confidence": 0.694,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -3158,8 +3374,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.34,
-            "strength": 0.34,
+            "blended_lean": 0.32,
+            "strength": 0.32,
             "weight": 0.45
           },
           "consistency": {
@@ -3168,14 +3384,14 @@
           }
         },
         "consistency_hits": 1,
-        "advantage_moneyline": -250,
-        "opponent_moneyline": 202,
+        "advantage_moneyline": -246,
+        "opponent_moneyline": 199,
         "line_check": {
           "open": -271,
-          "current": -250,
-          "implied_shift": -0.016,
+          "current": -246,
+          "implied_shift": -0.019,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-271\u2192-250, -1.6%)"
+          "reason": "line moved away from the pick (-271\u2192-246, -1.9%)"
         }
       },
       "flagged": false,
@@ -3308,16 +3524,33 @@
           "blended_lean": 0.06
         }
       },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
+      },
       "betting_lines": {
         "majority": {
           "team": "Minnesota Twins",
           "consensus_pct": 53.0,
-          "moneyline": "-160"
+          "moneyline": "-175"
         },
         "non_majority": {
           "team": "Colorado Rockies",
           "consensus_pct": 47.0,
-          "moneyline": "+153"
+          "moneyline": "+140"
         }
       },
       "consistency": {
@@ -3471,6 +3704,7 @@
         "reason": "public is also on Minnesota Twins (no fade)",
         "advantage_team": "Minnesota Twins",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": true,
         "confidence": 0.577,
         "edge_threshold": 0.4,
@@ -3616,8 +3850,8 @@
           "consensus": {
             "pick": "Mia",
             "pcts": {
-              "Mia": 59.0,
-              "Stl": 41.0
+              "Mia": 60.0,
+              "Stl": 40.0
             }
           },
           "forum": {
@@ -3627,20 +3861,42 @@
           },
           "agree": true,
           "forum_lean": -1.0,
-          "consensus_lean": -0.18,
-          "blended_lean": -0.713
+          "consensus_lean": -0.2,
+          "blended_lean": -0.72
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "away",
+            "agrees": true
+          },
+          {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 2,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [],
+        "line": "with public"
       },
       "betting_lines": {
         "majority": {
           "team": "Miami Marlins",
-          "consensus_pct": 59.0,
-          "moneyline": "-110"
+          "consensus_pct": 60.0,
+          "moneyline": "-104"
         },
         "non_majority": {
           "team": "St. Louis Cardinals",
-          "consensus_pct": 41.0,
-          "moneyline": "-110"
+          "consensus_pct": 40.0,
+          "moneyline": "+100"
         }
       },
       "consistency": {
@@ -3794,8 +4050,9 @@
         "reason": "public is also on Miami Marlins (no fade)",
         "advantage_team": "Miami Marlins",
         "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.401,
+        "confidence": 0.405,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -3804,8 +4061,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.713,
-            "strength": 0.713,
+            "blended_lean": -0.72,
+            "strength": 0.72,
             "weight": 0.45
           },
           "consistency": {
@@ -3935,36 +4192,49 @@
         }
       },
       "public_majority": {
-        "team": "Athletics",
+        "team": "Los Angeles Angels",
         "detail": {
           "consensus": {
             "pick": "Laa",
             "pcts": {
-              "Ath": 44.0,
-              "Laa": 56.0
+              "Ath": 43.0,
+              "Laa": 57.0
             }
           },
-          "forum": {
-            "pick": "Athletics",
-            "home": 0,
-            "away": 1
-          },
-          "agree": false,
-          "forum_lean": -1.0,
-          "consensus_lean": 0.12,
-          "blended_lean": -0.608
+          "forum": null,
+          "agree": null,
+          "forum_lean": null,
+          "consensus_lean": 0.14,
+          "blended_lean": 0.14
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
-          "team": "Athletics",
-          "consensus_pct": 44.0,
-          "moneyline": "-106"
+          "team": "Los Angeles Angels",
+          "consensus_pct": 57.0,
+          "moneyline": "-110"
         },
         "non_majority": {
-          "team": "Los Angeles Angels",
-          "consensus_pct": 56.0,
-          "moneyline": "+102"
+          "team": "Athletics",
+          "consensus_pct": 43.0,
+          "moneyline": "-115"
         }
       },
       "consistency": {
@@ -4115,11 +4385,12 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "line did not confirm the fade \u2014 only a slight move our way, below the 2% signal floor (+102\u2192-105, +1.7%)",
+        "reason": "public is also on Los Angeles Angels (no fade)",
         "advantage_team": "Los Angeles Angels",
-        "public_edge": true,
+        "public_edge": false,
+        "public_trusted": true,
         "edge_strong": true,
-        "confidence": 0.824,
+        "confidence": 0.613,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -4128,8 +4399,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.608,
-            "strength": 0.608,
+            "blended_lean": 0.14,
+            "strength": 0.14,
             "weight": 0.45
           },
           "consistency": {
@@ -4258,7 +4529,7 @@
         }
       },
       "public_majority": {
-        "team": "Los Angeles Dodgers",
+        "team": "San Diego Padres",
         "detail": {
           "consensus": {
             "pick": "Sd",
@@ -4268,26 +4539,43 @@
             }
           },
           "forum": {
-            "pick": "Los Angeles Dodgers",
+            "pick": "San Diego Padres",
             "home": 1,
-            "away": 2
+            "away": 1
           },
-          "agree": false,
-          "forum_lean": -0.333,
+          "agree": null,
+          "forum_lean": 0.0,
           "consensus_lean": 0.06,
-          "blended_lean": -0.196
+          "blended_lean": 0.06
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
-          "team": "Los Angeles Dodgers",
-          "consensus_pct": 47.0,
-          "moneyline": "-137"
-        },
-        "non_majority": {
           "team": "San Diego Padres",
           "consensus_pct": 53.0,
           "moneyline": "+124"
+        },
+        "non_majority": {
+          "team": "Los Angeles Dodgers",
+          "consensus_pct": 47.0,
+          "moneyline": "-137"
         }
       },
       "consistency": {
@@ -4438,11 +4726,12 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "line did not confirm the fade \u2014 only a slight move our way, below the 2% signal floor (+129\u2192+123, +1.2%)",
+        "reason": "public is also on San Diego Padres (no fade)",
         "advantage_team": "San Diego Padres",
-        "public_edge": true,
+        "public_edge": false,
+        "public_trusted": true,
         "edge_strong": true,
-        "confidence": 0.638,
+        "confidence": 0.577,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -4451,8 +4740,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.196,
-            "strength": 0.196,
+            "blended_lean": 0.06,
+            "strength": 0.06,
             "weight": 0.45
           },
           "consistency": {
@@ -4589,26 +4878,43 @@
             }
           },
           "forum": {
-            "pick": "Atlanta Braves",
+            "pick": "San Francisco Giants",
             "home": 2,
-            "away": 3
+            "away": 2
           },
-          "agree": true,
-          "forum_lean": -0.2,
+          "agree": null,
+          "forum_lean": 0.0,
           "consensus_lean": -0.22,
-          "blended_lean": -0.207
+          "blended_lean": -0.22
         }
+      },
+      "public_check": {
+        "sources": [
+          {
+            "name": "covers",
+            "side": "away",
+            "agrees": true
+          }
+        ],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
+        "flags": [],
+        "line": "flat"
       },
       "betting_lines": {
         "majority": {
           "team": "Atlanta Braves",
           "consensus_pct": 61.0,
-          "moneyline": "-120"
+          "moneyline": "-112"
         },
         "non_majority": {
           "team": "San Francisco Giants",
           "consensus_pct": 39.0,
-          "moneyline": "+100"
+          "moneyline": "+101"
         }
       },
       "consistency": {
@@ -4762,8 +5068,9 @@
         "reason": "stat edge too small (margin 0.32 < 0.4 threshold)",
         "advantage_team": "San Francisco Giants",
         "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.534,
+        "confidence": 0.54,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -4772,8 +5079,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.207,
-            "strength": 0.207,
+            "blended_lean": -0.22,
+            "strength": 0.22,
             "weight": 0.45
           },
           "consistency": {
