@@ -10,7 +10,7 @@ on:
         required: false
         default: "wincond"
         type: choice
-        options: ["wincond", "edge", "line", "home", "division", "quality", "books"]
+        options: ["wincond", "edge", "line", "home", "division", "quality", "sp", "books"]
       days:
         description: "How many days back to analyze (wincond can do the season; edge is heavier, use ~14)."
         required: false
@@ -41,6 +41,7 @@ jobs:
           [ "${{ github.event.inputs.signal }}" = "home" ] && MODULE=src.home_calibrate
           [ "${{ github.event.inputs.signal }}" = "division" ] && MODULE=src.division_calibrate
           [ "${{ github.event.inputs.signal }}" = "quality" ] && MODULE=src.quality_calibrate
+          [ "${{ github.event.inputs.signal }}" = "sp" ] && MODULE=src.sp_calibrate
           [ "${{ github.event.inputs.signal }}" = "books" ] && MODULE=src.backtest_books
           python -m "$MODULE" --days "${{ github.event.inputs.days }}" \
             ${{ github.event.inputs.end && format('--end {0}', github.event.inputs.end) || '' }}
@@ -55,6 +56,7 @@ jobs:
                   output/home_analysis.json output/home_analysis.md \
                   output/division_analysis.json output/division_analysis.md \
                   output/quality_analysis.json output/quality_analysis.md \
+                  output/sp_analysis.json output/sp_analysis.md \
                   output/books_backtest.json output/books_backtest.md 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No change."

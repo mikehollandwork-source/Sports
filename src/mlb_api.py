@@ -149,6 +149,34 @@ def _season_for(date: str) -> int:
     return dt.date.fromisoformat(date).year
 
 
+def _ip_to_innings(ip) -> float:
+    """MLB innings-pitched string '5.2' (5 and 2/3) -> 5.667."""
+    try:
+        whole, _, frac = str(ip).partition(".")
+        return int(whole or 0) + (int(frac or 0) / 3.0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def pitcher_season_line(pitcher_id: int, season: int, as_of: str | None = None) -> dict:
+    """A pitcher's season-to-date totals (point-in-time): {ip, hr, bb, hbp, k, gs}.
+    Caller computes FIP so the FIP constant stays in one place (analysis)."""
+    ip = 0.0
+    tot = {"hr": 0, "bb": 0, "hbp": 0, "k": 0, "gs": 0}
+    for sp in _full_gamelog(pitcher_id, "pitching", season):
+        if as_of and sp.get("date", "") >= as_of:
+            continue
+        st = sp.get("stat", {})
+        ip += _ip_to_innings(st.get("inningsPitched", "0"))
+        tot["hr"] += int(st.get("homeRuns", 0) or 0)
+        tot["bb"] += int(st.get("baseOnBalls", 0) or 0)
+        tot["hbp"] += int(st.get("hitByPitch", 0) or 0)
+        tot["k"] += int(st.get("strikeOuts", 0) or 0)
+        tot["gs"] += int(st.get("gamesStarted", 0) or 0)
+    tot["ip"] = round(ip, 2)
+    return tot
+
+
 # --- game logs ----------------------------------------------------------------
 _GAMELOG_CACHE: dict[tuple, list] = {}
 
