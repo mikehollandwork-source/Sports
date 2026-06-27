@@ -15,6 +15,11 @@ on:
         type: boolean
         required: false
         default: false
+      public_debug:
+        description: "Dump raw extra-public-source HTML to output/public_debug/ (for fixing selectors)."
+        type: boolean
+        required: false
+        default: false
       grade_date:
         description: "Date to grade for the bankroll (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
         required: false
@@ -49,6 +54,7 @@ jobs:
         env:
           PICKS_DATE: ${{ github.event.inputs.date }}
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
+          PUBLIC_DEBUG: ${{ github.event.inputs.public_debug == 'true' && '1' || '' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
