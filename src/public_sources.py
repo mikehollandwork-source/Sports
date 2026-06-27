@@ -30,8 +30,8 @@ from bs4 import BeautifulSoup
 
 log = logging.getLogger("public_sources")
 
-SCORESODDS_URL = "https://www.scoresandodds.com/mlb"
-VEGASINSIDER_URL = "https://www.vegasinsider.com/mlb/matchups/"
+SCORESODDS_URL = "https://www.scoresandodds.com/mlb/consensus-picks"
+VEGASINSIDER_URL = "https://www.vegasinsider.com/mlb/picks/consensus/"
 
 TIMEOUT = 20
 POLITE_DELAY = 1.0
