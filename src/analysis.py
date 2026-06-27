@@ -502,8 +502,8 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     `line` is filled in later (main._attach_line) from the slate.
     """
     out = {"sources": [], "majority_side": None, "agree": 0, "dissent": 0,
-           "trusted": True, "verdict": "no public read",
-           "note": "no public lean to check", "flags": [], "line": "unknown"}
+           "trusted": True, "verdict": "no public read", "note": "no public lean to check",
+           "flags": [], "line": "unknown", "money": "unknown"}
     if majority is None:
         return out
     out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
@@ -514,12 +514,19 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
                          tuple((detail.get("consensus") or {}).get("pcts", {}).values()) or None))
     if detail.get("forum_lean"):
         opinions.append(("forum", "home" if detail["forum_lean"] > 0 else "away", None))
+    # `*_money` sources (share of dollars) aren't public-consensus votes - they're the
+    # sharp signal, handled separately below. Only ticket/consensus sources corroborate.
+    money_side = None
     for name, rows in (extra_public or {}).items():
         for row in rows:
             side, pcts = _source_side(game, row)
-            if side:
+            if not side:
+                continue
+            if name.endswith("_money"):
+                money_side = side
+            else:
                 opinions.append((name, side, pcts))
-                break
+            break
 
     ms = out["majority_side"]
     out["sources"] = [{"name": n, "side": s, "agrees": s == ms} for n, s, _ in opinions]
@@ -547,6 +554,14 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     else:
         out["verdict"] = "sources split"
         out["note"] = f"sources disagree on the public side ({', '.join(dis_names)} differ)"
+
+    # Sharp signal: where the MONEY is vs where the tickets (public) are. Money on
+    # the opposite side from the public is the classic "the % doesn't match the
+    # dollars" tell - and a tailwind when it's on our fade side.
+    if money_side:
+        out["money"] = "with public" if money_side == ms else "against public"
+        if out["money"] == "against public":
+            out["flags"].append("money is on the other side from the public tickets")
     return out
 
 

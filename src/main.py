@@ -315,9 +315,14 @@ def _public_check_phrase(g: dict) -> str | None:
         parts.append(f"{cc.get('agree', 0)}/{n} sources")
     line = cc.get("line", "unknown")
     if line == "with public":
-        parts.append("money with public")
+        parts.append("line with public")
     elif line == "against public":
-        parts.append("money AGAINST public (RLM)")
+        parts.append("line AGAINST public (RLM)")
+    money = cc.get("money", "unknown")
+    if money == "with public":
+        parts.append("$ with public")
+    elif money == "against public":
+        parts.append("$ AGAINST public")
     s = " · ".join(parts)
     if cc.get("flags"):
         s += " · ⚠️ " + "; ".join(cc["flags"])
