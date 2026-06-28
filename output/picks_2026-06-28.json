@@ -1,6 +1,6 @@
 {
   "date": "2026-06-28",
-  "generated_at": "2026-06-28T17:44:05.973663+00:00",
+  "generated_at": "2026-06-28T18:59:37.810384+00:00",
   "games": [
     {
       "game_pk": 824821,
@@ -3195,7 +3195,7 @@
           "losses": 28
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 823769,
@@ -3561,7 +3561,7 @@
           "losses": 22
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 823037,
@@ -3929,7 +3929,7 @@
           "losses": 22
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 824011,
@@ -3938,8 +3938,8 @@
       "park_factor": 1.0,
       "statistical_advantage": {
         "team": "Los Angeles Angels",
-        "home_score": -0.18349999999999997,
-        "away_score": -0.4531,
+        "home_score": -0.18389999999999998,
+        "away_score": -0.453,
         "home": {
           "name": "Los Angeles Angels",
           "probable_pitcher": "Sam Aldegheri",
@@ -3969,17 +3969,17 @@
             "bat_opp_pitching_factor": 0.925,
             "arm_opp_offense_factor": 0.993,
             "raw": {
-              "bat_opp_fip": 4.464833317199943,
+              "bat_opp_fip": 4.467266887959089,
               "bat_opp_win": 0.4787151898734177,
-              "sp_opp_woba": 0.32087827439013256,
+              "sp_opp_woba": 0.32080531160705533,
               "sp_opp_win": 0.4847368421052632,
-              "bp_opp_woba": 0.32539371474282197,
+              "bp_opp_woba": 0.3253502851902717,
               "bp_opp_win": 0.503671111111111
             }
           },
-          "offense_index": -0.1377,
-          "pitching_index": -0.1458,
-          "score": -0.2835
+          "offense_index": -0.138,
+          "pitching_index": -0.1459,
+          "score": -0.2839
         },
         "away": {
           "name": "Athletics",
@@ -4012,19 +4012,19 @@
             "raw": {
               "bat_opp_fip": 4.290238758052851,
               "bat_opp_win": 0.41599337748344367,
-              "sp_opp_woba": 0.31881018359254504,
+              "sp_opp_woba": 0.31891439901568847,
               "sp_opp_win": 0.44295238095238093,
-              "bp_opp_woba": 0.323369420545369,
+              "bp_opp_woba": 0.32336401993041974,
               "bp_opp_win": 0.46609354120267266
             }
           },
           "offense_index": -0.0658,
-          "pitching_index": -0.3873,
-          "score": -0.4531
+          "pitching_index": -0.3872,
+          "score": -0.453
         }
       },
       "public_majority": {
-        "team": "Athletics",
+        "team": "Los Angeles Angels",
         "detail": {
           "consensus": {
             "pick": "Ath",
@@ -4034,14 +4034,14 @@
             }
           },
           "forum": {
-            "pick": "Athletics",
-            "home": 0,
-            "away": 1
+            "pick": "Los Angeles Angels",
+            "home": 3,
+            "away": 0
           },
-          "agree": true,
-          "forum_lean": -1.0,
+          "agree": false,
+          "forum_lean": 1.0,
           "consensus_lean": -0.14,
-          "blended_lean": -0.699,
+          "blended_lean": 0.601,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -4056,28 +4056,30 @@
           {
             "name": "covers",
             "side": "away",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "forum",
-            "side": "away",
+            "side": "home",
             "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "away",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "away",
-        "agree": 3,
-        "dissent": 0,
-        "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 3 sources agree on the public side",
-        "flags": [],
-        "line": "flat",
-        "money": "with public"
+        "majority_side": "home",
+        "agree": 1,
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
+        "line": "with public",
+        "money": "against public"
       },
       "bvp": {
         "home_ops": 0.794,
@@ -4090,13 +4092,13 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "Athletics",
-          "consensus_pct": 57.0,
-          "moneyline": "-116"
-        },
-        "non_majority": {
           "team": "Los Angeles Angels",
           "consensus_pct": 43.0,
+          "moneyline": "-107"
+        },
+        "non_majority": {
+          "team": "Athletics",
+          "consensus_pct": 57.0,
           "moneyline": "-103"
         }
       },
@@ -4248,22 +4250,22 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "stat edge too small (margin 0.27 < 0.4 threshold)",
+        "reason": "public is also on Los Angeles Angels (no fade)",
         "advantage_team": "Los Angeles Angels",
-        "public_edge": true,
-        "public_trusted": true,
+        "public_edge": false,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.685,
+        "confidence": 0.64,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.27,
-            "strength": 0.674,
+            "margin": 0.269,
+            "strength": 0.673,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.699,
-            "strength": 0.699,
+            "blended_lean": 0.601,
+            "strength": 0.601,
             "weight": 0.45
           },
           "consistency": {
@@ -4272,14 +4274,15 @@
           }
         },
         "consistency_hits": 0,
-        "advantage_moneyline": -107,
-        "opponent_moneyline": -112,
+        "advantage_moneyline": -112,
+        "opponent_moneyline": -108,
         "line_check": {
           "open": 100,
-          "current": -107,
-          "implied_shift": 0.017,
-          "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (+100\u2192-107, +1.7%)"
+          "current": -112,
+          "implied_shift": 0.028,
+          "status": "confirms",
+          "tier": "moderate",
+          "reason": "moderate sharp move toward the pick (+100\u2192-112, +2.8%)"
         }
       },
       "flagged": false,
@@ -4297,7 +4300,7 @@
           "losses": 20
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 823204,
@@ -4306,8 +4309,8 @@
       "park_factor": 0.96,
       "statistical_advantage": {
         "team": "San Francisco Giants",
-        "home_score": 0.1417,
-        "away_score": -0.1655,
+        "home_score": 0.1412,
+        "away_score": -0.1124,
         "home": {
           "name": "San Francisco Giants",
           "probable_pitcher": "Robbie Ray",
@@ -4332,63 +4335,63 @@
           "starter_ip_last5": 29.0,
           "bullpen_fip_last5": 3.99,
           "bullpen_ip_last5": 157.33,
-          "combined_fip_sos_adj": 4.03,
+          "combined_fip_sos_adj": 4.031,
           "strength_of_schedule": {
             "bat_opp_pitching_factor": 0.986,
             "arm_opp_offense_factor": 1.019,
             "raw": {
-              "bat_opp_fip": 4.329722189769703,
+              "bat_opp_fip": 4.33125635020169,
               "bat_opp_win": 0.5427710843373493,
-              "sp_opp_woba": 0.3257427915977724,
+              "sp_opp_woba": 0.3255210168298426,
               "sp_opp_win": 0.5111379310344828,
-              "bp_opp_woba": 0.3237087413132445,
+              "bp_opp_woba": 0.32360023115429176,
               "bp_opp_win": 0.5407203389830509
             }
           },
-          "offense_index": 0.0247,
-          "pitching_index": 0.017,
-          "score": 0.0417
+          "offense_index": 0.0244,
+          "pitching_index": 0.0168,
+          "score": 0.0412
         },
         "away": {
           "name": "Atlanta Braves",
           "probable_pitcher": "Chris Sale",
           "starter_hand": "L",
           "offense": {
-            "avg": 0.19,
-            "obp": 0.238,
-            "slg": 0.265,
-            "ops": 0.503,
-            "iso": 0.075,
-            "woba": 0.228,
-            "bb_pct": 0.056,
-            "k_pct": 0.238,
-            "sb_rate": 0.014,
-            "pa": 214,
+            "avg": 0.208,
+            "obp": 0.255,
+            "slg": 0.286,
+            "ops": 0.54,
+            "iso": 0.078,
+            "woba": 0.243,
+            "bb_pct": 0.055,
+            "k_pct": 0.242,
+            "sb_rate": 0.0182,
+            "pa": 165,
             "park_factor": 0.965,
-            "woba_neutral": 0.236,
-            "iso_neutral": 0.078
+            "woba_neutral": 0.252,
+            "iso_neutral": 0.081
           },
-          "platoon_factor": 1.002,
+          "platoon_factor": 1.0075,
           "starter_fip_last5": 1.721,
           "starter_ip_last5": 29.0,
           "bullpen_fip_last5": 4.532,
           "bullpen_ip_last5": 117.33,
           "combined_fip_sos_adj": 3.448,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 1.012,
+            "bat_opp_pitching_factor": 1.009,
             "arm_opp_offense_factor": 1.009,
             "raw": {
-              "bat_opp_fip": 4.027554494891715,
-              "bat_opp_win": 0.4995,
-              "sp_opp_woba": 0.3183838053800435,
+              "bat_opp_fip": 4.035361889328214,
+              "bat_opp_win": 0.49736363636363634,
+              "sp_opp_woba": 0.31842697086617483,
               "sp_opp_win": 0.5201379310344827,
-              "bp_opp_woba": 0.3144605741024513,
+              "bp_opp_woba": 0.31448697263417963,
               "bp_opp_win": 0.49501988636363614
             }
           },
-          "offense_index": -0.3245,
+          "offense_index": -0.2714,
           "pitching_index": 0.159,
-          "score": -0.1655
+          "score": -0.1124
         }
       },
       "public_majority": {
@@ -4397,19 +4400,19 @@
           "consensus": {
             "pick": "Atl",
             "pcts": {
-              "Atl": 64.0,
-              "Sf": 36.0
+              "Atl": 65.0,
+              "Sf": 35.0
             }
           },
           "forum": {
             "pick": "Atlanta Braves",
-            "home": 1,
-            "away": 2
+            "home": 0,
+            "away": 3
           },
           "agree": true,
-          "forum_lean": -0.333,
-          "consensus_lean": -0.28,
-          "blended_lean": -0.315,
+          "forum_lean": -1.0,
+          "consensus_lean": -0.3,
+          "blended_lean": -0.755,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -4444,28 +4447,28 @@
         "verdict": "corroborated",
         "note": "all 3 sources agree on the public side",
         "flags": [],
-        "line": "flat",
+        "line": "with public",
         "money": "with public"
       },
       "bvp": {
         "home_ops": 0.437,
-        "away_ops": 0.598,
+        "away_ops": 0.741,
         "home_pa": 65,
-        "away_pa": 92,
-        "total_pa": 157,
+        "away_pa": 70,
+        "total_pa": 135,
         "edge_team": "Atlanta Braves",
-        "gap": 0.161
+        "gap": 0.304
       },
       "betting_lines": {
         "majority": {
           "team": "Atlanta Braves",
-          "consensus_pct": 64.0,
-          "moneyline": "-180"
+          "consensus_pct": 65.0,
+          "moneyline": "-175"
         },
         "non_majority": {
           "team": "San Francisco Giants",
-          "consensus_pct": 36.0,
-          "moneyline": "+145"
+          "consensus_pct": 35.0,
+          "moneyline": "+152"
         }
       },
       "consistency": {
@@ -4616,22 +4619,22 @@
       },
       "pick_criteria": {
         "status": "lean",
-        "reason": "stat edge too small (margin 0.31 < 0.4 threshold)",
+        "reason": "stat edge too small (margin 0.25 < 0.4 threshold)",
         "advantage_team": "San Francisco Giants",
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.564,
+        "confidence": 0.688,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.307,
-            "strength": 0.768,
+            "margin": 0.254,
+            "strength": 0.634,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.315,
-            "strength": 0.315,
+            "blended_lean": -0.755,
+            "strength": 0.755,
             "weight": 0.45
           },
           "consistency": {
@@ -4640,14 +4643,14 @@
           }
         },
         "consistency_hits": 1,
-        "advantage_moneyline": 139,
-        "opponent_moneyline": -168,
+        "advantage_moneyline": 153,
+        "opponent_moneyline": -186,
         "line_check": {
           "open": 129,
-          "current": 139,
-          "implied_shift": -0.018,
+          "current": 153,
+          "implied_shift": -0.041,
           "status": "contradicts",
-          "reason": "line moved away from the pick (+129\u2192+139, -1.8%)"
+          "reason": "line moved away from the pick (+129\u2192+153, -4.1%)"
         }
       },
       "flagged": false,
@@ -4674,8 +4677,8 @@
       "park_factor": 0.96,
       "statistical_advantage": {
         "team": "San Diego Padres",
-        "home_score": 0.3388,
-        "away_score": 0.0354,
+        "home_score": 0.3386,
+        "away_score": 0.0366,
         "home": {
           "name": "San Diego Padres",
           "probable_pitcher": "Michael King",
@@ -4700,22 +4703,22 @@
           "starter_ip_last5": 30.0,
           "bullpen_fip_last5": 4.364,
           "bullpen_ip_last5": 121.0,
-          "combined_fip_sos_adj": 4.38,
+          "combined_fip_sos_adj": 4.381,
           "strength_of_schedule": {
             "bat_opp_pitching_factor": 1.106,
             "arm_opp_offense_factor": 0.993,
             "raw": {
-              "bat_opp_fip": 3.883318400030575,
+              "bat_opp_fip": 3.883005685907412,
               "bat_opp_win": 0.6149281045751634,
-              "sp_opp_woba": 0.31474570771753574,
+              "sp_opp_woba": 0.3145906352141166,
               "sp_opp_win": 0.5082888888888889,
-              "bp_opp_woba": 0.32006342821873374,
+              "bp_opp_woba": 0.3199298367989068,
               "bp_opp_win": 0.5314187327823693
             }
           },
           "offense_index": 0.307,
-          "pitching_index": -0.0682,
-          "score": 0.2388
+          "pitching_index": -0.0684,
+          "score": 0.2386
         },
         "away": {
           "name": "Los Angeles Dodgers",
@@ -4743,20 +4746,20 @@
           "bullpen_ip_last5": 157.0,
           "combined_fip_sos_adj": 4.391,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.971,
-            "arm_opp_offense_factor": 0.981,
+            "bat_opp_pitching_factor": 0.972,
+            "arm_opp_offense_factor": 0.98,
             "raw": {
-              "bat_opp_fip": 4.2408281971574375,
+              "bat_opp_fip": 4.233088365430483,
               "bat_opp_win": 0.4914278074866311,
-              "sp_opp_woba": 0.3196645924865781,
+              "sp_opp_woba": 0.31960965378227835,
               "sp_opp_win": 0.4687424242424243,
-              "bp_opp_woba": 0.3182904418860645,
+              "bp_opp_woba": 0.31835661332517257,
               "bp_opp_win": 0.5023036093418258
             }
           },
-          "offense_index": 0.1063,
+          "offense_index": 0.1075,
           "pitching_index": -0.0709,
-          "score": 0.0354
+          "score": 0.0366
         }
       },
       "public_majority": {
@@ -4771,13 +4774,13 @@
           },
           "forum": {
             "pick": "San Diego Padres",
-            "home": 4,
-            "away": 2
+            "home": 2,
+            "away": 0
           },
           "agree": true,
-          "forum_lean": 0.333,
+          "forum_lean": 1.0,
           "consensus_lean": 0.18,
-          "blended_lean": 0.28,
+          "blended_lean": 0.713,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -4835,14 +4838,14 @@
         "non_majority": {
           "team": "Los Angeles Dodgers",
           "consensus_pct": 41.0,
-          "moneyline": "-143"
+          "moneyline": "-149"
         }
       },
       "consistency": {
         "home": {
           "runs_to_win": 8,
           "runs_to_allow": 4,
-          "expected_opponent_runs": 7.26,
+          "expected_opponent_runs": 7.27,
           "expected_own_runs": 4.93,
           "games": 5,
           "back_test": {
@@ -4915,7 +4918,7 @@
           "runs_to_win": 5,
           "runs_to_allow": 7,
           "expected_opponent_runs": 4.93,
-          "expected_own_runs": 7.26,
+          "expected_own_runs": 7.27,
           "games": 5,
           "back_test": {
             "scored_target": 2,
@@ -4933,7 +4936,7 @@
               "allowed": 1,
               "hits": 9,
               "hits_allowed": 3,
-              "adj_scored": 1.85,
+              "adj_scored": 1.86,
               "adj_allowed": 1.01,
               "opp_win_pct": 0.464
             },
@@ -4944,7 +4947,7 @@
               "allowed": 3,
               "hits": 17,
               "hits_allowed": 7,
-              "adj_scored": 11.11,
+              "adj_scored": 11.14,
               "adj_allowed": 3.04,
               "opp_win_pct": 0.464
             },
@@ -4955,7 +4958,7 @@
               "allowed": 3,
               "hits": 10,
               "hits_allowed": 8,
-              "adj_scored": 3.7,
+              "adj_scored": 3.71,
               "adj_allowed": 3.04,
               "opp_win_pct": 0.464
             },
@@ -4991,17 +4994,17 @@
         "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.543,
+        "confidence": 0.736,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.303,
-            "strength": 0.758,
+            "margin": 0.302,
+            "strength": 0.755,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.28,
-            "strength": 0.28,
+            "blended_lean": 0.713,
+            "strength": 0.713,
             "weight": 0.45
           },
           "consistency": {
@@ -5044,8 +5047,8 @@
       "park_factor": 1.06,
       "statistical_advantage": {
         "team": "Boston Red Sox",
-        "home_score": 0.3438,
-        "away_score": -0.1822,
+        "home_score": 0.3439,
+        "away_score": -0.1817,
         "home": {
           "name": "Boston Red Sox",
           "probable_pitcher": "Sonny Gray",
@@ -5070,22 +5073,22 @@
           "starter_ip_last5": 32.33,
           "bullpen_fip_last5": 3.401,
           "bullpen_ip_last5": 153.0,
-          "combined_fip_sos_adj": 3.678,
+          "combined_fip_sos_adj": 3.679,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.999,
-            "arm_opp_offense_factor": 0.991,
+            "bat_opp_pitching_factor": 1.0,
+            "arm_opp_offense_factor": 0.99,
             "raw": {
-              "bat_opp_fip": 4.094590171658554,
+              "bat_opp_fip": 4.0919115540791235,
               "bat_opp_win": 0.4975159817351598,
-              "sp_opp_woba": 0.3183477874679355,
+              "sp_opp_woba": 0.3179676997677046,
               "sp_opp_win": 0.490298969072165,
-              "bp_opp_woba": 0.32047517960560334,
+              "bp_opp_woba": 0.3203861966633132,
               "bp_opp_win": 0.5131067538126359
             }
           },
-          "offense_index": 0.1408,
-          "pitching_index": 0.103,
-          "score": 0.2438
+          "offense_index": 0.1412,
+          "pitching_index": 0.1027,
+          "score": 0.2439
         },
         "away": {
           "name": "New York Yankees",
@@ -5116,38 +5119,38 @@
             "bat_opp_pitching_factor": 0.984,
             "arm_opp_offense_factor": 0.984,
             "raw": {
-              "bat_opp_fip": 3.959565481356979,
+              "bat_opp_fip": 3.9546532298747623,
               "bat_opp_win": 0.43280412371134025,
-              "sp_opp_woba": 0.3142245796231288,
+              "sp_opp_woba": 0.31412221698183806,
               "sp_opp_win": 0.4946000000000001,
-              "bp_opp_woba": 0.314151686015789,
+              "bp_opp_woba": 0.3141174297921045,
               "bp_opp_win": 0.47093492407809123
             }
           },
-          "offense_index": -0.22,
+          "offense_index": -0.2195,
           "pitching_index": 0.0378,
-          "score": -0.1822
+          "score": -0.1817
         }
       },
       "public_majority": {
         "team": "Boston Red Sox",
         "detail": {
           "consensus": {
-            "pick": "Nyy",
+            "pick": "Bos",
             "pcts": {
-              "Nyy": 50.0,
-              "Bos": 50.0
+              "Nyy": 49.0,
+              "Bos": 51.0
             }
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 3,
-            "away": 1
+            "home": 5,
+            "away": 3
           },
-          "agree": null,
-          "forum_lean": 0.5,
-          "consensus_lean": 0.0,
-          "blended_lean": 0.5,
+          "agree": true,
+          "forum_lean": 0.25,
+          "consensus_lean": 0.02,
+          "blended_lean": 0.17,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -5160,6 +5163,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "forum",
             "side": "home",
             "agrees": true
@@ -5171,11 +5179,11 @@
           }
         ],
         "majority_side": "home",
-        "agree": 1,
+        "agree": 2,
         "dissent": 1,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (scoresodds_bets differ)",
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "2/3 sources agree (scoresodds_bets differ)",
         "flags": [
           "money is on the other side from the public tickets"
         ],
@@ -5194,13 +5202,13 @@
       "betting_lines": {
         "majority": {
           "team": "Boston Red Sox",
-          "consensus_pct": 50.0,
-          "moneyline": "-108"
+          "consensus_pct": 51.0,
+          "moneyline": "-116"
         },
         "non_majority": {
           "team": "New York Yankees",
-          "consensus_pct": 50.0,
-          "moneyline": "+102"
+          "consensus_pct": 49.0,
+          "moneyline": "-103"
         }
       },
       "consistency": {
@@ -5238,7 +5246,7 @@
               "hits": 11,
               "hits_allowed": 14,
               "adj_scored": 4.96,
-              "adj_allowed": 8.38,
+              "adj_allowed": 8.39,
               "opp_win_pct": 0.398
             },
             {
@@ -5298,7 +5306,7 @@
               "allowed": 3,
               "hits": 9,
               "hits_allowed": 8,
-              "adj_scored": 3.95,
+              "adj_scored": 3.96,
               "adj_allowed": 3.19,
               "opp_win_pct": 0.422
             },
@@ -5309,8 +5317,8 @@
               "allowed": 2,
               "hits": 6,
               "hits_allowed": 8,
-              "adj_scored": 3.95,
-              "adj_allowed": 2.13,
+              "adj_scored": 3.96,
+              "adj_allowed": 2.12,
               "opp_win_pct": 0.422
             },
             {
@@ -5354,9 +5362,9 @@
         "reason": "public is also on Boston Red Sox (no fade)",
         "advantage_team": "Boston Red Sox",
         "public_edge": false,
-        "public_trusted": false,
+        "public_trusted": true,
         "edge_strong": true,
-        "confidence": 0.775,
+        "confidence": 0.627,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -5365,8 +5373,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.5,
-            "strength": 0.5,
+            "blended_lean": 0.17,
+            "strength": 0.17,
             "weight": 0.45
           },
           "consistency": {
