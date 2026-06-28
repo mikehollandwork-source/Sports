@@ -61,6 +61,8 @@ jobs:
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
           PUBLIC_DEBUG: ${{ github.event.inputs.public_debug == 'true' && '1' || '' }}
           REDDIT_DEBUG: ${{ github.event.inputs.reddit_debug == 'true' && '1' || '' }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
