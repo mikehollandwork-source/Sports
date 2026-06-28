@@ -424,14 +424,24 @@ def _consensus_home_lean(game: Game, sides: dict) -> float | None:
     return (home_pct - away_pct) / 100.0
 
 
-def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
+def public_majority(game, consensus, forum_counts, reddit_counts=None) -> tuple[Team | None, dict]:
     """The side the betting public is on. The forum mention tally is weighted
     higher than covers consensus (PUBLIC_W_FORUM > PUBLIC_W_CONSENSUS); both are
     turned into a home-team lean and blended, and the blend's sign picks the side.
     Either signal alone decides if it's the only one present. detail carries both
-    raw signals, their leans, the blend, and whether they agree."""
+    raw signals, their leans, the blend, and whether they agree.
+
+    The Reddit forum tally is recorded (detail['reddit'/'reddit_lean']) for the
+    cross-check and the board, but is deliberately NOT blended into the side
+    decision yet - it's a new signal we watch before letting it move picks."""
     detail = {"consensus": None, "forum": None, "agree": None,
-              "forum_lean": None, "consensus_lean": None, "blended_lean": None}
+              "forum_lean": None, "consensus_lean": None, "blended_lean": None,
+              "reddit": None, "reddit_lean": None}
+
+    rh, ra = (reddit_counts or {}).get(game.home.name, 0), (reddit_counts or {}).get(game.away.name, 0)
+    if rh or ra:
+        detail["reddit"] = {"home": rh, "away": ra}
+        detail["reddit_lean"] = round((rh - ra) / (rh + ra), 3)
 
     # consensus -> home lean
     cons_lean = None
@@ -514,6 +524,8 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
                          tuple((detail.get("consensus") or {}).get("pcts", {}).values()) or None))
     if detail.get("forum_lean"):
         opinions.append(("forum", "home" if detail["forum_lean"] > 0 else "away", None))
+    if detail.get("reddit_lean"):
+        opinions.append(("reddit", "home" if detail["reddit_lean"] > 0 else "away", None))
     # `*_money` sources (share of dollars) aren't public-consensus votes - they're the
     # sharp signal, handled separately below. Only ticket/consensus sources corroborate.
     money_side = None
@@ -593,7 +605,7 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
 
 
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
-                  extra_public: dict | None = None) -> dict:
+                  extra_public: dict | None = None, reddit_counts: dict | None = None) -> dict:
     # platoon depends on the matchup, so set it before scoring
     home_opp = game.away.probable_pitcher.hand if game.away.probable_pitcher else ""
     away_opp = game.home.probable_pitcher.hand if game.home.probable_pitcher else ""
@@ -601,7 +613,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
     adv_team, hs, as_ = statistical_favorite(game)
-    majority, majority_detail = public_majority(game, consensus, forum_counts)
+    majority, majority_detail = public_majority(game, consensus, forum_counts, reddit_counts)
 
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)

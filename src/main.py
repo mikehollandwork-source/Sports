@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, tune
+from . import covers, espn, grade, notify, public_sources, reddit, tune
 from .analysis import (LINE_CONFIRM_MIN, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
@@ -54,6 +54,11 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("extra public sources failed: %s", exc)
         extra_public = {}
+    try:
+        reddit_counts = reddit.reddit_majority(teams, date)  # second forum to cross-check
+    except Exception as exc:
+        log.warning("reddit tally failed: %s", exc)
+        reddit_counts = {}
 
     results = []
     for g in games:
@@ -61,7 +66,7 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        r = evaluate_game(g, consensus, forum_counts, extra_public)
+        r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts)
         r["game_datetime"] = g.start_time
         results.append(r)
 
@@ -274,7 +279,10 @@ def _public_evidence(g: dict) -> str:
     bits = []
     fo = det.get("forum")
     if fo:
-        bits.append(f"forum {fo['away']}–{fo['home']} (away–home)")
+        bits.append(f"covers-forum {fo['away']}–{fo['home']} (away–home)")
+    rd = det.get("reddit")
+    if rd:
+        bits.append(f"reddit {rd['away']}–{rd['home']} (away–home)")
     co = det.get("consensus")
     if co:
         bits.append("consensus " + "–".join(f"{int(round(v))}%" for v in co["pcts"].values()))

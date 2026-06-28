@@ -20,6 +20,11 @@ on:
         type: boolean
         required: false
         default: false
+      reddit_debug:
+        description: "Dump raw Reddit JSON to output/reddit_debug/ (for fixing the forum tally)."
+        type: boolean
+        required: false
+        default: false
       grade_date:
         description: "Date to grade for the bankroll (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
         required: false
@@ -55,6 +60,7 @@ jobs:
           PICKS_DATE: ${{ github.event.inputs.date }}
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
           PUBLIC_DEBUG: ${{ github.event.inputs.public_debug == 'true' && '1' || '' }}
+          REDDIT_DEBUG: ${{ github.event.inputs.reddit_debug == 'true' && '1' || '' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
