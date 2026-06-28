@@ -38,7 +38,9 @@ def collect(end: str, days: int) -> list[dict]:
     """One row per game: {attn_fav_won, gap} where the attention favorite is the
     team with more pre-game pageviews and gap is the normalized popularity gap."""
     rows: list[dict] = []
-    for d in _date_range(end, days):
+    # Newest date first: the first pageview touch per team pulls a wide trailing
+    # series (one call), so every earlier date in the window is then a cache hit.
+    for d in reversed(_date_range(end, days)):
         try:
             games = mlb_api.schedule_for(d)
             results = mlb_api.results_for(d)
