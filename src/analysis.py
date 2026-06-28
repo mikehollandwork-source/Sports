@@ -613,6 +613,23 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
     return {"majority": fmt(majority), "non_majority": fmt(non_majority)}
 
 
+def bvp_read(game: Game) -> dict | None:
+    """Batter-vs-pitcher edge: which lineup has historically hit the OPPOSING starter
+    better (higher PA-weighted career OPS), and how much history backs it. Display
+    context only - per-matchup BvP samples are tiny, so total_pa is the trust gauge.
+    None when either side has no BvP history."""
+    h, a = game.home, game.away
+    if h.bvp_ops is None or a.bvp_ops is None:
+        return None
+    gap = round(h.bvp_ops - a.bvp_ops, 3)
+    return {
+        "home_ops": h.bvp_ops, "away_ops": a.bvp_ops,
+        "home_pa": h.bvp_pa, "away_pa": a.bvp_pa, "total_pa": h.bvp_pa + a.bvp_pa,
+        "edge_team": (h.name if gap > 0 else a.name) if gap else None,
+        "gap": abs(gap),
+    }
+
+
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
                   extra_public: dict | None = None, reddit_counts: dict | None = None,
                   wiki_counts: dict | None = None) -> dict:
@@ -680,6 +697,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
             "detail": majority_detail,
         },
         "public_check": crosscheck,
+        "bvp": bvp_read(game),
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,

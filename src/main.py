@@ -350,6 +350,21 @@ def _public_check_phrase(g: dict) -> str | None:
     return s
 
 
+def _bvp_phrase(g: dict) -> str | None:
+    """One-line batter-vs-pitcher read: each lineup's career OPS vs the opposing
+    starter, who it favors, and an honest sample-size flag (BvP samples are tiny)."""
+    b = g.get("bvp")
+    if not b:
+        return None
+    pa = b["total_pa"]
+    flag = ("ignore — tiny sample" if pa < 60 else
+            "thin sample" if pa < 150 else "decent sample")
+    away_t, home_t = g["matchup"].split(" @ ")
+    edge = f"edge {b['edge_team']}" if b["edge_team"] else "even"
+    return (f"{away_t} {b['away_ops']:.3f} ({b['away_pa']} PA) vs "
+            f"{home_t} {b['home_ops']:.3f} ({b['home_pa']} PA) → {edge} [{flag}]")
+
+
 def _situational_phrase(g: dict) -> str | None:
     """'NYY 24-15 home · BOS 18-21 road' — this-season straight-up situational
     records (display-only context). None when unavailable."""
@@ -391,6 +406,9 @@ def _game_lines(g: dict) -> list[str]:
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
+    bvp = _bvp_phrase(g)
+    if bvp:
+        lines.append(f"   • BvP: {bvp} _(context)_")
     sit = _situational_phrase(g)
     if sit:
         lines.append(f"   • this season: {sit} _(context)_")
@@ -506,6 +524,9 @@ def telegram_text(payload: dict) -> str:
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 public check: {pcheck}")
+        bvp = _bvp_phrase(g)
+        if bvp:
+            L.append(f"   🥊 BvP: {bvp}")
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 this season: {sit}")

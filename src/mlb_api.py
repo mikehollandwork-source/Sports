@@ -71,6 +71,8 @@ class Team:
     platoon_factor: float = 1.0
     games_last5: list = field(default_factory=list)  # per-game results + opp strength
     sos: dict = field(default_factory=dict)          # avg opp strength faced (see analysis)
+    bvp_ops: float | None = None   # this lineup's PA-weighted career OPS vs the opp starter
+    bvp_pa: int = 0                # total career PA behind that OPS (sample size / trust)
 
 
 @dataclass
@@ -572,6 +574,22 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         team.offense["bats"] = bats  # consumed by analysis.platoon_factor
         sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
         sos["bat_opp_win"] = (opp_win_num / park_den) if park_den else 0.5
+
+        # --- batter-vs-pitcher: this lineup's PA-weighted CAREER OPS vs the OPPOSING
+        # starter (display context; samples are tiny so it carries a PA count). ---
+        opp_sp = (game.away if is_home else game.home).probable_pitcher
+        if opp_sp:
+            pa_tot = ops_w = 0.0
+            for h in hitters:
+                try:
+                    bvp = batter_vs_pitcher(h.player_id, opp_sp.player_id)
+                except Exception:
+                    continue
+                if bvp["pa"] > 0:
+                    pa_tot += bvp["pa"]
+                    ops_w += bvp["ops"] * bvp["pa"]
+            team.bvp_ops = round(ops_w / pa_tot, 3) if pa_tot else None
+            team.bvp_pa = int(pa_tot)
 
         # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
