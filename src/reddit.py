@@ -35,8 +35,15 @@ log = logging.getLogger("reddit")
 
 # Betting-focused subreddits where people post daily MLB moneyline picks.
 SUBREDDITS = ["sportsbook", "mlbbetting", "sportsbetting"]
-LISTING = "https://www.reddit.com/r/{sub}/new.json?limit=50"
-THREAD = "https://www.reddit.com{permalink}.json?limit=200&depth=4"
+# Reddit blocks anonymous *.json reads from datacenter IPs (GitHub Actions gets a
+# 403), so we use the sanctioned application-only OAuth API when credentials are
+# present (REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET) and fall back to the public
+# host otherwise (which simply 403s -> zero counts, failing soft).
+WWW_BASE = "https://www.reddit.com"
+OAUTH_BASE = "https://oauth.reddit.com"
+TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
+LISTING = "{base}/r/{sub}/new.json?limit=50&raw_json=1"
+THREAD = "{base}{permalink}.json?limit=200&depth=4&raw_json=1"
 
 MAX_THREADS = 12          # most-recent qualifying threads per subreddit to crawl
 THREAD_AGE_HOURS = 36     # only threads this fresh (today's slate discussion)
@@ -49,6 +56,25 @@ SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0 (personal betting res
 
 DEBUG = os.environ.get("REDDIT_DEBUG") == "1"
 DEBUG_DIR = Path("output/reddit_debug")
+
+
+def _oauth_token() -> str | None:
+    """Application-only OAuth bearer token (client_credentials grant). Returns None
+    when credentials are absent or the token call fails - the caller then uses the
+    public host (which 403s from datacenter IPs) and the tally degrades to empty."""
+    cid, sec = os.environ.get("REDDIT_CLIENT_ID"), os.environ.get("REDDIT_CLIENT_SECRET")
+    if not cid or not sec:
+        return None
+    try:
+        resp = requests.post(TOKEN_URL, auth=(cid, sec),
+                             data={"grant_type": "client_credentials"},
+                             headers={"User-Agent": SESSION.headers["User-Agent"]},
+                             timeout=TIMEOUT)
+        resp.raise_for_status()
+        return resp.json().get("access_token")
+    except Exception as exc:
+        log.warning("reddit OAuth token failed: %s", exc)
+        return None
 
 
 def _get_json(url: str) -> dict | list | None:
@@ -84,9 +110,9 @@ def _is_baseball(title: str) -> bool:
                                 "daily", "moneyline", "what are"))
 
 
-def _recent_threads(sub: str, now: dt.datetime) -> list[str]:
+def _recent_threads(sub: str, now: dt.datetime, base: str) -> list[str]:
     """Permalinks of fresh, baseball-ish threads in r/<sub>, newest first."""
-    data = _get_json(LISTING.format(sub=sub))
+    data = _get_json(LISTING.format(base=base, sub=sub))
     if not isinstance(data, dict):
         return []
     out: list[str] = []
@@ -118,8 +144,8 @@ def _walk_comments(node, bodies: list[str]) -> None:
                 _walk_comments(replies, bodies)
 
 
-def _thread_bodies(permalink: str) -> list[str]:
-    data = _get_json(THREAD.format(permalink=permalink))
+def _thread_bodies(permalink: str, base: str) -> list[str]:
+    data = _get_json(THREAD.format(base=base, permalink=permalink))
     bodies: list[str] = []
     if isinstance(data, list) and len(data) >= 2:
         # data[0] = the post listing, data[1] = the comment listing
@@ -137,12 +163,22 @@ def reddit_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
     counts = {name: 0 for name, _ in teams}
     matchers = {name: _team_patterns(name, abbr) for name, abbr in teams}
     now = dt.datetime.now(dt.timezone.utc)
+
+    token = _oauth_token()
+    base = OAUTH_BASE if token else WWW_BASE
+    if token:
+        SESSION.headers["Authorization"] = f"bearer {token}"
+    else:
+        log.info("reddit: no OAuth credentials — anonymous reads are blocked from "
+                 "datacenter IPs, so the tally will be empty (set REDDIT_CLIENT_ID/SECRET)")
+
     threads = 0
     for sub in SUBREDDITS:
-        for permalink in _recent_threads(sub, now):
+        for permalink in _recent_threads(sub, now, base):
             threads += 1
-            for body in _thread_bodies(permalink):
+            for body in _thread_bodies(permalink, base):
                 for name in _post_moneyline_teams(body.lower(), matchers):
                     counts[name] += 1
-    log.info("reddit: tallied %d thread(s) across %d sub(s)", threads, len(SUBREDDITS))
+    log.info("reddit: tallied %d thread(s) across %d sub(s) [auth=%s]",
+             threads, len(SUBREDDITS), bool(token))
     return counts
