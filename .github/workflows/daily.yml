@@ -90,5 +90,11 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Update MLB picks ($(date -u +%Y-%m-%d))"
-            git push
+            # Concurrent runs (the 5-min listener / scheduler) push to the same
+            # branch, so a bare push races and drops the output. Rebase + retry.
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
           fi
