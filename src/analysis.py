@@ -424,7 +424,8 @@ def _consensus_home_lean(game: Game, sides: dict) -> float | None:
     return (home_pct - away_pct) / 100.0
 
 
-def public_majority(game, consensus, forum_counts, reddit_counts=None) -> tuple[Team | None, dict]:
+def public_majority(game, consensus, forum_counts, reddit_counts=None,
+                    wiki_counts=None) -> tuple[Team | None, dict]:
     """The side the betting public is on. The forum mention tally is weighted
     higher than covers consensus (PUBLIC_W_FORUM > PUBLIC_W_CONSENSUS); both are
     turned into a home-team lean and blended, and the blend's sign picks the side.
@@ -436,12 +437,20 @@ def public_majority(game, consensus, forum_counts, reddit_counts=None) -> tuple[
     decision yet - it's a new signal we watch before letting it move picks."""
     detail = {"consensus": None, "forum": None, "agree": None,
               "forum_lean": None, "consensus_lean": None, "blended_lean": None,
-              "reddit": None, "reddit_lean": None}
+              "reddit": None, "reddit_lean": None, "wiki": None, "wiki_lean": None}
 
     rh, ra = (reddit_counts or {}).get(game.home.name, 0), (reddit_counts or {}).get(game.away.name, 0)
     if rh or ra:
         detail["reddit"] = {"home": rh, "away": ra}
         detail["reddit_lean"] = round((rh - ra) / (rh + ra), 3)
+
+    # Wikipedia attention: recorded for the board + comparison, but display-only -
+    # it does NOT vote in the cross-check or the public-side blend until the
+    # calibration (wiki_calibrate.py) shows fading the higher-attention team has edge.
+    wh, wa = (wiki_counts or {}).get(game.home.name, 0), (wiki_counts or {}).get(game.away.name, 0)
+    if wh or wa:
+        detail["wiki"] = {"home": wh, "away": wa}
+        detail["wiki_lean"] = round((wh - wa) / (wh + wa), 3)
 
     # consensus -> home lean
     cons_lean = None
@@ -605,7 +614,8 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
 
 
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
-                  extra_public: dict | None = None, reddit_counts: dict | None = None) -> dict:
+                  extra_public: dict | None = None, reddit_counts: dict | None = None,
+                  wiki_counts: dict | None = None) -> dict:
     # platoon depends on the matchup, so set it before scoring
     home_opp = game.away.probable_pitcher.hand if game.away.probable_pitcher else ""
     away_opp = game.home.probable_pitcher.hand if game.home.probable_pitcher else ""
@@ -613,7 +623,8 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
     adv_team, hs, as_ = statistical_favorite(game)
-    majority, majority_detail = public_majority(game, consensus, forum_counts, reddit_counts)
+    majority, majority_detail = public_majority(game, consensus, forum_counts,
+                                                reddit_counts, wiki_counts)
 
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)

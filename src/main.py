@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune
+from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
 from .analysis import (LINE_CONFIRM_MIN, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
@@ -59,6 +59,11 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("reddit tally failed: %s", exc)
         reddit_counts = {}
+    try:
+        wiki_counts = wiki.team_attention_counts(teams, date)  # public-attention proxy
+    except Exception as exc:
+        log.warning("wiki attention failed: %s", exc)
+        wiki_counts = {}
 
     results = []
     for g in games:
@@ -66,7 +71,7 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
-        r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts)
+        r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts, wiki_counts)
         r["game_datetime"] = g.start_time
         results.append(r)
 
@@ -269,6 +274,11 @@ def _c10(conf: float) -> str:
     return f"{round((conf or 0.0) * 10, 1)}/10"
 
 
+def _kfmt(n: int) -> str:
+    """Compact pageview count: 12450 -> '12k', 980 -> '980'."""
+    return f"{round(n / 1000)}k" if n >= 1000 else str(int(n))
+
+
 def _public_evidence(g: dict) -> str:
     """Plain description of who the public is on and the evidence behind it,
     in away–home order to match the matchup."""
@@ -283,6 +293,9 @@ def _public_evidence(g: dict) -> str:
     rd = det.get("reddit")
     if rd:
         bits.append(f"reddit {rd['away']}–{rd['home']} (away–home)")
+    wk = det.get("wiki")
+    if wk:
+        bits.append(f"wiki-attention {_kfmt(wk['away'])}–{_kfmt(wk['home'])} (away–home)")
     co = det.get("consensus")
     if co:
         bits.append("consensus " + "–".join(f"{int(round(v))}%" for v in co["pcts"].values()))

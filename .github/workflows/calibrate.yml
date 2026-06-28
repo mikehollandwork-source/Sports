@@ -10,7 +10,7 @@ on:
         required: false
         default: "wincond"
         type: choice
-        options: ["wincond", "edge", "line", "home", "division", "quality", "sp", "bvp", "combo", "books"]
+        options: ["wincond", "edge", "line", "home", "division", "quality", "sp", "bvp", "combo", "wiki", "books"]
       days:
         description: "How many days back to analyze (wincond can do the season; edge is heavier, use ~14)."
         required: false
@@ -44,6 +44,7 @@ jobs:
           [ "${{ github.event.inputs.signal }}" = "sp" ] && MODULE=src.sp_calibrate
           [ "${{ github.event.inputs.signal }}" = "bvp" ] && MODULE=src.bvp_calibrate
           [ "${{ github.event.inputs.signal }}" = "combo" ] && MODULE=src.combo_calibrate
+          [ "${{ github.event.inputs.signal }}" = "wiki" ] && MODULE=src.wiki_calibrate
           [ "${{ github.event.inputs.signal }}" = "books" ] && MODULE=src.backtest_books
           python -m "$MODULE" --days "${{ github.event.inputs.days }}" \
             ${{ github.event.inputs.end && format('--end {0}', github.event.inputs.end) || '' }}
@@ -61,6 +62,7 @@ jobs:
                   output/sp_analysis.json output/sp_analysis.md \
                   output/bvp_analysis.json output/bvp_analysis.md \
                   output/combo_calibration.json output/combo_calibration.md \
+                  output/wiki_calibration.json output/wiki_calibration.md \
                   output/books_backtest.json output/books_backtest.md 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No change."
