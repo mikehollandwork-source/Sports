@@ -351,18 +351,28 @@ def _public_check_phrase(g: dict) -> str | None:
 
 
 def _bvp_phrase(g: dict) -> str | None:
-    """One-line batter-vs-pitcher read: each lineup's career OPS vs the opposing
-    starter, who it favors, and an honest sample-size flag (BvP samples are tiny)."""
+    """One-line batter-vs-pitcher read: the blended OPS (tiny exact BvP shrunk toward
+    the big-sample vs-hand number), who it favors, the exact + vs-hand components, and
+    an honest sample flag driven by the (now much larger) total PA."""
     b = g.get("bvp")
     if not b:
         return None
     pa = b["total_pa"]
-    flag = ("ignore — tiny sample" if pa < 60 else
-            "thin sample" if pa < 150 else "decent sample")
+    flag = ("thin" if pa < 150 else "ok" if pa < 400 else "robust")
     away_t, home_t = g["matchup"].split(" @ ")
     edge = f"edge {b['edge_team']}" if b["edge_team"] else "even"
-    return (f"{away_t} {b['away_ops']:.3f} ({b['away_pa']} PA) vs "
-            f"{home_t} {b['home_ops']:.3f} ({b['home_pa']} PA) → {edge} [{flag}]")
+    head = f"{away_t} {b['away_eff']:.3f} vs {home_t} {b['home_eff']:.3f} → {edge} [{flag}, {pa} PA]"
+
+    def _exact(ops, n):
+        return f"{ops:.3f}/{n}" if ops is not None else "—"
+
+    def _hand(ops):
+        return f"{ops:.3f}" if ops is not None else "—"
+
+    detail = (f" · vs-hand {away_t} {_hand(b['away_hand_ops'])} / {home_t} {_hand(b['home_hand_ops'])}"
+              f" · exact {away_t} {_exact(b['away_ops'], b['away_pa'])} / "
+              f"{home_t} {_exact(b['home_ops'], b['home_pa'])}")
+    return head + detail
 
 
 def _situational_phrase(g: dict) -> str | None:

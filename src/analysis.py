@@ -613,18 +613,41 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
     return {"majority": fmt(majority), "non_majority": fmt(non_majority)}
 
 
+BVP_SHRINK_PA = 50   # exact-BvP PA at which the exact number gets 50% weight
+
+
+def _bvp_effective(exact_ops, exact_pa, hand_ops, hand_pa):
+    """Shrink a tiny exact-BvP OPS toward the big-sample vs-hand OPS. With exact_pa
+    PA the exact number gets exact_pa/(exact_pa+BVP_SHRINK_PA) of the weight; the
+    rest goes to the vs-hand backbone. Falls back to whichever side exists."""
+    if exact_ops is not None and exact_pa and hand_ops is not None:
+        w = exact_pa / (exact_pa + BVP_SHRINK_PA)
+        return round(w * exact_ops + (1 - w) * hand_ops, 3), exact_pa + hand_pa
+    if hand_ops is not None:
+        return round(hand_ops, 3), hand_pa
+    if exact_ops is not None:
+        return round(exact_ops, 3), exact_pa
+    return None, 0
+
+
 def bvp_read(game: Game) -> dict | None:
-    """Batter-vs-pitcher edge: which lineup has historically hit the OPPOSING starter
-    better (higher PA-weighted career OPS), and how much history backs it. Display
-    context only - per-matchup BvP samples are tiny, so total_pa is the trust gauge.
-    None when either side has no BvP history."""
+    """Batter-vs-pitcher edge: which lineup projects to hit the OPPOSING starter
+    better. The tiny exact career-BvP OPS is shrunk toward the team's big-sample OPS
+    vs that starter's HAND, so the read is robust even when the exact sample is a
+    handful of PA. Display context only. None when neither read exists for a side."""
     h, a = game.home, game.away
-    if h.bvp_ops is None or a.bvp_ops is None:
+    h_eff, h_pa = _bvp_effective(h.bvp_ops, h.bvp_pa, h.bvp_hand_ops, h.bvp_hand_pa)
+    a_eff, a_pa = _bvp_effective(a.bvp_ops, a.bvp_pa, a.bvp_hand_ops, a.bvp_hand_pa)
+    if h_eff is None or a_eff is None:
         return None
-    gap = round(h.bvp_ops - a.bvp_ops, 3)
+    gap = round(h_eff - a_eff, 3)
     return {
-        "home_ops": h.bvp_ops, "away_ops": a.bvp_ops,
-        "home_pa": h.bvp_pa, "away_pa": a.bvp_pa, "total_pa": h.bvp_pa + a.bvp_pa,
+        "home_eff": h_eff, "away_eff": a_eff,
+        "home_ops": h.bvp_ops, "away_ops": a.bvp_ops,      # exact (small sample)
+        "home_pa": h.bvp_pa, "away_pa": a.bvp_pa,
+        "home_hand_ops": h.bvp_hand_ops, "away_hand_ops": a.bvp_hand_ops,  # vs-hand (big)
+        "home_hand_pa": h.bvp_hand_pa, "away_hand_pa": a.bvp_hand_pa,
+        "total_pa": h_pa + a_pa,
         "edge_team": (h.name if gap > 0 else a.name) if gap else None,
         "gap": abs(gap),
     }

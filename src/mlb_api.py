@@ -73,6 +73,8 @@ class Team:
     sos: dict = field(default_factory=dict)          # avg opp strength faced (see analysis)
     bvp_ops: float | None = None   # this lineup's PA-weighted career OPS vs the opp starter
     bvp_pa: int = 0                # total career PA behind that OPS (sample size / trust)
+    bvp_hand_ops: float | None = None  # team OPS vs the opp starter's HAND (big sample)
+    bvp_hand_pa: int = 0               # PA behind the vs-hand number
 
 
 @dataclass
@@ -160,6 +162,38 @@ def _ip_to_innings(ip) -> float:
         return int(whole or 0) + (int(frac or 0) / 3.0)
     except (ValueError, TypeError):
         return 0.0
+
+
+_VS_HAND_CACHE: dict = {}
+
+
+def team_vs_hand(team_id: int, season: int) -> dict:
+    """A team's season OPS split vs right- and left-handed pitching (big sample, the
+    backbone for shrinking tiny exact-BvP numbers). {'R': {ops, pa}, 'L': {ops, pa}}.
+    Season-to-date (not point-in-time) - fine for the live board's context."""
+    key = (team_id, season)
+    if key in _VS_HAND_CACHE:
+        return _VS_HAND_CACHE[key]
+    out = {"R": {"ops": None, "pa": 0}, "L": {"ops": None, "pa": 0}}
+    try:
+        data = _get(f"teams/{team_id}/stats", stats="statSplits", group="hitting",
+                    season=season, sitCodes="vr,vl")
+        for s in data.get("stats", []):
+            for sp in s.get("splits", []):
+                code = sp.get("split", {}).get("code", "")
+                hand = {"vr": "R", "vl": "L"}.get(code)
+                if not hand:
+                    continue
+                st = sp.get("stat", {})
+                try:
+                    out[hand] = {"ops": float(st.get("ops", 0) or 0),
+                                 "pa": int(st.get("plateAppearances", 0) or 0)}
+                except (ValueError, TypeError):
+                    pass
+    except Exception as exc:
+        log.warning("team vs-hand split failed for %s: %s", team_id, exc)
+    _VS_HAND_CACHE[key] = out
+    return out
 
 
 def batter_vs_pitcher(batter_id: int, pitcher_id: int) -> dict:
@@ -590,6 +624,11 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                     ops_w += bvp["ops"] * bvp["pa"]
             team.bvp_ops = round(ops_w / pa_tot, 3) if pa_tot else None
             team.bvp_pa = int(pa_tot)
+            # big-sample backbone: team OPS vs the opposing starter's hand
+            if opp_sp.hand in ("R", "L"):
+                vh = team_vs_hand(team.team_id, season).get(opp_sp.hand, {})
+                team.bvp_hand_ops = vh.get("ops")
+                team.bvp_hand_pa = int(vh.get("pa", 0) or 0)
 
         # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
