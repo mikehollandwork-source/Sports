@@ -28,9 +28,14 @@ from .mlb_api import SPORT_ID, _get
 log = logging.getLogger("pregame")
 
 OUTPUT_DIR = picks_main.OUTPUT_DIR
-DUE_MIN, DUE_MAX = 10, 30   # fire when a slot is this many minutes away (~T-15;
-                            # Actions cron is 15-min granular and often late, so
-                            # this is as close to "15 min before" as it can aim)
+# GitHub throttles the */15 cron hard (observed firings ~2h apart), so a narrow
+# "T-15" window would straddle the gaps and miss slots entirely. Instead: refresh
+# any unhandled slot starting within DUE_HORIZON, but only mark it handled once a
+# refresh lands within FINAL_MIN of first pitch - so every slot gets a refresh as
+# close to T-15 as the platform's sparse firing allows (often twice: an early one
+# and a final one).
+DUE_HORIZON = 90   # minutes ahead: refresh anything unhandled starting inside this
+FINAL_MIN = 30     # a refresh this close to start is the final word for that slot
 
 
 def schedule_slots(date: str) -> dict[str, list[int]]:
@@ -47,6 +52,7 @@ def schedule_slots(date: str) -> dict[str, list[int]]:
 
 
 def due_slots(slots: dict, now: dt.datetime, processed: set[str]) -> dict[str, list[int]]:
+    """Unhandled slots starting within DUE_HORIZON minutes."""
     due: dict[str, list[int]] = {}
     for iso, pks in slots.items():
         try:
@@ -54,7 +60,7 @@ def due_slots(slots: dict, now: dt.datetime, processed: set[str]) -> dict[str, l
         except ValueError:
             continue
         minutes = (start - now).total_seconds() / 60.0
-        if DUE_MIN <= minutes <= DUE_MAX and iso not in processed:
+        if 0 < minutes <= DUE_HORIZON and iso not in processed:
             due[iso] = pks
     return due
 
@@ -78,7 +84,7 @@ def run() -> bool:
 
     due = due_slots(slots, now, processed)
     if not due:
-        log.info("no game slot due in the next ~30 min (%s)", date)
+        log.info("no unhandled game slot in the next ~%d min (%s)", DUE_HORIZON, date)
         return False
     log.info("pre-game slots due: %s (%d game(s))", sorted(due), sum(len(v) for v in due.values()))
 
@@ -95,7 +101,12 @@ def run() -> bool:
     picks_main.write_outputs(payload, date)
     grade.update_ledger(date)  # move any now-final games into the record
 
-    processed |= set(due)
+    # only slots refreshed close to first pitch are final; farther-out slots stay
+    # unhandled so a later (throttled) firing refreshes them again nearer the start
+    final = {iso for iso in due
+             if (dt.datetime.fromisoformat(iso.replace("Z", "+00:00")) - now
+                 ).total_seconds() / 60.0 <= FINAL_MIN}
+    processed |= final
     OUTPUT_DIR.mkdir(exist_ok=True)
     state_path.write_text(json.dumps(sorted(processed)))
 
