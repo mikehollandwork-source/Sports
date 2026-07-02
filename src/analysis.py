@@ -80,8 +80,11 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 #   robust gaps get a small vote; they can tilt a close lean, not manufacture one).
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
-BVP_PEN_SHARE = 0.35   # the tilt blends starter BvP with bullpen BvP (late innings)
+BVP_PEN_SHARE = 0.35   # FALLBACK pen share when a starter has no projected innings;
+                       # normally the split is innings-projected per side (see
+                       # statistical_favorite: opposing starter's season IP/start / 9)
 PEN_BVP_MIN_PA = 100   # career PA behind the pen number before it joins the tilt
+PROJ_IP_CLAMP = (3.0, 7.5)   # sane bounds on a projected start
 
 # Weather x power (calibrated 2026-04-13..06-26, 486 open-air games): in hot/windy
 # conditions the power team won 57% vs 52% mild (+5%, ~1 SE - wired at user request,
@@ -407,16 +410,28 @@ def _blended_iso(team: Team) -> float | None:
 
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
-    # BvP nudge: starter matchup blended with the bullpen matchup (the arms that
-    # finish the game), meaningful combined gaps only
+    # BvP nudge, innings-projected: each lineup faces the opposing STARTER for his
+    # projected innings and the (available-arms) PEN for the rest, so each side's
+    # expected matchup OPS = starter_share * starter BvP + (1 - share) * pen BvP.
     b, pen = bvp_read(game), pen_bvp_read(game)
-    sgap = (b["home_eff"] - b["away_eff"]) if b else None
-    pgap = ((pen["home_ops"] - pen["away_ops"])
-            if pen and pen["total_pa"] >= PEN_BVP_MIN_PA else None)
-    if sgap is not None and pgap is not None:
-        gap = (1 - BVP_PEN_SHARE) * sgap + BVP_PEN_SHARE * pgap
-    else:
-        gap = sgap if sgap is not None else pgap
+    pen_ok = pen is not None and pen["total_pa"] >= PEN_BVP_MIN_PA
+
+    def _starter_share(opposing: Team) -> float:
+        ip = getattr(opposing, "starter_proj_ip", None)
+        if not ip:
+            return 1 - BVP_PEN_SHARE
+        return max(PROJ_IP_CLAMP[0], min(PROJ_IP_CLAMP[1], ip)) / 9.0
+
+    def _expected(side: str, opposing: Team) -> float | None:
+        sv = b[f"{side}_eff"] if b else None
+        pv = pen[f"{side}_ops"] if pen_ok else None
+        if sv is not None and pv is not None:
+            share = _starter_share(opposing)
+            return share * sv + (1 - share) * pv
+        return sv if sv is not None else pv
+
+    eh, ea = _expected("home", game.away), _expected("away", game.home)
+    gap = (eh - ea) if eh is not None and ea is not None else None
     if gap is not None and abs(gap) >= BVP_FLOOR:
         tilt = min(abs(gap) - BVP_FLOOR, BVP_TILT_CAP)
         if gap > 0:

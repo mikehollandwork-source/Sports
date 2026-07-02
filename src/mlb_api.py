@@ -66,6 +66,7 @@ class Team:
     offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
     starter_fip_last5: float | None = None
     starter_fip_season: float | None = None  # probable starter's season FIP (stable anchor)
+    starter_proj_ip: float | None = None     # projected innings (season IP per start)
     bullpen_fip_last5: float | None = None
     starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
     bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
@@ -689,6 +690,8 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
             # season-to-date starter FIP (stable anchor; calibrated 55% lever)
             try:
                 t = pitcher_season_line(team.probable_pitcher.player_id, season, as_of=as_of)
+                if t.get("gs"):
+                    team.starter_proj_ip = round(t["ip"] / t["gs"], 2)
                 if t["ip"] >= SEASON_FIP_MIN_IP:
                     from .analysis import FIP_CONSTANT
                     team.starter_fip_season = round(
