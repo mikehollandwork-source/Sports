@@ -22,8 +22,8 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
-from .analysis import (LINE_CONFIRM_MIN, _canon_abbr, _implied, evaluate_game,
-                       find_slate_line, line_confirms)
+from .analysis import (LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN, _canon_abbr, _implied,
+                       evaluate_game, find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -232,15 +232,23 @@ def _attach_line(game, result: dict, slate: list) -> None:
             if cc["line"] == "against public":
                 cc["flags"].append("reverse line move — money went against the public %")
 
-    if not result["flagged"]:
-        return
-    if confirms is not True:
+    if result["flagged"] and confirms is not True:
         result["flagged"] = False
         result["pick"] = None
         pc["status"] = "lean"
         pc["reason"] = (f"line did not confirm the fade — {info['reason']}"
                         if info["status"] != "unknown"
                         else "line movement unavailable — can't confirm the fade")
+
+    # Lean tier (non-picks): 'strong' = real margin + favorite's price + line not
+    # leaning away. Tracked as its own ledger book (see analysis.LEAN_STRONG_MARGIN).
+    if not result["flagged"]:
+        ml = pc.get("advantage_moneyline")
+        pc["lean_tier"] = ("strong"
+                          if pc["components"]["stat_edge"]["margin"] >= LEAN_STRONG_MARGIN
+                          and ml is not None and ml < 0
+                          and info.get("status") not in ("contradicts", "flat")
+                          else "standard")
 
 
 def _ranked(games: list) -> list:
@@ -441,8 +449,10 @@ def _game_lines(g: dict) -> list[str]:
             f"   • consistency: {cons} _(context)_",
         ]
     else:
+        strong = pc.get("lean_tier") == "strong"
         lines = [
-            f"🔸 **{adv}** (lean) — {tag}{g['matchup']} · confidence {_c10(conf)}",
+            f"{'⭐' if strong else '🔸'} **{adv}** ({'STRONG lean' if strong else 'lean'})"
+            f" — {tag}{g['matchup']} · confidence {_c10(conf)}",
             f"   • stat edge: {edge}",
             f"   • public: {pub}",
             f"   • consistency: {cons} _(context)_",
@@ -558,8 +568,10 @@ def telegram_text(payload: dict) -> str:
         edge = _edge_word(pc["components"]["stat_edge"]["strength"])
         emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        head = (f"✅ {tag}PICK {adv}{_ml_str(pc)}"
-                if g.get("flagged") else f"🔸 {tag}{aa} @ {ha} → lean {adv}")
+        strong = pc.get("lean_tier") == "strong"
+        head = (f"✅ {tag}PICK {adv}{_ml_str(pc)}" if g.get("flagged")
+                else f"{'⭐' if strong else '🔸'} {tag}{aa} @ {ha} → "
+                     f"{'STRONG lean' if strong else 'lean'} {adv}")
         frozen = " [frozen]" if g.get("state") == "live" else ""
         L += ["",
               f"{head} · conf {_c10(pc['confidence'])}"]

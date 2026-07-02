@@ -75,6 +75,13 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
 
+# Strong-lean tier (from the 06-26..07-01 lean autopsy, 85 graded leans): leans with
+# a real margin, a favorite's price, and a line that isn't leaning away hit 64-77%;
+# low-margin / dog / line-against leans were the whole bleed. Margin & line-confirm
+# also have season-long calibration behind them (less overfit risk); tracked as its
+# own ledger book to validate FORWARD before anyone trusts it with real sizing.
+LEAN_STRONG_MARGIN = 0.30
+
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
 #   1. public fade    - the statistical favorite is the side the public is fading
