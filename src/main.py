@@ -22,9 +22,9 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
-from .analysis import (LEAN_ELEVATED_MARGIN, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
-                       LINE_CONFIRM_MIN, LINE_STRONG, _canon_abbr, _implied,
-                       evaluate_game, find_slate_line, line_confirms)
+from .analysis import (LEAN_ELEVATED_MARGIN, LEAN_MIN_CONSISTENCY, LEAN_MIN_SIGNALS,
+                       LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN, LINE_STRONG, _canon_abbr,
+                       _implied, evaluate_game, find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -234,39 +234,35 @@ def _attach_line(game, result: dict, slate: list) -> None:
             if cc["line"] == "against public":
                 cc["flags"].append("reverse line move — money went against the public %")
 
-    # THE decision (no pick/lean separation): a game is a LEAN only when EVERY
-    # signal from the graded-lean autopsy hits - real margin, favorite's price,
-    # line moved TOWARD the lean, consistency >= 3/5, and BvP not pointing the
-    # other way. Anything that misses any signal is a FADE: bet AGAINST the stat
-    # favorite at the opponent's pre-game price.
+    # THE decision (no pick/lean separation): count the five autopsy signals -
+    # real margin, favorite's price, line moved TOWARD the lean, consistency
+    # >= 3/5, BvP not pointing the other way. At least LEAN_MIN_SIGNALS hits =
+    # LEAN; fewer = FADE: bet AGAINST the stat favorite at the opponent's price.
     result["flagged"] = False
     result["pick"] = None
     ml = pc.get("advantage_moneyline")
     margin = pc["components"]["stat_edge"]["margin"]
     cons = pc["components"]["consistency"]["hits"]
     bvp = result.get("bvp") or {}
-    fails = []
-    if margin < LEAN_STRONG_MARGIN:
-        fails.append(f"margin {margin} < {LEAN_STRONG_MARGIN}")
-    if ml is None:
-        fails.append("no captured price")
-    elif ml >= 0:
-        fails.append("underdog")
-    if info.get("status") != "confirms":
-        fails.append("line not moving our way" if info.get("status") != "unknown"
-                     else "no line read")
-    if cons < LEAN_MIN_CONSISTENCY:
-        fails.append(f"consistency {cons}/5 < {LEAN_MIN_CONSISTENCY}/5")
-    if bvp.get("edge_team") and bvp["edge_team"] != adv:
-        fails.append("BvP points the other way")
-    if fails:
-        pc["play"] = "fade"
-        pc["status"] = "fade"
-        pc["reason"] = ", ".join(fails)
-    else:
+    hits, misses = [], []
+    (hits if margin >= LEAN_STRONG_MARGIN else misses).append(f"margin {margin}")
+    (hits if ml is not None and ml < 0 else misses).append(
+        "favorite" if ml is not None else "no price")
+    (hits if info.get("status") == "confirms" else misses).append("line toward")
+    (hits if cons >= LEAN_MIN_CONSISTENCY else misses).append(f"consistency {cons}/5")
+    # BvP counts as a hit unless it exists AND points the other way (same
+    # semantics the >=2-of-5 backtest was measured with).
+    (misses if bvp.get("edge_team") and bvp["edge_team"] != adv else hits).append("BvP")
+    pc["signals_hit"] = len(hits)
+    if len(hits) >= LEAN_MIN_SIGNALS:
         pc["play"] = "lean"
         pc["status"] = "lean"
-        pc["reason"] = "all lean signals hit"
+        pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
+    else:
+        pc["play"] = "fade"
+        pc["status"] = "fade"
+        pc["reason"] = f"{len(hits)}/5 signals — missed: {', '.join(misses)}"
+    if pc["play"] == "lean":
         # ⭐ = a lean whose indicators aren't just over the bar but VERY high.
         elevated = []
         if margin >= LEAN_ELEVATED_MARGIN:
@@ -545,9 +541,9 @@ def build_summary(payload: dict) -> str:
         out.append("_No upcoming or live games — full slate is final (see the record below)._")
         out.append("")
 
-    out.append("_🔸 = LEAN (every signal hit: margin, favorite, line toward, consistency, "
-               "BvP). ⭐ = lean with 2+ very-high indicators. 🔄 = FADE: bet against the stat "
-               "side (it missed a signal). 🔴 = live; finals drop into the record._")
+    out.append("_🔸 = LEAN (2+ of the 5 signals hit: margin, favorite, line toward, "
+               "consistency, BvP). ⭐ = lean with 2+ very-high indicators. 🔄 = FADE: bet "
+               "against the stat side (0-1 signals). 🔴 = live; finals drop into the record._")
 
     out.append("")
     out.append(grade.records_block())
@@ -635,7 +631,7 @@ def telegram_text(payload: dict) -> str:
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 {sit}")
-        L.append("   ✅ all lean signals hit"
+        L.append(f"   ✅ {pc['reason']}"
                  + (f" · ⭐ {', '.join(elevated)}" if len(elevated) >= 2 else ""))
     if not leans:
         L += ["", "No leans on the slate — every game is a fade."]

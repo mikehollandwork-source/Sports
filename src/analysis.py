@@ -75,12 +75,14 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
 
-# The lean bar (from the 06-26..07-01 graded-lean autopsy): a game is a LEAN only
-# when EVERY winner signal hits - margin, favorite, line moved toward the lean,
-# consistency, BvP not against. Everything else is a FADE (bet against the stat
-# favorite). There is no separate "pick" tier.
-LEAN_STRONG_MARGIN = 0.30    # stat-edge margin bar (64% at/above vs 48% below)
-LEAN_MIN_CONSISTENCY = 3     # advantage team's consistency hits out of 5 (73% at >=3)
+# The lean bar (from the 06-26..07-01 graded-lean autopsy): count the five winner
+# signals - margin, favorite, line toward, consistency, BvP not against - and a
+# game is a LEAN when at least LEAN_MIN_SIGNALS hit; everything else is a FADE
+# (bet against the stat favorite). The count stacked monotonically in the graded
+# record: >=2 of 5 went 62% (+5.66u), >=3 77%, >=4 89%; all-5 never occurred.
+LEAN_MIN_SIGNALS = 2
+LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
+LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
 LEAN_ELEVATED_MARGIN = 0.45  # 'very high' margin; 2+ very-high indicators = ⭐ lean
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
