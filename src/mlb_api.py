@@ -589,6 +589,20 @@ def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> l
     return out
 
 
+def _pen_available(pid: int, season: int, date: str) -> bool:
+    """False when the reliever pitched on BOTH of the two days before `date` -
+    the classic 'unavailable tonight' pattern. Errors default to available (the
+    game log is cached, so this rides on fetches the pen-FIP pass already makes)."""
+    try:
+        recent = {sp.get("date") for sp in _last_n_gamelog(pid, "pitching", season, 4,
+                                                           as_of=date)}
+    except Exception:
+        return True
+    d = dt.date.fromisoformat(date)
+    return not ({(d - dt.timedelta(days=1)).isoformat(),
+                 (d - dt.timedelta(days=2)).isoformat()} <= recent)
+
+
 def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
     """Active-roster pitchers other than today's probable starter (the bullpen)."""
     data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
@@ -704,13 +718,15 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         except Exception as exc:
             log.warning("last-5 game log failed for %s: %s", team.name, exc)
 
-    # --- bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen (the arms
-    # that come in late). Capped at PEN_BVP_MAX_ARMS relievers to bound API load;
-    # exact career numbers only (no vs-hand backbone - the pen mixes hands).
+    # --- bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen's AVAILABLE
+    # arms (a reliever who pitched both of the last two days is almost certainly
+    # down tonight). Capped at PEN_BVP_MAX_ARMS to bound API load; exact career
+    # numbers only (no vs-hand backbone - the pen mixes hands).
     for team, opp in ((game.home, game.away), (game.away, game.home)):
         try:
             opp_sp_id = opp.probable_pitcher.player_id if opp.probable_pitcher else None
-            pen = reliever_ids(opp.team_id, date, opp_sp_id)[:PEN_BVP_MAX_ARMS]
+            pen = [pid for pid in reliever_ids(opp.team_id, date, opp_sp_id)
+                   if _pen_available(pid, season, date)][:PEN_BVP_MAX_ARMS]
             pa_tot = ops_w = 0.0
             for bid in getattr(team, "_hitter_ids", []):
                 for pid in pen:

@@ -680,7 +680,7 @@ def _telegram_records_lines() -> list[str]:
     out: list[str] = []
     for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
                            ("Locks", "locks", False),
-                           ("Stay-away fades", "fades", False)):
+                           ("Stay away", "stay_away", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = grade.windowed_records(ledger[key], today)
         if not rec:
