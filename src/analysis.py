@@ -41,6 +41,12 @@ LEAGUE_SB_RATE = 0.018   # SB per PA
 
 # offense component weights (sum ~1.0; wOBA is the backbone)
 W_WOBA, W_ISO, W_DISC, W_SPEED = 0.55, 0.20, 0.15, 0.10
+# Season anchor for the offense rates. The POINT of the offense index is current
+# form ("who's better at the moment"), so last-5 keeps the majority; the season
+# line only sands the worst 5-game noise off (~190 team PA is a tiny sample).
+# The graded-game audit showed the offense/ISO gaps separate winners from losers,
+# so a steadier estimate of them should sharpen the margin.
+OFF_SEASON_WEIGHT = 0.40
 # pitching weights: starters throw ~55% of innings, bullpen ~45%
 W_SP, W_BP = 0.55, 0.45
 # The probable starter's season FIP is the single biggest single-game lever
@@ -207,8 +213,21 @@ def opp_offense_factor(opp_woba: float | None, opp_win: float | None) -> float:
     return _clamp(1.0 + W_SOS_STAT * woba_idx + W_SOS_WIN * win_idx)
 
 
+def _blend_offense_lines(last5: dict, season: dict) -> dict:
+    """Blend the last-5 rate line with the season rate line (form-forward:
+    last-5 gets 1-OFF_SEASON_WEIGHT). Falls back to whichever exists."""
+    if not season:
+        return last5
+    if not last5:
+        return season
+    keys = ("woba_neutral", "iso_neutral", "bb_pct", "k_pct", "sb_rate")
+    return {k: (1 - OFF_SEASON_WEIGHT) * last5[k] + OFF_SEASON_WEIGHT * season[k]
+            for k in keys}
+
+
 def offense_index(team: Team) -> float:
-    line = offense_line(team.offense)
+    line = _blend_offense_lines(offense_line(team.offense),
+                                offense_line(team.season_offense))
     if not line:
         return 0.0
     # strength-of-schedule: scale run production by the pitching the bats faced

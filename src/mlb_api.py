@@ -78,6 +78,7 @@ class Team:
     bvp_hand_pa: int = 0               # PA behind the vs-hand number
     pen_bvp_ops: float | None = None   # lineup's career OPS vs the opp BULLPEN (late game)
     pen_bvp_pa: int = 0                # career PA behind the pen number
+    season_offense: dict = field(default_factory=dict)  # season counting stats (anchor)
 
 
 @dataclass
@@ -165,6 +166,32 @@ def _ip_to_innings(ip) -> float:
         return int(whole or 0) + (int(frac or 0) / 3.0)
     except (ValueError, TypeError):
         return 0.0
+
+
+_SEASON_OFF_CACHE: dict = {}
+
+
+def team_season_offense(team_id: int, season: int) -> dict:
+    """A team's season-to-date hitting counting stats in the same shape as the
+    last-5 aggregation (the season anchor for the offense blend). Cached; {} on
+    failure. Season-to-date (not point-in-time) - fine for the live board."""
+    key = (team_id, season)
+    if key in _SEASON_OFF_CACHE:
+        return _SEASON_OFF_CACHE[key]
+    agg: dict = {}
+    try:
+        data = _get(f"teams/{team_id}/stats", stats="season", group="hitting",
+                    season=season)
+        for st in data.get("stats", []):
+            for sp in st.get("splits", []):
+                raw = sp.get("stat", {})
+                agg = {k: float(raw.get(api, 0) or 0) for k, api in HIT_FIELDS.items()}
+                agg["park_factor"] = 1.0   # a season mixes parks ~evenly
+                break
+    except Exception as exc:
+        log.warning("season offense failed for %s: %s", team_id, exc)
+    _SEASON_OFF_CACHE[key] = agg
+    return agg
 
 
 _VS_HAND_CACHE: dict = {}
@@ -609,6 +636,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
         team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
         team.offense = agg
+        team.season_offense = team_season_offense(team.team_id, season)
         team.offense["bats"] = bats  # consumed by analysis.platoon_factor
         sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
         sos["bat_opp_win"] = (opp_win_num / park_den) if park_den else 0.5
