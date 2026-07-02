@@ -83,7 +83,6 @@ BVP_TILT_CAP = 0.10
 LEAN_MIN_SIGNALS = 2
 LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
 LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
-LEAN_ELEVATED_MARGIN = 0.45  # 'very high' margin; 2+ very-high indicators = ⭐ lean
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):

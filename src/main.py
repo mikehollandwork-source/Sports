@@ -22,9 +22,9 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
-from .analysis import (LEAN_ELEVATED_MARGIN, LEAN_MIN_CONSISTENCY, LEAN_MIN_SIGNALS,
-                       LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN, LINE_STRONG, _canon_abbr,
-                       _implied, evaluate_game, find_slate_line, line_confirms)
+from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_MIN_SIGNALS, LEAN_STRONG_MARGIN,
+                       LINE_CONFIRM_MIN, _canon_abbr, _implied, evaluate_game,
+                       find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -244,36 +244,37 @@ def _attach_line(game, result: dict, slate: list) -> None:
     margin = pc["components"]["stat_edge"]["margin"]
     cons = pc["components"]["consistency"]["hits"]
     bvp = result.get("bvp") or {}
-    hits, misses = [], []
-    (hits if margin >= LEAN_STRONG_MARGIN else misses).append(f"margin {margin}")
-    (hits if ml is not None and ml < 0 else misses).append(
-        "favorite" if ml is not None else "no price")
-    (hits if info.get("status") == "confirms" else misses).append("line toward")
-    (hits if cons >= LEAN_MIN_CONSISTENCY else misses).append(f"consistency {cons}/5")
+    m_hit = margin >= LEAN_STRONG_MARGIN
+    f_hit = ml is not None and ml < 0
+    l_hit = info.get("status") == "confirms"
+    c_hit = cons >= LEAN_MIN_CONSISTENCY
     # BvP counts as a hit unless it exists AND points the other way (same
     # semantics the >=2-of-5 backtest was measured with).
-    (misses if bvp.get("edge_team") and bvp["edge_team"] != adv else hits).append("BvP")
+    b_hit = not (bvp.get("edge_team") and bvp["edge_team"] != adv)
+    hits, misses = [], []
+    for ok, label in ((m_hit, f"margin {margin}"),
+                      (f_hit, "favorite" if ml is not None else "no price"),
+                      (l_hit, "line toward"),
+                      (c_hit, f"consistency {cons}/5"),
+                      (b_hit, "BvP")):
+        (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
     if len(hits) >= LEAN_MIN_SIGNALS:
         pc["play"] = "lean"
         pc["status"] = "lean"
         pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
+        # ⭐ = the proven-hot combos from the graded record: margin + favorite +
+        # line toward (that cell went 10-2), or the 4+-signal sweet spot (8-1).
+        star = []
+        if m_hit and f_hit and l_hit:
+            star.append("margin+favorite+line")
+        if len(hits) >= 4:
+            star.append(f"{len(hits)}/5 signals")
+        pc["starred"] = star
     else:
         pc["play"] = "fade"
         pc["status"] = "fade"
         pc["reason"] = f"{len(hits)}/5 signals — missed: {', '.join(misses)}"
-    if pc["play"] == "lean":
-        # ⭐ = a lean whose indicators aren't just over the bar but VERY high.
-        elevated = []
-        if margin >= LEAN_ELEVATED_MARGIN:
-            elevated.append(f"margin {margin}")
-        if cons >= 4:
-            elevated.append(f"consistency {cons}/5")
-        if info.get("implied_shift", 0) >= LINE_STRONG:
-            elevated.append("strong line move")
-        if bvp.get("meaningful") and bvp.get("edge_team") == adv:
-            elevated.append("BvP edge")
-        pc["elevated"] = elevated
 
 
 def _is_play(g: dict) -> bool:
@@ -480,6 +481,16 @@ def _fade_line(g: dict) -> str:
     return f"🔄 {_state_tag(g)}{g['matchup']} → bet {opp}{oml_s} — {pc.get('reason', '')}"
 
 
+def _star(pc: dict) -> list[str]:
+    """Star reasons for a lean: the proven-hot combos (margin+favorite+line, or 4+
+    signals). Falls back to the short-lived 'elevated' schema on older snapshots."""
+    st = pc.get("starred")
+    if st is not None:
+        return st
+    ev = pc.get("elevated") or []
+    return ev if len(ev) >= 2 else []
+
+
 def _game_lines(g: dict) -> list[str]:
     """Readable lines breaking down one matchup for the board. Fades collapse to a
     one-liner naming the side to bet."""
@@ -493,11 +504,11 @@ def _game_lines(g: dict) -> list[str]:
     cons = _cons_pair(g)
     pub = _public_evidence(g)
     tag = _state_tag(g)
-    elevated = pc.get("elevated") or []
-    mark = "⭐" if len(elevated) >= 2 else "🔸"
+    star = _star(pc)
+    mark = "⭐" if star else "🔸"
     lines = [
         f"{mark} **LEAN {adv}**{_ml_str(pc)} — {tag}{g['matchup']} · confidence {_c10(conf)}"
-        + (f" · ⭐ {', '.join(elevated)}" if len(elevated) >= 2 else ""),
+        + (f" · ⭐ {', '.join(star)}" if star else ""),
         f"   • stat edge: {edge}",
         f"   • public: {pub}",
         f"   • consistency: {cons}",
@@ -542,7 +553,7 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_🔸 = LEAN (2+ of the 5 signals hit: margin, favorite, line toward, "
-               "consistency, BvP). ⭐ = lean with 2+ very-high indicators. 🔄 = FADE: bet "
+               "consistency, BvP). ⭐ = lean hitting a proven-hot combo (margin+favorite+line, or 4+ signals). 🔄 = FADE: bet "
                "against the stat side (0-1 signals). 🔴 = live; finals drop into the record._")
 
     out.append("")
@@ -614,8 +625,8 @@ def telegram_text(payload: dict) -> str:
         emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
         frozen = " [frozen]" if g.get("state") == "live" else ""
-        elevated = pc.get("elevated") or []
-        mark = "⭐" if len(elevated) >= 2 else "🔸"
+        star = _star(pc)
+        mark = "⭐" if star else "🔸"
         L += ["",
               f"{mark} {tag}LEAN {adv}{_ml_str(pc)} · conf {_c10(pc['confidence'])}",
               f"   {aa} @ {ha}",
@@ -632,7 +643,7 @@ def telegram_text(payload: dict) -> str:
         if sit:
             L.append(f"   📅 {sit}")
         L.append(f"   ✅ {pc['reason']}"
-                 + (f" · ⭐ {', '.join(elevated)}" if len(elevated) >= 2 else ""))
+                 + (f" · ⭐ {', '.join(star)}" if star else ""))
     if not leans:
         L += ["", "No leans on the slate — every game is a fade."]
 
