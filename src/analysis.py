@@ -713,6 +713,25 @@ def bvp_read(game: Game) -> dict | None:
     }
 
 
+def pen_bvp_read(game: Game) -> dict | None:
+    """Bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen - the arms
+    likely to close the game out. Exact career numbers only (the pen mixes hands,
+    so no vs-hand backbone); meaningful needs a real gap AND a real sample.
+    Display context only."""
+    h, a = game.home, game.away
+    if h.pen_bvp_ops is None or a.pen_bvp_ops is None:
+        return None
+    gap = round(h.pen_bvp_ops - a.pen_bvp_ops, 3)
+    total = h.pen_bvp_pa + a.pen_bvp_pa
+    return {
+        "home_ops": h.pen_bvp_ops, "away_ops": a.pen_bvp_ops,
+        "home_pa": h.pen_bvp_pa, "away_pa": a.pen_bvp_pa, "total_pa": total,
+        "edge_team": (h.name if gap > 0 else a.name) if gap else None,
+        "gap": abs(gap),
+        "meaningful": abs(gap) >= BVP_FLOOR and total >= 100,
+    }
+
+
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
                   extra_public: dict | None = None, reddit_counts: dict | None = None,
                   wiki_counts: dict | None = None) -> dict:
@@ -789,6 +808,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
         },
         "public_check": crosscheck,
         "bvp": bvp_read(game),
+        "bvp_pen": pen_bvp_read(game),
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,

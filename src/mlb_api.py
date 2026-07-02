@@ -35,6 +35,7 @@ SPORT_ID = 1
 TIMEOUT = 20
 POLITE_DELAY = 0.1
 SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
+PEN_BVP_MAX_ARMS = 6       # opposing relievers per game checked for bullpen BvP
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
@@ -75,6 +76,8 @@ class Team:
     bvp_pa: int = 0                # total career PA behind that OPS (sample size / trust)
     bvp_hand_ops: float | None = None  # team OPS vs the opp starter's HAND (big sample)
     bvp_hand_pa: int = 0               # PA behind the vs-hand number
+    pen_bvp_ops: float | None = None   # lineup's career OPS vs the opp BULLPEN (late game)
+    pen_bvp_pa: int = 0                # career PA behind the pen number
 
 
 @dataclass
@@ -604,6 +607,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                 opp_fip_w += pa
             bats.append((h.hand, pa))
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
+        team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
         team.offense = agg
         team.offense["bats"] = bats  # consumed by analysis.platoon_factor
         sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
@@ -670,5 +674,24 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
             team.games_last5 = team_last5_gamelog(team.team_id, season, as_of=as_of)
         except Exception as exc:
             log.warning("last-5 game log failed for %s: %s", team.name, exc)
+
+    # --- bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen (the arms
+    # that come in late). Capped at PEN_BVP_MAX_ARMS relievers to bound API load;
+    # exact career numbers only (no vs-hand backbone - the pen mixes hands).
+    for team, opp in ((game.home, game.away), (game.away, game.home)):
+        try:
+            opp_sp_id = opp.probable_pitcher.player_id if opp.probable_pitcher else None
+            pen = reliever_ids(opp.team_id, date, opp_sp_id)[:PEN_BVP_MAX_ARMS]
+            pa_tot = ops_w = 0.0
+            for bid in getattr(team, "_hitter_ids", []):
+                for pid in pen:
+                    b = batter_vs_pitcher(bid, pid)
+                    if b["pa"] > 0:
+                        pa_tot += b["pa"]
+                        ops_w += b["ops"] * b["pa"]
+            team.pen_bvp_ops = round(ops_w / pa_tot, 3) if pa_tot else None
+            team.pen_bvp_pa = int(pa_tot)
+        except Exception as exc:
+            log.warning("pen BvP failed for %s: %s", team.name, exc)
 
     return game

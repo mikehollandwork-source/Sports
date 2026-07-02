@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
+from . import covers, espn, grade, notify, public_sources, reddit, tune, weather, wiki
 from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN,
                        PICK_MIN_SIGNALS, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms)
@@ -98,6 +98,10 @@ def run(date: str) -> dict:
     for g, r in zip(games, results):
         _attach_line(g, r, slate)
         _attach_situational(g, r, date)
+        try:
+            r["weather"] = weather.forecast_for(r.get("venue", ""), r.get("game_datetime"))
+        except Exception as exc:
+            log.warning("weather failed for %s: %s", g.game_pk, exc)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
@@ -338,11 +342,6 @@ def _edge_word(strength: float) -> str:
     return "strong" if strength >= 0.66 else "moderate" if strength >= 0.33 else "slight"
 
 
-def _c10(conf: float) -> str:
-    """Confidence on an intuitive /10 scale, e.g. 0.536 -> '5.4/10'."""
-    return f"{round((conf or 0.0) * 10, 1)}/10"
-
-
 def _kfmt(n: int) -> str:
     """Compact pageview count: 12450 -> '12k', 980 -> '980'."""
     return f"{round(n / 1000)}k" if n >= 1000 else str(int(n))
@@ -482,6 +481,27 @@ def _bvp_phrase(g: dict) -> str | None:
             f"{aa} {b['away_eff']:.3f} v {ha} {b['home_eff']:.3f}")
 
 
+def _weather_phrase(g: dict) -> str | None:
+    """'82°F · wind 12mph SSE · rain 20%' at first pitch; roofed parks say so."""
+    w = g.get("weather")
+    if not w:
+        return None
+    if w.get("roof") == "dome":
+        return "dome (no weather factor)"
+    base = f"{w['temp_f']}°F · wind {w['wind_mph']}mph {w['wind_dir']} · rain {w['precip_pct']}%"
+    return base + (" · retractable roof" if w.get("roof") == "retract" else "")
+
+
+def _pen_bvp_phrase(g: dict) -> str | None:
+    """Bullpen BvP one-liner, only when the gap is meaningful on a real sample."""
+    b = g.get("bvp_pen")
+    if not b or not b.get("meaningful") or not b.get("edge_team"):
+        return None
+    aa, ha = _abbrs(g)
+    return (f"edge {_short(g, b['edge_team'])} — "
+            f"{aa} {b['away_ops']:.3f} v {ha} {b['home_ops']:.3f} ({b['total_pa']} PA)")
+
+
 def _situational_phrase(g: dict) -> str | None:
     """'NYY 24-15 home · BOS 18-21 road' — this-season straight-up situational
     records (display-only context). None when unavailable."""
@@ -546,6 +566,12 @@ def _game_lines(g: dict) -> list[str]:
     bvp = _bvp_phrase(g)
     if bvp:
         lines.append(f"   • BvP: {bvp} _(context)_")
+    pen = _pen_bvp_phrase(g)
+    if pen:
+        lines.append(f"   • pen BvP: {pen} _(context)_")
+    wx = _weather_phrase(g)
+    if wx:
+        lines.append(f"   • weather: {wx} _(context)_")
     sit = _situational_phrase(g)
     if sit:
         lines.append(f"   • this season: {sit} _(context)_")
@@ -673,6 +699,12 @@ def telegram_text(payload: dict) -> str:
         bvp = _bvp_phrase(g)
         if bvp:
             L.append(f"   🥊 BvP {bvp}")
+        pen = _pen_bvp_phrase(g)
+        if pen:
+            L.append(f"   🧯 pen BvP {pen}")
+        wx = _weather_phrase(g)
+        if wx:
+            L.append(f"   🌤 {wx}")
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 {sit}")
