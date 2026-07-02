@@ -4,10 +4,10 @@ in output/ledger.json:
 
   - Picks: 2+ of the 5 signals hit. Bet the advantage team.
   - Leans: exactly 1 signal. Bet the advantage team.
-  - Locks: the opponent matched the 9-1 profile (line toward them + public not
-    against them). Bet the opponent at its price.
-  - Stay away: the stay-away pile's money-fade - bet against wherever the money
-    sits (pc.stay_bet/stay_odds). Stay-aways without a clean money read are
+  - Fades: the 9-1 profile plays (shown as LOCK on the board): line toward the
+    opponent + public not against them. Bet the opponent at its price.
+  - Stay away: every remaining game - the only action is fading the team with
+    the most money on it (pc.stay_bet/stay_odds). No clean money read = listed,
     never booked. (leans_faded is frozen history.)
 
 Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
@@ -56,7 +56,7 @@ def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
-            "picks": _empty_book(), "leans": _empty_book(), "locks": _empty_book(),
+            "picks": _empty_book(), "leans": _empty_book(), "fades": _empty_book(),
             "leans_faded": _empty_book(), "stay_away": _empty_book()}
 
 
@@ -68,9 +68,12 @@ def load_ledger() -> dict:
         return led
     if "picks" in old and "leans" in old:
         old.setdefault("leans_faded", _empty_book())   # added after the two-book schema
-        old.setdefault("locks", _empty_book())         # 9-1 profile book
+        old.setdefault("fades", _empty_book())         # the 9-1 LOCK plays
         old.setdefault("stay_away", _empty_book())     # stay-away money-fade book
-        old.pop("fades", None)   # superseded by stay_away (was empty at rename)
+        if old.get("locks", {}).get("entries"):        # brief 'locks' naming era
+            old["fades"] = old.pop("locks")
+        else:
+            old.pop("locks", None)
         old.pop("leans_strong", None)  # short-lived tier book, folded into leans itself
         old.setdefault("grade_from", None)
         return old
@@ -190,16 +193,16 @@ def update_ledger(date: str) -> dict:
         return ledger
     pe, le, ke, se = grade_date(date)
     added = (_add(ledger["picks"], pe) + _add(ledger["leans"], le)
-             + _add(ledger["locks"], ke) + _add(ledger["stay_away"], se))
+             + _add(ledger["fades"], ke) + _add(ledger["stay_away"], se))
     if added:
         ledger["review"] = review(ledger["picks"])
         log.info("graded %s: picks %+.2f (%d-%d), leans %+.2f (%d-%d), "
-                 "locks %+.2f (%d-%d), stay-away %+.2f (%d-%d)",
+                 "fades %+.2f (%d-%d), stay-away %+.2f (%d-%d)",
                  date, ledger["picks"]["bankroll"], ledger["picks"]["record"]["wins"],
                  ledger["picks"]["record"]["losses"], ledger["leans"]["bankroll"],
                  ledger["leans"]["record"]["wins"], ledger["leans"]["record"]["losses"],
-                 ledger["locks"]["bankroll"], ledger["locks"]["record"]["wins"],
-                 ledger["locks"]["record"]["losses"],
+                 ledger["fades"]["bankroll"], ledger["fades"]["record"]["wins"],
+                 ledger["fades"]["record"]["losses"],
                  ledger["stay_away"]["bankroll"], ledger["stay_away"]["record"]["wins"],
                  ledger["stay_away"]["record"]["losses"])
     else:
@@ -246,7 +249,7 @@ def bankroll_line(ledger: dict | None = None) -> str:
     ledger = ledger or load_ledger()
     return (_book_line("Picks", ledger["picks"]) + "  ·  "
             + _book_line("Leans", ledger["leans"]) + "  ·  "
-            + _book_line("Locks", ledger["locks"]) + "  ·  "
+            + _book_line("Fades", ledger["fades"]) + "  ·  "
             + _book_line("Stay away", ledger["stay_away"])
             + "  _($1/bet at pre-game moneyline)_")
 
@@ -288,7 +291,7 @@ def records_block(ledger: dict | None = None, today: dt.date | None = None) -> s
     today = today or dt.datetime.now(EASTERN).date()
     lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
     for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
-                           ("Locks", "locks", False),
+                           ("Fades", "fades", False),
                            ("Stay away", "stay_away", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = windowed_records(ledger[key], today)

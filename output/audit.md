@@ -3,8 +3,8 @@
 ## Books
 - **picks**: 0-1 (-1.00u)
 - **leans**: 0-0 (+0.00u)
-- **locks**: 0-0 (+0.00u)
 - **fades**: 0-0 (+0.00u)
+- **stay_away**: 0-0 (+0.00u)
 
 ## Signals on the 1 graded picks+leans
 

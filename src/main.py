@@ -679,7 +679,7 @@ def _telegram_records_lines() -> list[str]:
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
     for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
-                           ("Locks", "locks", False),
+                           ("Fades", "fades", False),
                            ("Stay away", "stay_away", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = grade.windowed_records(ledger[key], today)

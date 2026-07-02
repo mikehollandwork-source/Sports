@@ -95,7 +95,7 @@ def _wr(rows: list[dict]) -> str:
 
 def build() -> tuple[dict, str]:
     led = grade.load_ledger()
-    books = {k: led.get(k, {}).get("entries", []) for k in ("picks", "leans", "locks", "fades")}
+    books = {k: led.get(k, {}).get("entries", []) for k in ("picks", "leans", "fades", "stay_away")}
 
     # bets ON the stat side, joined with their frozen signals
     rows: list[dict] = []
@@ -112,7 +112,7 @@ def build() -> tuple[dict, str]:
 
     md = [f"# 10-day audit — generated {dt.datetime.now(EASTERN).date()}", ""]
     md.append("## Books")
-    for k in ("picks", "leans", "locks", "fades"):
+    for k in ("picks", "leans", "fades", "stay_away"):
         b = led.get(k, {})
         r = b.get("record", {})
         md.append(f"- **{k}**: {r.get('wins', 0)}-{r.get('losses', 0)} "
