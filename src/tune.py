@@ -20,6 +20,10 @@ from pathlib import Path
 
 log = logging.getLogger("tune")
 
+# Kill switch (user request): the auto-tuner is OFF for now. auto_tune() does
+# nothing and status_line() stays silent; flip to True to re-enable.
+TUNER_ENABLED = False
+
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 TUNING_PATH = OUTPUT_DIR / "tuning.json"
 
@@ -59,6 +63,9 @@ def edge_threshold_for_streak(streak: int) -> float:
 def auto_tune(ledger: dict) -> dict:
     """Recompute the required stat-edge threshold from the Picks book's recent
     losing streak (stricter = bigger edge demanded); persist."""
+    if not TUNER_ENABLED:
+        log.info("auto-tuner disabled")
+        return {}
     daily = _daily_pnl(ledger.get("picks", {}).get("entries", []))
     streak = _losing_streak(daily)
     thr = edge_threshold_for_streak(streak)
@@ -93,6 +100,8 @@ def auto_tune(ledger: dict) -> dict:
 
 def status_line(state: dict | None = None) -> str:
     """One-line tuning status for the daily issue."""
+    if not TUNER_ENABLED:
+        return ""
     if state is None:
         try:
             state = json.loads(TUNING_PATH.read_text())

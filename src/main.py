@@ -447,9 +447,12 @@ def _public_check_phrase(g: dict) -> str | None:
     cc = g.get("public_check")
     if not cc or not cc.get("majority_side"):
         return None
-    parts = [cc.get("verdict", "unconfirmed")]
+    plain = {"corroborated": "all sources agree", "mostly agrees": "most sources agree",
+             "sources split": "sources disagree", "unconfirmed": "only 1 source"}
+    v = cc.get("verdict", "unconfirmed")
+    parts = [plain.get(v, v)]
     n = len(cc.get("sources", []))
-    if n:
+    if n > 1:
         parts.append(f"{cc.get('agree', 0)}/{n} sources")
     line = cc.get("line", "unknown")
     if line == "with public":
@@ -521,7 +524,7 @@ def _game_lines(g: dict) -> list[str]:
     if _play(g) == "pass":
         return [f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', '')}"]
     c = pc["components"]
-    adv, conf = pc["advantage_team"], pc["confidence"]
+    adv = pc["advantage_team"]
     e = c["stat_edge"]
     edge = f"{adv} ({_edge_word(e['strength'])}, margin {e['margin']})"
     cons = _cons_pair(g)
@@ -531,7 +534,7 @@ def _game_lines(g: dict) -> list[str]:
     kind = _play(g).upper()
     mark = "⭐" if star else ("✅" if kind == "PICK" else "🔸")
     lines = [
-        f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']} · confidence {_c10(conf)}"
+        f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
         + (f" · ⭐ {', '.join(star)}" if star else ""),
         f"   • stat edge: {edge}",
         f"   • public: {pub}",
@@ -659,7 +662,7 @@ def telegram_text(payload: dict) -> str:
         kind = _play(g).upper()
         mark = "⭐" if star else ("✅" if kind == "PICK" else "🔸")
         L += ["",
-              f"{mark} {tag}{kind} {adv}{_ml_str(pc)} · conf {_c10(pc['confidence'])}",
+              f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
               f"   {aa} @ {ha}",
               f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
               f"   👥 public {_public_evidence(g)}",

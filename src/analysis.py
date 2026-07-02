@@ -119,7 +119,9 @@ LINE_BIG = 0.08           # ~30c+; treat as news, verify before trusting
 
 def _apply_tuning() -> None:
     """Override the decision params from output/tuning.json (written by the
-    bankroll auto-tuner). Absent/invalid file -> the defaults above stand."""
+    bankroll auto-tuner). DISABLED for now (user request) - the auto-tuner is
+    off, so the defaults above always stand."""
+    return
     import json
     import os
     path = os.path.join(os.path.dirname(__file__), "..", "output", "tuning.json")
