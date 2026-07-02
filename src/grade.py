@@ -2,11 +2,11 @@
 Grade the board against actual MLB results and keep two running $1/unit bankrolls
 in output/ledger.json:
 
-  - Leans: games where EVERY lean signal hit (margin, favorite, line toward,
-    consistency, BvP not against - see main._attach_line). Bet the advantage team.
-  - Fades: every other game. Bet AGAINST the advantage team at the opponent's
-    pre-game price.
-  (The old picks / leans_faded books are frozen history - no new entries.)
+  - Picks: 2+ of the 5 signals hit. Bet the advantage team.
+  - Leans: exactly 1 signal. Bet the advantage team.
+  - Fades: the opponent matched the 9-1 profile (line toward them + public not
+    against them). Bet AGAINST the advantage team at the opponent's price.
+  Passes (everything else) are never booked. (leans_faded is frozen history.)
 
 Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
 covers' odds page (pick_criteria.advantage_moneyline). A game whose real price
@@ -103,29 +103,29 @@ def _settle(date, g, res, bet, won, odds) -> dict:
     }
 
 
-def _is_lean(g: dict) -> bool:
-    """Mirror of main._is_play: lean when every signal hit. Older frozen snapshots
-    map flagged picks / strong-tier leans to leans, everything else to fades."""
+def _play(g: dict) -> str:
+    """Mirror of main._play. Older frozen snapshots: flagged / strong-tier map to
+    lean; anything unclassified is a pass (never booked)."""
     pc = g.get("pick_criteria", {})
-    if "play" in pc:
-        return pc["play"] == "lean"
-    if g.get("flagged"):
-        return True
-    return pc.get("lean_tier") == "strong"
+    if pc.get("play") in ("pick", "lean", "fade", "pass"):
+        return pc["play"]
+    if g.get("flagged") or pc.get("lean_tier") == "strong":
+        return "lean"
+    return "pass"
 
 
-def grade_date(date: str) -> tuple[list[dict], list[dict]]:
-    """Settle every final game into (lean_entries, fade_entries). Leans bet the
-    advantage team at its pre-game price; fades bet the OTHER side at its price.
-    Games without a captured price for the needed side are skipped, never booked
-    at fake even money."""
+def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """Settle every final game into (pick_entries, lean_entries, fade_entries).
+    Picks/leans bet the advantage team at its pre-game price; fades bet the OTHER
+    side at its price. Passes and games without a captured price are never booked."""
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         log.warning("no picks file for %s", date)
-        return [], []
+        return [], [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
 
+    pick_entries: list[dict] = []
     lean_entries: list[dict] = []
     fade_entries: list[dict] = []
     for g in payload.get("games", []):
@@ -134,16 +134,18 @@ def grade_date(date: str) -> tuple[list[dict], list[dict]]:
         res = results.get(g.get("game_pk"))
         if not adv or not res or not res["final"] or not res["winner"]:
             continue
-        if _is_lean(g):
+        play = _play(g)
+        if play in ("pick", "lean"):
             odds = _price(g, "advantage_moneyline")
             if odds is not None:
-                lean_entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
-        else:
+                entry = _settle(date, g, res, adv, res["winner"] == adv, odds)
+                (pick_entries if play == "pick" else lean_entries).append(entry)
+        elif play == "fade":
             opp = res["home"] if adv == res["away"] else res["away"]
             f_odds = _price(g, "opponent_moneyline")
             if f_odds is not None:
                 fade_entries.append(_settle(date, g, res, opp, res["winner"] == opp, f_odds))
-    return lean_entries, fade_entries
+    return pick_entries, lean_entries, fade_entries
 
 
 def _add(book: dict, entries: list[dict]) -> int:
@@ -170,14 +172,17 @@ def update_ledger(date: str) -> dict:
         log.info("skip grading %s (before grade_from %s)", date, gf)
         save_ledger(ledger)
         return ledger
-    le, fe = grade_date(date)
-    added = _add(ledger["leans"], le) + _add(ledger["fades"], fe)
+    pe, le, fe = grade_date(date)
+    added = (_add(ledger["picks"], pe) + _add(ledger["leans"], le)
+             + _add(ledger["fades"], fe))
     if added:
-        ledger["review"] = review(ledger["leans"])
-        log.info("graded %s: leans %+.2f (%d-%d), fades %+.2f (%d-%d)", date,
-                 ledger["leans"]["bankroll"], ledger["leans"]["record"]["wins"],
-                 ledger["leans"]["record"]["losses"], ledger["fades"]["bankroll"],
-                 ledger["fades"]["record"]["wins"], ledger["fades"]["record"]["losses"])
+        ledger["review"] = review(ledger["picks"])
+        log.info("graded %s: picks %+.2f (%d-%d), leans %+.2f (%d-%d), fades %+.2f (%d-%d)",
+                 date, ledger["picks"]["bankroll"], ledger["picks"]["record"]["wins"],
+                 ledger["picks"]["record"]["losses"], ledger["leans"]["bankroll"],
+                 ledger["leans"]["record"]["wins"], ledger["leans"]["record"]["losses"],
+                 ledger["fades"]["bankroll"], ledger["fades"]["record"]["wins"],
+                 ledger["fades"]["record"]["losses"])
     else:
         log.info("nothing new to settle for %s", date)
     # Always persist so the ledger artifact exists from the first grade onward
@@ -203,10 +208,10 @@ def review(book: dict) -> dict:
 
 def review_line(ledger: dict | None = None) -> str:
     ledger = ledger or load_ledger()
-    rev = ledger.get("review") or review(ledger["leans"])
+    rev = ledger.get("review") or review(ledger["picks"])
     if not rev["losses"]:
         return ""
-    return (f"**Loss review (leans):** {rev['losses']} loss(es) — "
+    return (f"**Loss review (picks):** {rev['losses']} loss(es) — "
             f"{rev['losses_as_underdog']} as a dog, {rev['losses_as_favorite']} as a favorite.")
 
 
@@ -220,7 +225,8 @@ def _book_line(name: str, book: dict, hypothetical: bool = False) -> str:
 def bankroll_line(ledger: dict | None = None) -> str:
     """One-line summary of both books for the daily issue."""
     ledger = ledger or load_ledger()
-    return (_book_line("Leans", ledger["leans"]) + "  ·  "
+    return (_book_line("Picks", ledger["picks"]) + "  ·  "
+            + _book_line("Leans", ledger["leans"]) + "  ·  "
             + _book_line("Fades", ledger["fades"])
             + "  _($1/bet at pre-game moneyline)_")
 
@@ -261,7 +267,8 @@ def records_block(ledger: dict | None = None, today: dt.date | None = None) -> s
     ledger = ledger or load_ledger()
     today = today or dt.datetime.now(EASTERN).date()
     lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
-    for name, key, hyp in (("Leans", "leans", False), ("Fades", "fades", False)):
+    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
+                           ("Fades", "fades", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = windowed_records(ledger[key], today)
         lines.append(f"- **{name}{tag}:** " + (_fmt_windows(rec) if rec else "no settled bets yet"))

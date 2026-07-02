@@ -75,12 +75,16 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
 
-# The lean bar (from the 06-26..07-01 graded-lean autopsy): count the five winner
-# signals - margin, favorite, line toward, consistency, BvP not against - and a
-# game is a LEAN when at least LEAN_MIN_SIGNALS hit; everything else is a FADE
-# (bet against the stat favorite). The count stacked monotonically in the graded
-# record: >=2 of 5 went 62% (+5.66u), >=3 77%, >=4 89%; all-5 never occurred.
-LEAN_MIN_SIGNALS = 2
+# Play taxonomy (from the 06-26..07-01 graded-lean autopsy). Count the five winner
+# signals - margin, favorite, line toward, consistency, BvP not against:
+#   PICK = >= PICK_MIN_SIGNALS hits (the >=2 tier went 62% +5.66u, stacking to
+#          77% at >=3 and 89% at >=4; includes the margin+favorite+line combo).
+#   LEAN = exactly 1 hit.
+#   FADE = the OPPONENT matches the mirrored 9-1 profile: the line moved toward
+#          them (>= LINE_CONFIRM_MIN) and the public is on them or silent
+#          (no-fade + line-confirmed leans went 9-1 in the graded record).
+#   PASS = none of the above; shown one-line, never booked.
+PICK_MIN_SIGNALS = 2
 LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
 LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
 
