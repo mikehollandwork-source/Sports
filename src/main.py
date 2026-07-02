@@ -22,7 +22,8 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, wiki
-from .analysis import (LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN, _canon_abbr, _implied,
+from .analysis import (LEAN_ELEVATED_MARGIN, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
+                       LINE_CONFIRM_MIN, LINE_STRONG, _canon_abbr, _implied,
                        evaluate_game, find_slate_line, line_confirms)
 from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
 
@@ -112,14 +113,15 @@ def run(date: str) -> dict:
     for r in results:
         r["state"] = states.get(r.get("game_pk"), {}).get("state", "upcoming")
 
-    picks = [r["pick"] for r in results if r["flagged"]]
-    log.info("Flagged %d edge game(s)", len(picks))
+    leans = [r["pick_criteria"]["advantage_team"] for r in results if _is_play(r)]
+    log.info("Board: %d lean(s), %d fade(s)", len(leans), len(results) - len(leans))
 
     return {
         "date": date,
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "games": results,
-        "picks": picks,
+        "picks": [],      # the pick tier is gone - kept for old readers of the JSON
+        "leans": leans,
     }
 
 
@@ -214,8 +216,8 @@ def _attach_line(game, result: dict, slate: list) -> None:
     pc["advantage_moneyline"] = e.get(f"{side}_current") if e else None
     pc["opponent_moneyline"] = e.get(f"{opp}_current") if e else None  # for the faded-leans book
 
-    # line movement toward our side (the advantage team) for EVERY game, pick or lean
-    confirms, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
+    # line movement toward our side (the advantage team) for EVERY game
+    _, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
     pc["line_check"] = info
 
     # Cross-check the public read against the money: did the line move WITH the
@@ -232,42 +234,59 @@ def _attach_line(game, result: dict, slate: list) -> None:
             if cc["line"] == "against public":
                 cc["flags"].append("reverse line move — money went against the public %")
 
-    if result["flagged"] and confirms is not True:
-        result["flagged"] = False
-        result["pick"] = None
+    # THE decision (no pick/lean separation): a game is a LEAN only when EVERY
+    # signal from the graded-lean autopsy hits - real margin, favorite's price,
+    # line moved TOWARD the lean, consistency >= 3/5, and BvP not pointing the
+    # other way. Anything that misses any signal is a FADE: bet AGAINST the stat
+    # favorite at the opponent's pre-game price.
+    result["flagged"] = False
+    result["pick"] = None
+    ml = pc.get("advantage_moneyline")
+    margin = pc["components"]["stat_edge"]["margin"]
+    cons = pc["components"]["consistency"]["hits"]
+    bvp = result.get("bvp") or {}
+    fails = []
+    if margin < LEAN_STRONG_MARGIN:
+        fails.append(f"margin {margin} < {LEAN_STRONG_MARGIN}")
+    if ml is None:
+        fails.append("no captured price")
+    elif ml >= 0:
+        fails.append("underdog")
+    if info.get("status") != "confirms":
+        fails.append("line not moving our way" if info.get("status") != "unknown"
+                     else "no line read")
+    if cons < LEAN_MIN_CONSISTENCY:
+        fails.append(f"consistency {cons}/5 < {LEAN_MIN_CONSISTENCY}/5")
+    if bvp.get("edge_team") and bvp["edge_team"] != adv:
+        fails.append("BvP points the other way")
+    if fails:
+        pc["play"] = "fade"
+        pc["status"] = "fade"
+        pc["reason"] = ", ".join(fails)
+    else:
+        pc["play"] = "lean"
         pc["status"] = "lean"
-        pc["reason"] = (f"line did not confirm the fade — {info['reason']}"
-                        if info["status"] != "unknown"
-                        else "line movement unavailable — can't confirm the fade")
-
-    # Lean bar (non-picks): a game is only a LEAN at all if it clears the strong
-    # criteria - real margin + favorite's price + line not leaning away (from the
-    # graded-lean autopsy; see analysis.LEAN_STRONG_MARGIN). Below the bar the game
-    # is a PASS: shown as a one-liner, never booked in the Leans ledger.
-    if not result["flagged"]:
-        ml = pc.get("advantage_moneyline")
-        margin = pc["components"]["stat_edge"]["margin"]
-        fails = []
-        if margin < LEAN_STRONG_MARGIN:
-            fails.append(f"margin {margin} < {LEAN_STRONG_MARGIN}")
-        if ml is None:
-            fails.append("no captured price")
-        elif ml >= 0:
-            fails.append("underdog")
-        if info.get("status") in ("contradicts", "flat"):
-            fails.append(f"line {info['status']}")
-        if fails:
-            pc["lean_tier"] = "standard"
-            pc["status"] = "pass"
-            pc["reason"] = "below the lean bar: " + ", ".join(fails)
-        else:
-            pc["lean_tier"] = "strong"
+        pc["reason"] = "all lean signals hit"
+        # ⭐ = a lean whose indicators aren't just over the bar but VERY high.
+        elevated = []
+        if margin >= LEAN_ELEVATED_MARGIN:
+            elevated.append(f"margin {margin}")
+        if cons >= 4:
+            elevated.append(f"consistency {cons}/5")
+        if info.get("implied_shift", 0) >= LINE_STRONG:
+            elevated.append("strong line move")
+        if bvp.get("meaningful") and bvp.get("edge_team") == adv:
+            elevated.append("BvP edge")
+        pc["elevated"] = elevated
 
 
 def _is_play(g: dict) -> bool:
-    """A game that gets a full board block: a pick, or a lean that cleared the bar.
-    Old frozen snapshots (no lean_tier) keep their lean status."""
+    """True when the game is a LEAN (full board block; ledger bets the advantage
+    team). Everything else is a FADE. Older frozen snapshots map: flagged pick or
+    strong-tier lean -> lean; the rest -> fade."""
     pc = g.get("pick_criteria", {})
+    if "play" in pc:
+        return pc["play"] == "lean"
     if g.get("flagged"):
         return True
     if "lean_tier" in pc:
@@ -453,13 +472,24 @@ def _situational_phrase(g: dict) -> str | None:
             f"{a['abbr']} {a['wins']}-{a['losses']} road")
 
 
+def _fade_line(g: dict) -> str:
+    """One-liner for a FADE: the side to bet (against the stat favorite), its price,
+    and which lean signals failed."""
+    pc = g["pick_criteria"]
+    adv = pc["advantage_team"]
+    away, home = g["matchup"].split(" @ ")
+    opp = _short(g, home if adv == away else away)
+    oml = pc.get("opponent_moneyline")
+    oml_s = f" ({oml:+d})" if isinstance(oml, int) else ""
+    return f"🔄 {_state_tag(g)}{g['matchup']} → bet {opp}{oml_s} — {pc.get('reason', '')}"
+
+
 def _game_lines(g: dict) -> list[str]:
-    """Readable lines breaking down one matchup for the board. Games below the lean
-    bar collapse to a one-liner."""
+    """Readable lines breaking down one matchup for the board. Fades collapse to a
+    one-liner naming the side to bet."""
     pc = g["pick_criteria"]
     if not _is_play(g):
-        why = pc.get("reason", "").replace("below the lean bar: ", "")
-        return [f"▫️ {_state_tag(g)}{g['matchup']} — {why}"]
+        return [_fade_line(g)]
     c = pc["components"]
     adv, conf = pc["advantage_team"], pc["confidence"]
     e = c["stat_edge"]
@@ -467,25 +497,15 @@ def _game_lines(g: dict) -> list[str]:
     cons = _cons_pair(g)
     pub = _public_evidence(g)
     tag = _state_tag(g)
-    if g.get("flagged"):
-        bl = g.get("betting_lines")
-        ml = f" · bet {bl['non_majority']['moneyline']}" if bl else ""
-        lines = [
-            f"✅ **{adv}** — {tag}{g['matchup']} · all 3 gates ✓ · confidence {_c10(conf)}{ml}",
-            f"   • stat edge: {edge} ✓",
-            f"   • public: {pub} → **we fade them** ✓",
-            f"   • consistency: {cons} _(context)_",
-        ]
-    else:
-        starred = (pc.get("line_check") or {}).get("status") == "confirms"
-        lines = [
-            f"{'⭐' if starred else '🔸'} **{adv}** (lean) — {tag}{g['matchup']}"
-            f" · confidence {_c10(conf)}",
-            f"   • stat edge: {edge}",
-            f"   • public: {pub}",
-            f"   • consistency: {cons} _(context)_",
-            f"   • why not a pick: {pc['reason']}",
-        ]
+    elevated = pc.get("elevated") or []
+    mark = "⭐" if len(elevated) >= 2 else "🔸"
+    lines = [
+        f"{mark} **LEAN {adv}**{_ml_str(pc)} — {tag}{g['matchup']} · confidence {_c10(conf)}"
+        + (f" · ⭐ {', '.join(elevated)}" if len(elevated) >= 2 else ""),
+        f"   • stat edge: {edge}",
+        f"   • public: {pub}",
+        f"   • consistency: {cons}",
+    ]
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -506,12 +526,13 @@ def build_summary(payload: dict) -> str:
     team, the public read + evidence, consistency, and a check (pick) or the
     specific reason it's only a lean."""
     date = payload["date"]
-    picks = payload.get("picks", [])
     games = payload.get("games", [])
     board, finals = _board_games(games), _finals(games)
+    leans = [g for g in board if _is_play(g)]
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} pick(s)"
-               + (f": {', '.join(picks)}**" if picks else " — no game cleared the bar today.**"))
+    out.append(f"**{len(leans)} lean(s) · {len(board) - len(leans)} fade(s)**"
+               + (f" — leans: {', '.join(g['pick_criteria']['advantage_team'] for g in leans)}"
+                  if leans else ""))
     if finals:
         out.append(f"\n_{len(finals)} game(s) final — moved into the record below._")
     out.append("")
@@ -524,10 +545,9 @@ def build_summary(payload: dict) -> str:
         out.append("_No upcoming or live games — full slate is final (see the record below)._")
         out.append("")
 
-    out.append("_✅ = pick (the public is fading the stat favorite and confidence ≥ threshold). "
-               "🔸 = lean: the advantage team is shown, but it's not a play — usually because the "
-               "public agrees with the stats (no one to fade) or confidence fell short. "
-               "🔴 = live; final games drop off into the record._")
+    out.append("_🔸 = LEAN (every signal hit: margin, favorite, line toward, consistency, "
+               "BvP). ⭐ = lean with 2+ very-high indicators. 🔄 = FADE: bet against the stat "
+               "side (it missed a signal). 🔴 = live; finals drop into the record._")
 
     out.append("")
     out.append(grade.records_block())
@@ -550,7 +570,7 @@ def write_outputs(payload: dict, date: str) -> None:
     (OUTPUT_DIR / f"picks_{date}.json").write_text(json.dumps(payload, indent=2))
     (OUTPUT_DIR / "latest_summary.md").write_text(build_summary(payload))  # gitignored
     (OUTPUT_DIR / "latest_date.txt").write_text(date)                      # gitignored
-    log.info("Wrote picks for %s (%d pick(s))", date, len(payload.get("picks", [])))
+    log.info("Wrote board for %s (%d lean(s))", date, len(payload.get("leans", [])))
 
 
 def _ml_str(pc: dict) -> str:
@@ -563,8 +583,7 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True),
-                           ("Leans faded", "leans_faded", True)):
+    for name, key, hyp in (("Leans", "leans", False), ("Fades", "fades", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = grade.windowed_records(ledger[key], today)
         if not rec:
@@ -582,37 +601,29 @@ def telegram_text(payload: dict) -> str:
     date = payload["date"]
     games = payload.get("games", [])
     board, finals = _board_games(games), _finals(games)
-    picks = payload.get("picks", [])
 
-    plays = [g for g in board if _is_play(g)]
-    passes = [g for g in board if not _is_play(g)]
+    leans = [g for g in board if _is_play(g)]
+    fades = [g for g in board if not _is_play(g)]
 
     L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} pick(s) · {len(plays) - len(picks)} lean(s)"
-         + (f" · {len(passes)} below the bar" if passes else "")]
-    if picks:
-        L.append(f"picks: {', '.join(picks)}")
+         f"{len(leans)} lean(s) · {len(fades)} fade(s)"]
     if finals:
         L.append(f"({len(finals)} final → moved to the record)")
 
-    for g in plays:
+    for g in leans:
         pc = g["pick_criteria"]
         aa, ha = _abbrs(g)
         adv = _short(g, pc["advantage_team"])
         edge = _edge_word(pc["components"]["stat_edge"]["strength"])
         emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        # ⭐ marks a lean whose line has MOVED TOWARD it (sharp money agreeing -
-        # the strongest lean signal in the graded record); other leans stay 🔸.
-        starred = (pc.get("line_check") or {}).get("status") == "confirms"
-        head = (f"✅ {tag}PICK {adv}{_ml_str(pc)}" if g.get("flagged")
-                else f"{'⭐' if starred else '🔸'} {tag}{aa} @ {ha} → lean {adv}{_ml_str(pc)}")
         frozen = " [frozen]" if g.get("state") == "live" else ""
+        elevated = pc.get("elevated") or []
+        mark = "⭐" if len(elevated) >= 2 else "🔸"
         L += ["",
-              f"{head} · conf {_c10(pc['confidence'])}"]
-        if g.get("flagged"):
-            L.append(f"   {aa} @ {ha}")
-        L += [f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
+              f"{mark} {tag}LEAN {adv}{_ml_str(pc)} · conf {_c10(pc['confidence'])}",
+              f"   {aa} @ {ha}",
+              f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
               f"   👥 public {_public_evidence(g)}",
               f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"]
         pcheck = _public_check_phrase(g)
@@ -624,19 +635,23 @@ def telegram_text(payload: dict) -> str:
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 {sit}")
-        L.append("   ✅ all 3 gates — WE FADE" if g.get("flagged")
-                 else f"   → lean (not a pick): {pc['reason']}")
-    if not plays:
-        L += ["", "No picks or qualified leans on the slate."]
+        L.append("   ✅ all lean signals hit"
+                 + (f" · ⭐ {', '.join(elevated)}" if len(elevated) >= 2 else ""))
+    if not leans:
+        L += ["", "No leans on the slate — every game is a fade."]
 
-    if passes:
-        L += ["", "— below the lean bar —"]
-        for g in passes:
+    if fades:
+        L += ["", "— FADES (bet against the stat side) —"]
+        for g in fades:
             aa, ha = _abbrs(g)
             pc = g["pick_criteria"]
+            adv_name = pc["advantage_team"]
+            away, home = g["matchup"].split(" @ ")
+            opp = _short(g, home if adv_name == away else away)
+            oml = pc.get("opponent_moneyline")
+            oml_s = f" ({oml:+d})" if isinstance(oml, int) else ""
             tag = "🔴 " if g.get("state") == "live" else ""
-            why = pc.get("reason", "").replace("below the lean bar: ", "")
-            L.append(f"▫️ {tag}{aa} @ {ha} — {why}")
+            L.append(f"🔄 {tag}{aa} @ {ha} → bet {opp}{oml_s} — {pc.get('reason', '')}")
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
@@ -656,7 +671,7 @@ def main() -> None:
     write_outputs(payload, args.date)
     grade.update_ledger(args.date)  # record any games that just went final (idempotent)
     notify.send_telegram(telegram_text(payload))
-    print(json.dumps(payload.get("picks", []), indent=2))
+    print(json.dumps(payload.get("leans", []), indent=2))
 
 
 if __name__ == "__main__":

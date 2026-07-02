@@ -75,12 +75,13 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
 
-# Strong-lean tier (from the 06-26..07-01 lean autopsy, 85 graded leans): leans with
-# a real margin, a favorite's price, and a line that isn't leaning away hit 64-77%;
-# low-margin / dog / line-against leans were the whole bleed. Margin & line-confirm
-# also have season-long calibration behind them (less overfit risk); tracked as its
-# own ledger book to validate FORWARD before anyone trusts it with real sizing.
-LEAN_STRONG_MARGIN = 0.30
+# The lean bar (from the 06-26..07-01 graded-lean autopsy): a game is a LEAN only
+# when EVERY winner signal hits - margin, favorite, line moved toward the lean,
+# consistency, BvP not against. Everything else is a FADE (bet against the stat
+# favorite). There is no separate "pick" tier.
+LEAN_STRONG_MARGIN = 0.30    # stat-edge margin bar (64% at/above vs 48% below)
+LEAN_MIN_CONSISTENCY = 3     # advantage team's consistency hits out of 5 (73% at >=3)
+LEAN_ELEVATED_MARGIN = 0.45  # 'very high' margin; 2+ very-high indicators = ⭐ lean
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
