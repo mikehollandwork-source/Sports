@@ -279,27 +279,71 @@ def _kfmt(n: int) -> str:
     return f"{round(n / 1000)}k" if n >= 1000 else str(int(n))
 
 
+def _abbrs(g: dict) -> tuple[str, str]:
+    """(away, home) short labels: abbreviations when the payload has them, else the
+    full names from the matchup (older locked snapshots lack abbr fields)."""
+    aa, ha = g.get("away_abbr"), g.get("home_abbr")
+    if aa and ha:
+        return aa, ha
+    away, home = g["matchup"].split(" @ ")
+    return away, home
+
+
+def _short(g: dict, name: str | None) -> str:
+    """A team's short label given its full name."""
+    if not name:
+        return "?"
+    away, home = g["matchup"].split(" @ ")
+    aa, ha = _abbrs(g)
+    return aa if name == away else ha if name == home else name
+
+
+def _cons_pair(g: dict) -> str:
+    """Both teams' consistency, labeled: 'CIN 2/5 · MIL 3/5' (away first, matching
+    the matchup order). Falls back to the advantage team's single number on old
+    snapshots that didn't store both."""
+    aa, ha = _abbrs(g)
+
+    def hits(side: str):
+        try:
+            return g["consistency"][side]["back_test"]["complete_win_condition"]
+        except (KeyError, TypeError):
+            return None
+
+    ah, hh = hits("away"), hits("home")
+    if ah is None or hh is None:
+        return f"{g['pick_criteria']['components']['consistency']['hits']}/5"
+    return f"{aa} {ah}/5 · {ha} {hh}/5"
+
+
 def _public_evidence(g: dict) -> str:
-    """Plain description of who the public is on and the evidence behind it,
-    in away–home order to match the matchup."""
+    """Who the public is on + each source's numbers, compact. All pairs are
+    away/home, labeled once at the end with the team abbreviations."""
     det = g["public_majority"]["detail"]
     team = g["public_majority"]["team"]
     if not team:
-        return "no public read (forum + consensus both empty)"
+        return "no public read"
+    aa, ha = _abbrs(g)
     bits = []
-    fo = det.get("forum")
-    if fo:
-        bits.append(f"covers-forum {fo['away']}–{fo['home']} (away–home)")
-    rd = det.get("reddit")
-    if rd:
-        bits.append(f"reddit {rd['away']}–{rd['home']} (away–home)")
-    wk = det.get("wiki")
-    if wk:
-        bits.append(f"wiki-attention {_kfmt(wk['away'])}–{_kfmt(wk['home'])} (away–home)")
     co = det.get("consensus")
     if co:
-        bits.append("consensus " + "–".join(f"{int(round(v))}%" for v in co["pcts"].values()))
-    return f"{team}" + (f" [{', '.join(bits)}]" if bits else "")
+        p = [int(round(v)) for v in co["pcts"].values()]
+        if len(p) >= 2:
+            bits.append(f"covers {p[0]}/{p[1]}%")
+    so = det.get("sobets")
+    if so:
+        bits.append(f"S&O {int(so['away'])}/{int(so['home'])}%")
+    fo = det.get("forum")
+    if fo:
+        bits.append(f"forum {fo['away']}/{fo['home']}")
+    rd = det.get("reddit")
+    if rd:
+        bits.append(f"reddit {rd['away']}/{rd['home']}")
+    wk = det.get("wiki")
+    if wk:
+        bits.append(f"wiki {_kfmt(wk['away'])}/{_kfmt(wk['home'])}")
+    ev = f" — {' · '.join(bits)} ({aa}/{ha})" if bits else ""
+    return f"on {_short(g, team)}{ev}"
 
 
 def _line_phrase(lc: dict | None) -> str:
@@ -351,28 +395,15 @@ def _public_check_phrase(g: dict) -> str | None:
 
 
 def _bvp_phrase(g: dict) -> str | None:
-    """One-line batter-vs-pitcher read: the blended OPS (tiny exact BvP shrunk toward
-    the big-sample vs-hand number), who it favors, the exact + vs-hand components, and
-    an honest sample flag driven by the (now much larger) total PA."""
+    """Batter-vs-pitcher, one short line, and ONLY when the blended-OPS gap is
+    meaningful (>= BVP_FLOOR - the same bar at which it nudges the edge). Below
+    that it's noise and the board stays quiet. None also on old-schema snapshots."""
     b = g.get("bvp")
-    if not b:
+    if not b or "away_eff" not in b or not b.get("meaningful") or not b.get("edge_team"):
         return None
-    pa = b["total_pa"]
-    flag = ("thin" if pa < 150 else "ok" if pa < 400 else "robust")
-    away_t, home_t = g["matchup"].split(" @ ")
-    edge = f"edge {b['edge_team']}" if b["edge_team"] else "even"
-    head = f"{away_t} {b['away_eff']:.3f} vs {home_t} {b['home_eff']:.3f} → {edge} [{flag}, {pa} PA]"
-
-    def _exact(ops, n):
-        return f"{ops:.3f}/{n}" if ops is not None else "—"
-
-    def _hand(ops):
-        return f"{ops:.3f}" if ops is not None else "—"
-
-    detail = (f" · vs-hand {away_t} {_hand(b['away_hand_ops'])} / {home_t} {_hand(b['home_hand_ops'])}"
-              f" · exact {away_t} {_exact(b['away_ops'], b['away_pa'])} / "
-              f"{home_t} {_exact(b['home_ops'], b['home_pa'])}")
-    return head + detail
+    aa, ha = _abbrs(g)
+    return (f"edge {_short(g, b['edge_team'])} — "
+            f"{aa} {b['away_eff']:.3f} v {ha} {b['home_eff']:.3f}")
 
 
 def _situational_phrase(g: dict) -> str | None:
@@ -393,7 +424,7 @@ def _game_lines(g: dict) -> list[str]:
     adv, conf = pc["advantage_team"], pc["confidence"]
     e = c["stat_edge"]
     edge = f"{adv} ({_edge_word(e['strength'])}, margin {e['margin']})"
-    cons = c["consistency"]["hits"]
+    cons = _cons_pair(g)
     pub = _public_evidence(g)
     tag = _state_tag(g)
     if g.get("flagged"):
@@ -402,15 +433,15 @@ def _game_lines(g: dict) -> list[str]:
         lines = [
             f"✅ **{adv}** — {tag}{g['matchup']} · all 3 gates ✓ · confidence {_c10(conf)}{ml}",
             f"   • stat edge: {edge} ✓",
-            f"   • public is on: {pub} → **we fade them** ✓",
-            f"   • consistency: {cons}/5 games _(context)_",
+            f"   • public: {pub} → **we fade them** ✓",
+            f"   • consistency: {cons} _(context)_",
         ]
     else:
         lines = [
             f"🔸 **{adv}** (lean) — {tag}{g['matchup']} · confidence {_c10(conf)}",
             f"   • stat edge: {edge}",
-            f"   • public is on: {pub}",
-            f"   • consistency: {cons}/5 games _(context)_",
+            f"   • public: {pub}",
+            f"   • consistency: {cons} _(context)_",
             f"   • why not a pick: {pc['reason']}",
         ]
     pcheck = _public_check_phrase(g)
@@ -518,30 +549,32 @@ def telegram_text(payload: dict) -> str:
 
     for g in board:
         pc = g["pick_criteria"]
-        cons = pc["components"]["consistency"]["hits"]
+        aa, ha = _abbrs(g)
+        adv = _short(g, pc["advantage_team"])
         edge = _edge_word(pc["components"]["stat_edge"]["strength"])
         emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        head = (f"✅ {tag}PICK: {pc['advantage_team']}{_ml_str(pc)}"
-                if g.get("flagged") else f"🔸 {tag}{pc['advantage_team']}")
+        head = (f"✅ {tag}PICK {adv}{_ml_str(pc)}"
+                if g.get("flagged") else f"🔸 {tag}{aa} @ {ha} → lean {adv}")
         frozen = " [frozen]" if g.get("state") == "live" else ""
         L += ["",
-              f"{head} · conf {_c10(pc['confidence'])}",
-              f"   {g['matchup']}",
-              f"   stat edge: {edge} (margin {emargin}) · consistency {cons}/5",
-              f"   👥 public: {_public_evidence(g)}",
-              f"   🦈 sharp/line: {_line_phrase(pc.get('line_check'))}{frozen}"]
+              f"{head} · conf {_c10(pc['confidence'])}"]
+        if g.get("flagged"):
+            L.append(f"   {aa} @ {ha}")
+        L += [f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
+              f"   👥 public {_public_evidence(g)}",
+              f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"]
         pcheck = _public_check_phrase(g)
         if pcheck:
-            L.append(f"   🔍 public check: {pcheck}")
+            L.append(f"   🔍 check: {pcheck}")
         bvp = _bvp_phrase(g)
         if bvp:
-            L.append(f"   🥊 BvP: {bvp}")
+            L.append(f"   🥊 BvP {bvp}")
         sit = _situational_phrase(g)
         if sit:
-            L.append(f"   📅 this season: {sit}")
+            L.append(f"   📅 {sit}")
         L.append("   ✅ all 3 gates — WE FADE" if g.get("flagged")
-                 else f"   → lean: {pc['reason']}")
+                 else f"   → {pc['reason']}")
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 

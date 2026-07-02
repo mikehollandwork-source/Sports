@@ -64,6 +64,16 @@ SOS_CLAMP = (0.80, 1.25)
 # make the forum the sole voice; lower it to let consensus matter more.
 PUBLIC_W_FORUM = 0.65
 PUBLIC_W_CONSENSUS = 0.35
+PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, weighted
+                         # like covers consensus (the blend normalizes by weights present)
+
+# Batter-vs-pitcher (blended read: exact career BvP shrunk toward vs-hand OPS):
+#   below BVP_FLOOR the OPS gap is noise - not shown, no effect.
+#   at/above it, the gap nudges the stat edge, capped at a home-field-sized bump
+#   (calibration: BvP is ~50% overall but suggestive at big gaps - so only big,
+#   robust gaps get a small vote; they can tilt a close lean, not manufacture one).
+BVP_FLOOR = 0.05
+BVP_TILT_CAP = 0.10
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
@@ -345,6 +355,13 @@ def win_condition_core(team_games_last5: list, team_fip: float | None,
 # --- decision -----------------------------------------------------------------
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
+    b = bvp_read(game)
+    if b and b.get("meaningful") and b.get("edge_team"):   # BvP nudge, meaningful gaps only
+        tilt = min(b["gap"] - BVP_FLOOR, BVP_TILT_CAP)
+        if b["edge_team"] == game.home.name:
+            hs += tilt
+        else:
+            as_ += tilt
     winner = game.home if hs >= as_ else game.away
     return winner, hs, as_
 
@@ -425,7 +442,7 @@ def _consensus_home_lean(game: Game, sides: dict) -> float | None:
 
 
 def public_majority(game, consensus, forum_counts, reddit_counts=None,
-                    wiki_counts=None) -> tuple[Team | None, dict]:
+                    wiki_counts=None, extra_public=None) -> tuple[Team | None, dict]:
     """The side the betting public is on. The forum mention tally is weighted
     higher than covers consensus (PUBLIC_W_FORUM > PUBLIC_W_CONSENSUS); both are
     turned into a home-team lean and blended, and the blend's sign picks the side.
@@ -437,7 +454,21 @@ def public_majority(game, consensus, forum_counts, reddit_counts=None,
     decision yet - it's a new signal we watch before letting it move picks."""
     detail = {"consensus": None, "forum": None, "agree": None,
               "forum_lean": None, "consensus_lean": None, "blended_lean": None,
-              "reddit": None, "reddit_lean": None, "wiki": None, "wiki_lean": None}
+              "reddit": None, "reddit_lean": None, "wiki": None, "wiki_lean": None,
+              "sobets": None, "sobets_lean": None}
+
+    # Scores & Odds bet% - a second book-reported public number, IN the blend
+    # (unlike wiki/reddit it's the same kind of signal as covers consensus and
+    # verified live, so it votes on the public side).
+    sob_lean = None
+    for row in (extra_public or {}).get("scoresodds_bets", []):
+        side, pcts = _source_side(game, row)
+        if side and pcts:
+            ap, hp = pcts
+            detail["sobets"] = {"away": ap, "home": hp}
+            sob_lean = (hp - ap) / 100.0
+            detail["sobets_lean"] = round(sob_lean, 3)
+            break
 
     rh, ra = (reddit_counts or {}).get(game.home.name, 0), (reddit_counts or {}).get(game.away.name, 0)
     if rh or ra:
@@ -477,6 +508,8 @@ def public_majority(game, consensus, forum_counts, reddit_counts=None,
         parts.append((PUBLIC_W_FORUM, forum_lean))
     if cons_lean:
         parts.append((PUBLIC_W_CONSENSUS, cons_lean))
+    if sob_lean:
+        parts.append((PUBLIC_W_SOBETS, sob_lean))
     majority = None
     if parts:
         blended = sum(w * l for w, l in parts) / sum(w for w, _ in parts)
@@ -650,6 +683,7 @@ def bvp_read(game: Game) -> dict | None:
         "total_pa": h_pa + a_pa,
         "edge_team": (h.name if gap > 0 else a.name) if gap else None,
         "gap": abs(gap),
+        "meaningful": abs(gap) >= BVP_FLOOR,
     }
 
 
@@ -664,7 +698,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
 
     adv_team, hs, as_ = statistical_favorite(game)
     majority, majority_detail = public_majority(game, consensus, forum_counts,
-                                                reddit_counts, wiki_counts)
+                                                reddit_counts, wiki_counts, extra_public)
 
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
@@ -683,7 +717,13 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
     edge_margin = abs(hs - as_)
     edge_conf = _clamp01(edge_margin / EDGE_FULL)
-    fade_conf = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
+    # Fade strength now requires an ACTUAL fade (public on the other side) and is
+    # scaled by how many sources corroborate the public read - a lean backed by a
+    # fade that 3 sources agree on outranks one where the public read is shaky.
+    raw_fade = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
+    corrob = (crosscheck["agree"] / len(crosscheck["sources"])
+              if crosscheck["sources"] else 1.0)
+    fade_conf = raw_fade * corrob if public_edge else 0.0
     confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf, 3)  # display strength
 
     # Hard gate: public fade AND a real stat edge. The third must-have (line moved
@@ -708,6 +748,8 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     return {
         "game_pk": game.game_pk,
         "matchup": f"{game.away.name} @ {game.home.name}",
+        "away_abbr": game.away.abbreviation or game.away.name,
+        "home_abbr": game.home.abbreviation or game.home.name,
         "venue": game.venue,
         "park_factor": game.park_factor,
         "statistical_advantage": {
