@@ -477,8 +477,10 @@ def _game_lines(g: dict) -> list[str]:
             f"   • consistency: {cons} _(context)_",
         ]
     else:
+        starred = (pc.get("line_check") or {}).get("status") == "confirms"
         lines = [
-            f"⭐ **{adv}** (lean) — {tag}{g['matchup']} · confidence {_c10(conf)}",
+            f"{'⭐' if starred else '🔸'} **{adv}** (lean) — {tag}{g['matchup']}"
+            f" · confidence {_c10(conf)}",
             f"   • stat edge: {edge}",
             f"   • public: {pub}",
             f"   • consistency: {cons} _(context)_",
@@ -600,8 +602,11 @@ def telegram_text(payload: dict) -> str:
         edge = _edge_word(pc["components"]["stat_edge"]["strength"])
         emargin = pc["components"]["stat_edge"]["margin"]
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
+        # ⭐ marks a lean whose line has MOVED TOWARD it (sharp money agreeing -
+        # the strongest lean signal in the graded record); other leans stay 🔸.
+        starred = (pc.get("line_check") or {}).get("status") == "confirms"
         head = (f"✅ {tag}PICK {adv}{_ml_str(pc)}" if g.get("flagged")
-                else f"⭐ {tag}{aa} @ {ha} → lean {adv}{_ml_str(pc)}")
+                else f"{'⭐' if starred else '🔸'} {tag}{aa} @ {ha} → lean {adv}{_ml_str(pc)}")
         frozen = " [frozen]" if g.get("state") == "live" else ""
         L += ["",
               f"{head} · conf {_c10(pc['confidence'])}"]
