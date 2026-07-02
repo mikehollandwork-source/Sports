@@ -3,8 +3,9 @@ Grade the board against actual MLB results and keep two running $1/unit bankroll
 in output/ledger.json:
 
   - Picks: every flagged pick (the public-vs-stats plays the system makes).
-  - Leans: every other game's advantage team (a hypothetical "what if I'd bet the
-    stat favorite every day" tracker).
+  - Leans: qualified leans only - the advantage team of games that cleared the
+    lean bar (margin + favorite + line not against; analysis.LEAN_STRONG_MARGIN).
+    Games below the bar are passes and are never booked.
 
 Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
 covers' odds page (pick_criteria.advantage_moneyline). A game whose real price
@@ -53,7 +54,7 @@ def empty_ledger() -> dict:
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
             "picks": _empty_book(), "leans": _empty_book(),
-            "leans_faded": _empty_book(), "leans_strong": _empty_book()}
+            "leans_faded": _empty_book()}
 
 
 def load_ledger() -> dict:
@@ -64,7 +65,7 @@ def load_ledger() -> dict:
         return led
     if "picks" in old and "leans" in old:
         old.setdefault("leans_faded", _empty_book())   # added after the two-book schema
-        old.setdefault("leans_strong", _empty_book())  # strong-lean tier book
+        old.pop("leans_strong", None)  # short-lived tier book, folded into leans itself
         old.setdefault("grade_from", None)
         return old
     # migrate the old single-book schema (picks only) into the new layout
@@ -100,23 +101,23 @@ def _settle(date, g, res, bet, won, odds) -> dict:
     }
 
 
-def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    """Settle every final game. Returns (pick_entries, lean_entries, fade_entries,
-    strong_entries). fade_entries bet AGAINST each lean's advantage team (the
-    public/other side) at that team's pre-game moneyline - i.e. 'what if I faded the
-    leans instead'. strong_entries are the subset of leans in the 'strong' tier
-    (margin + favorite + line not against; see analysis.LEAN_STRONG_MARGIN)."""
+def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """Settle every final game. Returns (pick_entries, lean_entries, fade_entries).
+    A game is only a LEAN if it cleared the lean bar (pc.lean_tier == 'strong':
+    margin + favorite + line not against - see analysis.LEAN_STRONG_MARGIN); games
+    below the bar are passes and are never booked. fade_entries bet AGAINST each
+    lean's advantage team at that team's pre-game moneyline - i.e. 'what if I faded
+    the leans instead'."""
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         log.warning("no picks file for %s", date)
-        return [], [], [], []
+        return [], [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
 
     pick_entries: list[dict] = []
     lean_entries: list[dict] = []
     fade_entries: list[dict] = []
-    strong_entries: list[dict] = []
     for g in payload.get("games", []):
         pc = g.get("pick_criteria", {})
         adv = pc.get("advantage_team")
@@ -130,15 +131,15 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict], list[dict
         if g.get("flagged"):
             pick_entries.append(entry)
             continue
+        if pc.get("lean_tier") != "strong":
+            continue  # below the lean bar -> a pass, not a bet
         lean_entries.append(entry)
-        if pc.get("lean_tier") == "strong":
-            strong_entries.append(entry)
         # the fade: bet the OTHER team at its pre-game price (skip if we didn't capture it)
         opp = res["home"] if adv == res["away"] else res["away"]
         f_odds = _price(g, "opponent_moneyline")
         if f_odds is not None:
             fade_entries.append(_settle(date, g, res, opp, res["winner"] == opp, f_odds))
-    return pick_entries, lean_entries, fade_entries, strong_entries
+    return pick_entries, lean_entries, fade_entries
 
 
 def _add(book: dict, entries: list[dict]) -> int:
@@ -165,9 +166,9 @@ def update_ledger(date: str) -> dict:
         log.info("skip grading %s (before grade_from %s)", date, gf)
         save_ledger(ledger)
         return ledger
-    pe, le, fe, se = grade_date(date)
+    pe, le, fe = grade_date(date)
     added = (_add(ledger["picks"], pe) + _add(ledger["leans"], le)
-             + _add(ledger["leans_faded"], fe) + _add(ledger["leans_strong"], se))
+             + _add(ledger["leans_faded"], fe))
     if added:
         ledger["review"] = review(ledger["picks"])
         log.info("graded %s: picks %+.2f (%d-%d), leans %+.2f (%d-%d), faded %+.2f (%d-%d)", date,
@@ -260,7 +261,6 @@ def records_block(ledger: dict | None = None, today: dt.date | None = None) -> s
     today = today or dt.datetime.now(EASTERN).date()
     lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
     for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", True),
-                           ("Strong leans", "leans_strong", True),
                            ("Leans faded", "leans_faded", True)):
         tag = " (hypothetical)" if hyp else ""
         rec = windowed_records(ledger[key], today)
