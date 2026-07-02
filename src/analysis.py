@@ -455,20 +455,25 @@ def public_majority(game, consensus, forum_counts, reddit_counts=None,
     detail = {"consensus": None, "forum": None, "agree": None,
               "forum_lean": None, "consensus_lean": None, "blended_lean": None,
               "reddit": None, "reddit_lean": None, "wiki": None, "wiki_lean": None,
-              "sobets": None, "sobets_lean": None}
+              "books": {}}
 
-    # Scores & Odds bet% - a second book-reported public number, IN the blend
-    # (unlike wiki/reddit it's the same kind of signal as covers consensus and
-    # verified live, so it votes on the public side).
-    sob_lean = None
-    for row in (extra_public or {}).get("scoresodds_bets", []):
-        side, pcts = _source_side(game, row)
-        if side and pcts:
-            ap, hp = pcts
-            detail["sobets"] = {"away": ap, "home": hp}
-            sob_lean = (hp - ap) / 100.0
-            detail["sobets_lean"] = round(sob_lean, 3)
-            break
+    # Every '*_bets' source (S&O / VSiN / OddsShark ticket shares) is the same kind
+    # of signal as covers consensus, so each votes on the public side. '*_money'
+    # (dollar shares) never joins the fade blend - it's the sharp side, handled in
+    # public_crosscheck as the money flag.
+    book_leans: list[float] = []
+    for name in sorted((extra_public or {})):
+        if not name.endswith("_bets"):
+            continue
+        for row in extra_public[name]:
+            side, pcts = _source_side(game, row)
+            if side and pcts:
+                ap, hp = pcts
+                lean = (hp - ap) / 100.0
+                detail["books"][name] = {"away": ap, "home": hp, "lean": round(lean, 3)}
+                if lean:
+                    book_leans.append(lean)
+                break
 
     rh, ra = (reddit_counts or {}).get(game.home.name, 0), (reddit_counts or {}).get(game.away.name, 0)
     if rh or ra:
@@ -508,8 +513,8 @@ def public_majority(game, consensus, forum_counts, reddit_counts=None,
         parts.append((PUBLIC_W_FORUM, forum_lean))
     if cons_lean:
         parts.append((PUBLIC_W_CONSENSUS, cons_lean))
-    if sob_lean:
-        parts.append((PUBLIC_W_SOBETS, sob_lean))
+    for lean in book_leans:
+        parts.append((PUBLIC_W_SOBETS, lean))
     majority = None
     if parts:
         blended = sum(w * l for w, l in parts) / sum(w for w, _ in parts)
@@ -570,17 +575,20 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
         opinions.append(("reddit", "home" if detail["reddit_lean"] > 0 else "away", None))
     # `*_money` sources (share of dollars) aren't public-consensus votes - they're the
     # sharp signal, handled separately below. Only ticket/consensus sources corroborate.
-    money_side = None
+    money_sides: list[str] = []
     for name, rows in (extra_public or {}).items():
         for row in rows:
             side, pcts = _source_side(game, row)
             if not side:
                 continue
             if name.endswith("_money"):
-                money_side = side
+                money_sides.append(side)
             else:
                 opinions.append((name, side, pcts))
             break
+    # unanimous money sources -> that side; disagreement -> no clean money read
+    money_side = money_sides[0] if money_sides and len(set(money_sides)) == 1 else None
+    money_split = len(set(money_sides)) > 1
 
     ms = out["majority_side"]
     out["sources"] = [{"name": n, "side": s, "agrees": s == ms} for n, s, _ in opinions]
@@ -616,6 +624,9 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
         out["money"] = "with public" if money_side == ms else "against public"
         if out["money"] == "against public":
             out["flags"].append("money is on the other side from the public tickets")
+    elif money_split:
+        out["money"] = "sources split"
+        out["flags"].append("money sources disagree")
     return out
 
 

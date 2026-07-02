@@ -330,8 +330,12 @@ def _public_evidence(g: dict) -> str:
         p = [int(round(v)) for v in co["pcts"].values()]
         if len(p) >= 2:
             bits.append(f"covers {p[0]}/{p[1]}%")
-    so = det.get("sobets")
-    if so:
+    labels = {"scoresodds_bets": "S&O", "vsin_bets": "VSiN", "oddsshark_bets": "Shark"}
+    books = det.get("books") or {}
+    for name, bk in books.items():
+        bits.append(f"{labels.get(name, name)} {int(bk['away'])}/{int(bk['home'])}%")
+    so = det.get("sobets")            # pre-books schema (older locked snapshots)
+    if so and not books:
         bits.append(f"S&O {int(so['away'])}/{int(so['home'])}%")
     fo = det.get("forum")
     if fo:
