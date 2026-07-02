@@ -37,7 +37,6 @@ log = logging.getLogger("public_sources")
 
 SCORESODDS_URL = "https://www.scoresandodds.com/mlb/consensus-picks"
 VSIN_URL = "https://data.vsin.com/mlb/betting-splits/"
-ODDSSHARK_URL = "https://www.oddsshark.com/mlb/consensus-picks"
 
 TIMEOUT = 20
 POLITE_DELAY = 1.0
@@ -72,26 +71,16 @@ _NICK2ABBR = {
 }
 
 
-def _teams_in_text(txt: str) -> list[str]:
-    """MLB teams named in a text block, as canonical abbrs in order of first
-    appearance. Matches abbreviations as whole words and nicknames as substrings."""
-    low = txt.lower()
-    found: list[tuple[int, str]] = []
-    for m in re.finditer(r"\b([A-Z]{2,3})\b", txt):
-        if m.group(1) in _VALID_ABBRS:
-            found.append((m.start(), m.group(1)))
+def _name_abbr(text: str) -> str | None:
+    """Canonical abbr for a token that IS a team name ('Chicago White Sox' -> CWS),
+    else None. Endswith-nickname match, length-capped so prose can't hit."""
+    low = text.strip().lower()
+    if not 3 <= len(low) <= 25:
+        return None
     for nick, ab in _NICK2ABBR.items():
-        i = low.find(nick)
-        if i != -1:
-            found.append((i, ab))
-    alias = {"WAS": "WSH", "CHW": "CWS", "SDP": "SD", "SFG": "SF", "TBR": "TB",
-             "KCR": "KC", "AZ": "ARI", "WSN": "WSH", "OAK": "ATH"}
-    out: list[str] = []
-    for _, ab in sorted(found):
-        ab = alias.get(ab, ab)
-        if ab not in out:
-            out.append(ab)
-    return out
+        if low.endswith(nick):
+            return ab
+    return None
 
 
 def _fetch(url: str) -> tuple[BeautifulSoup | None, str, str]:
@@ -168,57 +157,63 @@ def scoresandodds_consensus() -> list[dict]:
     return out
 
 
-def _generic_split_rows(soup: BeautifulSoup, source: str) -> list[dict]:
-    """Best-effort extractor for consensus/split pages we haven't pinned yet: from
-    each candidate block, two MLB teams + the percentages in that block. 2-3 pcts ->
-    treated as one bets-style pair; >=4 -> (money away/home, bets away/home), the
-    VSiN column convention (handle then bets). Tuned after a PUBLIC_DEBUG capture."""
-    out: list[dict] = []
-    seen: set = set()
-    blocks = soup.select("tr, [class*=matchup], [class*=game], [class*=event], li") or []
-    for b in blocks:
-        txt = b.get_text(" ", strip=True)
-        if len(txt) > 400:                 # page-level containers, not a game row
+_VSIN_ML = re.compile(r"^[+-]\d{3,4}$")   # moneyline price token, e.g. -156
+_VSIN_PCT = re.compile(r"^(\d{1,3})%$")
+
+
+def _parse_vsin(soup: BeautifulSoup) -> list[dict]:
+    """data.vsin.com betting-splits: each team's text run is
+    [Team Name, run line, RL handle%, RL bets%, total, TOT handle%, TOT bets%,
+     ML price, ML handle%, ML bets%] (arrows interleaved). We key on the signed ML
+    price and take the two %s after it: handle (money) then bets (tickets).
+    Qualifying teams pair up away-then-home, the page's row order."""
+    toks = [t for t in soup.stripped_strings]
+    entries: list[tuple[str, int, int]] = []   # (abbr, ml_handle, ml_bets)
+    i = 0
+    while i < len(toks):
+        ab = _name_abbr(toks[i])
+        if not ab:
+            i += 1
             continue
-        teams = _teams_in_text(txt)
-        pcts = [int(p) for p in re.findall(r"\b(\d{1,3})\s*%", txt) if int(p) <= 100]
-        if len(teams) != 2 or len(pcts) < 2:
+        j, handle, bets = i + 1, None, None
+        while j < len(toks) and j - i < 20 and _name_abbr(toks[j]) is None:
+            if _VSIN_ML.fullmatch(toks[j]):
+                pcts = []
+                k = j + 1
+                while k < len(toks) and len(pcts) < 2 and k - j < 6:
+                    m = _VSIN_PCT.fullmatch(toks[k])
+                    if m:
+                        pcts.append(int(m.group(1)))
+                    elif _name_abbr(toks[k]):
+                        break
+                    k += 1
+                if len(pcts) == 2:
+                    handle, bets = pcts
+                break
+            j += 1
+        if handle is not None:
+            entries.append((ab, handle, bets))
+        i = max(j, i + 1)
+    out, seen = [], set()
+    for a, h in zip(entries[0::2], entries[1::2]):
+        if (a[0], h[0]) in seen:      # page lists today then tomorrow; keep today's
             continue
-        key = (teams[0], teams[1])
-        if key in seen:
-            continue
-        seen.add(key)
-        row = {"away_abbr": teams[0], "home_abbr": teams[1]}
-        if len(pcts) >= 4:
-            row.update(away_money=pcts[0], home_money=pcts[1],
-                       away_bets=pcts[2], home_bets=pcts[3])
-        else:
-            row.update(away_bets=pcts[0], home_bets=pcts[1])
-        out.append(row)
+        seen.add((a[0], h[0]))
+        out.append({"away_abbr": a[0], "home_abbr": h[0],
+                    "away_money": a[1], "home_money": h[1],
+                    "away_bets": a[2], "home_bets": h[2]})
     return out
 
 
 def vsin_splits() -> list[dict]:
-    """VSiN's DraftKings MLB betting splits: handle% (money) + bets% (tickets) per
-    game. UNVERIFIED selectors - fail soft to []."""
+    """VSiN's DraftKings MLB betting splits: moneyline handle% (money) + bets%
+    (tickets) per game. Fail soft to []."""
     soup, text, final_url = _fetch(VSIN_URL)
     if soup is None:
         return []
-    out = _generic_split_rows(soup, "vsin")
+    out = _parse_vsin(soup)
     if not out:
         _fingerprint(text, final_url, soup, "vsin")
-    return out
-
-
-def oddsshark_consensus() -> list[dict]:
-    """OddsShark's MLB consensus picks (public bet %). UNVERIFIED selectors - fail
-    soft to []."""
-    soup, text, final_url = _fetch(ODDSSHARK_URL)
-    if soup is None:
-        return []
-    out = _generic_split_rows(soup, "oddsshark")
-    if not out:
-        _fingerprint(text, final_url, soup, "oddsshark")
     return out
 
 
@@ -236,9 +231,10 @@ def all_sources() -> dict[str, list[dict]]:
     '*_money' = dollar share (the sharp side - money flag only, never faded).
     {source_name: [{away_abbr, home_abbr, away_pct, home_pct}]}"""
     out: dict[str, list[dict]] = {}
+    # (OddsShark's consensus page is client-rendered - no data in the HTML - and
+    # VegasInsider's is handicapper picks; neither is scrapeable public %.)
     for name, fn in (("scoresodds", scoresandodds_consensus),
-                     ("vsin", vsin_splits),
-                     ("oddsshark", oddsshark_consensus)):
+                     ("vsin", vsin_splits)):
         try:
             rows = fn()
         except Exception as exc:
