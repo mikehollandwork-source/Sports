@@ -15,6 +15,16 @@ on:
         type: boolean
         required: false
         default: false
+      public_debug:
+        description: "Dump raw extra-public-source HTML to output/public_debug/ (for fixing selectors)."
+        type: boolean
+        required: false
+        default: false
+      reddit_debug:
+        description: "Dump raw Reddit JSON to output/reddit_debug/ (for fixing the forum tally)."
+        type: boolean
+        required: false
+        default: false
       grade_date:
         description: "Date to grade for the bankroll (YYYY-MM-DD). Blank = yesterday (US/Eastern)."
         required: false
@@ -49,6 +59,10 @@ jobs:
         env:
           PICKS_DATE: ${{ github.event.inputs.date }}
           COVERS_DEBUG: ${{ github.event.inputs.covers_debug == 'true' && '1' || '' }}
+          PUBLIC_DEBUG: ${{ github.event.inputs.public_debug == 'true' && '1' || '' }}
+          REDDIT_DEBUG: ${{ github.event.inputs.reddit_debug == 'true' && '1' || '' }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
@@ -76,5 +90,11 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Update MLB picks ($(date -u +%Y-%m-%d))"
-            git push
+            # Concurrent runs (the 5-min listener / scheduler) push to the same
+            # branch, so a bare push races and drops the output. Rebase + retry.
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
           fi

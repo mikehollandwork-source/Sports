@@ -43,6 +43,11 @@ LEAGUE_SB_RATE = 0.018   # SB per PA
 W_WOBA, W_ISO, W_DISC, W_SPEED = 0.55, 0.20, 0.15, 0.10
 # pitching weights: starters throw ~55% of innings, bullpen ~45%
 W_SP, W_BP = 0.55, 0.45
+# The probable starter's season FIP is the single biggest single-game lever
+# (calibrated: the better starter's team wins ~55%). Blend it with the noisier
+# last-5 team-starter FIP - season is the stable anchor, last-5 catches recent
+# form. Falls back to last-5 only when the season sample is too thin.
+SEASON_SP_WEIGHT = 0.60
 # league-average platoon swing applied per handedness matchup
 PLATOON = 0.03
 
@@ -59,6 +64,24 @@ SOS_CLAMP = (0.80, 1.25)
 # make the forum the sole voice; lower it to let consensus matter more.
 PUBLIC_W_FORUM = 0.65
 PUBLIC_W_CONSENSUS = 0.35
+PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, weighted
+                         # like covers consensus (the blend normalizes by weights present)
+
+# Batter-vs-pitcher (blended read: exact career BvP shrunk toward vs-hand OPS):
+#   below BVP_FLOOR the OPS gap is noise - not shown, no effect.
+#   at/above it, the gap nudges the stat edge, capped at a home-field-sized bump
+#   (calibration: BvP is ~50% overall but suggestive at big gaps - so only big,
+#   robust gaps get a small vote; they can tilt a close lean, not manufacture one).
+BVP_FLOOR = 0.05
+BVP_TILT_CAP = 0.10
+
+# The lean bar (from the 06-26..07-01 graded-lean autopsy): a game is a LEAN only
+# when EVERY winner signal hits - margin, favorite, line moved toward the lean,
+# consistency, BvP not against. Everything else is a FADE (bet against the stat
+# favorite). There is no separate "pick" tier.
+LEAN_STRONG_MARGIN = 0.30    # stat-edge margin bar (64% at/above vs 48% below)
+LEAN_MIN_CONSISTENCY = 3     # advantage team's consistency hits out of 5 (73% at >=3)
+LEAN_ELEVATED_MARGIN = 0.45  # 'very high' margin; 2+ very-high indicators = ⭐ lean
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
@@ -73,6 +96,11 @@ PUBLIC_W_CONSENSUS = 0.35
 W_EDGE, W_FADE = 0.55, 0.45   # confidence display blend (sum 1)
 EDGE_FULL = 0.40       # team_score margin that counts as a full-strength stat edge
 EDGE_THRESHOLD = 0.40  # calibrated bar: the favorite only wins (~62%) at >= this
+# Home field is a real, season-calibrated edge (home teams win ~53%) that the
+# last-5 stat indices miss - add it to the home side's team_score. ~0.10 in
+# team_score units = the ~3% win-prob bump under the 0.40->62% mapping. (Splitting
+# the stats by venue added ~nothing, so we use a flat bump, not home/road splits.)
+HOME_FIELD = 0.10
 
 # Line-movement gate (implied-probability shift of OUR side, open->current):
 #   < LINE_CONFIRM_MIN : noise / too small to mean anything (does not confirm)
@@ -225,9 +253,14 @@ def _adjusted_fip(fip: float | None, ip: float, opp_woba, opp_win) -> float | No
 
 
 def combined_fip(team: Team) -> float | None:
-    """Starter+bullpen FIP, each sample-shrunk then SOS-adjusted for offenses faced."""
+    """Starter+bullpen FIP, each sample-shrunk then SOS-adjusted for offenses faced.
+    The starter side blends the SOS-adjusted last-5 FIP with the probable starter's
+    season FIP (the stable anchor) when a real season sample exists."""
     sp = _adjusted_fip(team.starter_fip_last5, team.starter_ip_last5,
                        team.sos.get("sp_opp_woba"), team.sos.get("sp_opp_win"))
+    if team.starter_fip_season is not None:
+        sp = (SEASON_SP_WEIGHT * team.starter_fip_season + (1 - SEASON_SP_WEIGHT) * sp
+              if sp is not None else team.starter_fip_season)
     bp = _adjusted_fip(team.bullpen_fip_last5, team.bullpen_ip_last5,
                        team.sos.get("bp_opp_woba"), team.sos.get("bp_opp_win"))
     if sp is not None and bp is not None:
@@ -329,7 +362,14 @@ def win_condition_core(team_games_last5: list, team_fip: float | None,
 
 # --- decision -----------------------------------------------------------------
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
-    hs, as_ = team_score(game.home), team_score(game.away)
+    hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
+    b = bvp_read(game)
+    if b and b.get("meaningful") and b.get("edge_team"):   # BvP nudge, meaningful gaps only
+        tilt = min(b["gap"] - BVP_FLOOR, BVP_TILT_CAP)
+        if b["edge_team"] == game.home.name:
+            hs += tilt
+        else:
+            as_ += tilt
     winner = game.home if hs >= as_ else game.away
     return winner, hs, as_
 
@@ -409,14 +449,52 @@ def _consensus_home_lean(game: Game, sides: dict) -> float | None:
     return (home_pct - away_pct) / 100.0
 
 
-def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
+def public_majority(game, consensus, forum_counts, reddit_counts=None,
+                    wiki_counts=None, extra_public=None) -> tuple[Team | None, dict]:
     """The side the betting public is on. The forum mention tally is weighted
     higher than covers consensus (PUBLIC_W_FORUM > PUBLIC_W_CONSENSUS); both are
     turned into a home-team lean and blended, and the blend's sign picks the side.
     Either signal alone decides if it's the only one present. detail carries both
-    raw signals, their leans, the blend, and whether they agree."""
+    raw signals, their leans, the blend, and whether they agree.
+
+    The Reddit forum tally is recorded (detail['reddit'/'reddit_lean']) for the
+    cross-check and the board, but is deliberately NOT blended into the side
+    decision yet - it's a new signal we watch before letting it move picks."""
     detail = {"consensus": None, "forum": None, "agree": None,
-              "forum_lean": None, "consensus_lean": None, "blended_lean": None}
+              "forum_lean": None, "consensus_lean": None, "blended_lean": None,
+              "reddit": None, "reddit_lean": None, "wiki": None, "wiki_lean": None,
+              "books": {}}
+
+    # Every '*_bets' source (S&O / VSiN / OddsShark ticket shares) is the same kind
+    # of signal as covers consensus, so each votes on the public side. '*_money'
+    # (dollar shares) never joins the fade blend - it's the sharp side, handled in
+    # public_crosscheck as the money flag.
+    book_leans: list[float] = []
+    for name in sorted((extra_public or {})):
+        if not name.endswith("_bets"):
+            continue
+        for row in extra_public[name]:
+            side, pcts = _source_side(game, row)
+            if side and pcts:
+                ap, hp = pcts
+                lean = (hp - ap) / 100.0
+                detail["books"][name] = {"away": ap, "home": hp, "lean": round(lean, 3)}
+                if lean:
+                    book_leans.append(lean)
+                break
+
+    rh, ra = (reddit_counts or {}).get(game.home.name, 0), (reddit_counts or {}).get(game.away.name, 0)
+    if rh or ra:
+        detail["reddit"] = {"home": rh, "away": ra}
+        detail["reddit_lean"] = round((rh - ra) / (rh + ra), 3)
+
+    # Wikipedia attention: recorded for the board + comparison, but display-only -
+    # it does NOT vote in the cross-check or the public-side blend until the
+    # calibration (wiki_calibrate.py) shows fading the higher-attention team has edge.
+    wh, wa = (wiki_counts or {}).get(game.home.name, 0), (wiki_counts or {}).get(game.away.name, 0)
+    if wh or wa:
+        detail["wiki"] = {"home": wh, "away": wa}
+        detail["wiki_lean"] = round((wh - wa) / (wh + wa), 3)
 
     # consensus -> home lean
     cons_lean = None
@@ -443,6 +521,8 @@ def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
         parts.append((PUBLIC_W_FORUM, forum_lean))
     if cons_lean:
         parts.append((PUBLIC_W_CONSENSUS, cons_lean))
+    for lean in book_leans:
+        parts.append((PUBLIC_W_SOBETS, lean))
     majority = None
     if parts:
         blended = sum(w * l for w, l in parts) / sum(w for w, _ in parts)
@@ -455,6 +535,107 @@ def public_majority(game, consensus, forum_counts) -> tuple[Team | None, dict]:
         detail["agree"] = (forum_lean > 0) == (cons_lean > 0)
 
     return majority, detail
+
+
+def _source_side(game: Game, row: dict) -> tuple[str | None, tuple[int, int] | None]:
+    """Which side ('home'/'away') a public-% row says the public is on, matched to
+    this game by abbreviation (orientation-agnostic). (None, None) if it isn't this
+    game or the percentages are missing."""
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    ra, rh = _canon_abbr(row.get("away_abbr", "")), _canon_abbr(row.get("home_abbr", ""))
+    if {ra, rh} != {a, h}:
+        return None, None
+    ap, hp = row.get("away_pct"), row.get("home_pct")
+    if ap is None or hp is None:
+        return None, None
+    if ra == h:                      # row lists the teams home-first; reorient
+        ap, hp = hp, ap
+    return ("away" if ap >= hp else "home"), (round(ap), round(hp))
+
+
+def public_crosscheck(game: Game, majority: Team | None, detail: dict,
+                      extra_public: dict | None) -> dict:
+    """Corroborate the public read across every available source (covers consensus,
+    the covers forum tally, and each extra public-% site) and sanity-check it.
+
+    A single book's public % can be misleading, so we only TRUST the read enough to
+    fade it when at least two independent sources agree on the side. With fewer than
+    two opinions we can't cross-check, so we don't penalize it (keeps the system live
+    while new-source selectors are still being tuned) — but we mark it unconfirmed.
+
+    Returns {sources, majority_side, agree, dissent, trusted, verdict, note, flags}.
+    `line` is filled in later (main._attach_line) from the slate.
+    """
+    out = {"sources": [], "majority_side": None, "agree": 0, "dissent": 0,
+           "trusted": True, "verdict": "no public read", "note": "no public lean to check",
+           "flags": [], "line": "unknown", "money": "unknown"}
+    if majority is None:
+        return out
+    out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
+
+    opinions: list[tuple[str, str, tuple | None]] = []
+    if detail.get("consensus_lean"):
+        opinions.append(("covers", "home" if detail["consensus_lean"] > 0 else "away",
+                         tuple((detail.get("consensus") or {}).get("pcts", {}).values()) or None))
+    if detail.get("forum_lean"):
+        opinions.append(("forum", "home" if detail["forum_lean"] > 0 else "away", None))
+    if detail.get("reddit_lean"):
+        opinions.append(("reddit", "home" if detail["reddit_lean"] > 0 else "away", None))
+    # `*_money` sources (share of dollars) aren't public-consensus votes - they're the
+    # sharp signal, handled separately below. Only ticket/consensus sources corroborate.
+    money_sides: list[str] = []
+    for name, rows in (extra_public or {}).items():
+        for row in rows:
+            side, pcts = _source_side(game, row)
+            if not side:
+                continue
+            if name.endswith("_money"):
+                money_sides.append(side)
+            else:
+                opinions.append((name, side, pcts))
+            break
+    # unanimous money sources -> that side; disagreement -> no clean money read
+    money_side = money_sides[0] if money_sides and len(set(money_sides)) == 1 else None
+    money_split = len(set(money_sides)) > 1
+
+    ms = out["majority_side"]
+    out["sources"] = [{"name": n, "side": s, "agrees": s == ms} for n, s, _ in opinions]
+    out["agree"] = sum(1 for _, s, _ in opinions if s == ms)
+    out["dissent"] = sum(1 for _, s, _ in opinions if s != ms)
+
+    # sanity: a source whose two percentages don't roughly complement (sum ~100) is
+    # suspect markup or a bad read - surface it rather than silently trusting it.
+    for n, _, pcts in opinions:
+        if pcts and len(pcts) >= 2:
+            tot = sum(pcts[:2])
+            if not 80 <= tot <= 120:
+                out["flags"].append(f"{n} % looks off (sums {int(tot)}%)")
+
+    n = len(opinions)
+    out["trusted"] = (n < 2) or (out["agree"] > out["dissent"])
+    dis_names = [s["name"] for s in out["sources"] if not s["agrees"]]
+    if n < 2:
+        out["verdict"], out["note"] = "unconfirmed", "only one public source — can't cross-check"
+    elif out["dissent"] == 0:
+        out["verdict"], out["note"] = "corroborated", f"all {n} sources agree on the public side"
+    elif out["trusted"]:
+        out["verdict"] = "mostly agrees"
+        out["note"] = f"{out['agree']}/{n} sources agree ({', '.join(dis_names)} differ)"
+    else:
+        out["verdict"] = "sources split"
+        out["note"] = f"sources disagree on the public side ({', '.join(dis_names)} differ)"
+
+    # Sharp signal: where the MONEY is vs where the tickets (public) are. Money on
+    # the opposite side from the public is the classic "the % doesn't match the
+    # dollars" tell - and a tailwind when it's on our fade side.
+    if money_side:
+        out["money"] = "with public" if money_side == ms else "against public"
+        if out["money"] == "against public":
+            out["flags"].append("money is on the other side from the public tickets")
+    elif money_split:
+        out["money"] = "sources split"
+        out["flags"].append("money sources disagree")
+    return out
 
 
 def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None) -> dict | None:
@@ -484,7 +665,50 @@ def betting_lines(game: Game, consensus: dict, majority_team: Team | None = None
     return {"majority": fmt(majority), "non_majority": fmt(non_majority)}
 
 
-def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
+BVP_SHRINK_PA = 50   # exact-BvP PA at which the exact number gets 50% weight
+
+
+def _bvp_effective(exact_ops, exact_pa, hand_ops, hand_pa):
+    """Shrink a tiny exact-BvP OPS toward the big-sample vs-hand OPS. With exact_pa
+    PA the exact number gets exact_pa/(exact_pa+BVP_SHRINK_PA) of the weight; the
+    rest goes to the vs-hand backbone. Falls back to whichever side exists."""
+    if exact_ops is not None and exact_pa and hand_ops is not None:
+        w = exact_pa / (exact_pa + BVP_SHRINK_PA)
+        return round(w * exact_ops + (1 - w) * hand_ops, 3), exact_pa + hand_pa
+    if hand_ops is not None:
+        return round(hand_ops, 3), hand_pa
+    if exact_ops is not None:
+        return round(exact_ops, 3), exact_pa
+    return None, 0
+
+
+def bvp_read(game: Game) -> dict | None:
+    """Batter-vs-pitcher edge: which lineup projects to hit the OPPOSING starter
+    better. The tiny exact career-BvP OPS is shrunk toward the team's big-sample OPS
+    vs that starter's HAND, so the read is robust even when the exact sample is a
+    handful of PA. Display context only. None when neither read exists for a side."""
+    h, a = game.home, game.away
+    h_eff, h_pa = _bvp_effective(h.bvp_ops, h.bvp_pa, h.bvp_hand_ops, h.bvp_hand_pa)
+    a_eff, a_pa = _bvp_effective(a.bvp_ops, a.bvp_pa, a.bvp_hand_ops, a.bvp_hand_pa)
+    if h_eff is None or a_eff is None:
+        return None
+    gap = round(h_eff - a_eff, 3)
+    return {
+        "home_eff": h_eff, "away_eff": a_eff,
+        "home_ops": h.bvp_ops, "away_ops": a.bvp_ops,      # exact (small sample)
+        "home_pa": h.bvp_pa, "away_pa": a.bvp_pa,
+        "home_hand_ops": h.bvp_hand_ops, "away_hand_ops": a.bvp_hand_ops,  # vs-hand (big)
+        "home_hand_pa": h.bvp_hand_pa, "away_hand_pa": a.bvp_hand_pa,
+        "total_pa": h_pa + a_pa,
+        "edge_team": (h.name if gap > 0 else a.name) if gap else None,
+        "gap": abs(gap),
+        "meaningful": abs(gap) >= BVP_FLOOR,
+    }
+
+
+def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
+                  extra_public: dict | None = None, reddit_counts: dict | None = None,
+                  wiki_counts: dict | None = None) -> dict:
     # platoon depends on the matchup, so set it before scoring
     home_opp = game.away.probable_pitcher.hand if game.away.probable_pitcher else ""
     away_opp = game.home.probable_pitcher.hand if game.home.probable_pitcher else ""
@@ -492,10 +716,16 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
     adv_team, hs, as_ = statistical_favorite(game)
-    majority, majority_detail = public_majority(game, consensus, forum_counts)
+    majority, majority_detail = public_majority(game, consensus, forum_counts,
+                                                reddit_counts, wiki_counts, extra_public)
 
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
+
+    # Cross-check the public read across all sources (covers % + forum + extras);
+    # we only fade a read that's corroborated (see public_crosscheck).
+    crosscheck = public_crosscheck(game, majority, majority_detail, extra_public)
+    public_trusted = crosscheck["trusted"]
 
     # Precondition: there's a public read AND the statistical favorite is the side
     # the public is fading (keeps the public-vs-stats thesis).
@@ -506,14 +736,20 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
     cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
     edge_margin = abs(hs - as_)
     edge_conf = _clamp01(edge_margin / EDGE_FULL)
-    fade_conf = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
+    # Fade strength now requires an ACTUAL fade (public on the other side) and is
+    # scaled by how many sources corroborate the public read - a lean backed by a
+    # fade that 3 sources agree on outranks one where the public read is shaky.
+    raw_fade = _clamp01(abs(majority_detail.get("blended_lean") or 0.0))
+    corrob = (crosscheck["agree"] / len(crosscheck["sources"])
+              if crosscheck["sources"] else 1.0)
+    fade_conf = raw_fade * corrob if public_edge else 0.0
     confidence = round(W_EDGE * edge_conf + W_FADE * fade_conf, 3)  # display strength
 
     # Hard gate: public fade AND a real stat edge. The third must-have (line moved
     # in our favor) is applied in main._attach_line, which downgrades a flagged
     # pick whose line doesn't confirm.
     edge_strong = edge_margin >= EDGE_THRESHOLD
-    flagged = public_edge and edge_strong
+    flagged = public_edge and edge_strong and public_trusted
 
     if flagged:
         status, reason = "pick", "public fade + stat edge cleared (pending line confirm)"
@@ -522,13 +758,17 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             status, reason = "lean", "no public lean on this game"
         else:
             status, reason = "lean", f"public is also on {adv_team.name} (no fade)"
-    else:
+    elif not edge_strong:
         status, reason = "lean", (f"stat edge too small (margin {round(edge_margin, 2)} "
                                   f"< {EDGE_THRESHOLD} threshold)")
+    else:
+        status, reason = "lean", f"public read not corroborated — {crosscheck['note']}"
 
     return {
         "game_pk": game.game_pk,
         "matchup": f"{game.away.name} @ {game.home.name}",
+        "away_abbr": game.away.abbreviation or game.away.name,
+        "home_abbr": game.home.abbreviation or game.home.name,
         "venue": game.venue,
         "park_factor": game.park_factor,
         "statistical_advantage": {
@@ -540,6 +780,8 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "team": majority.name if majority else None,
             "detail": majority_detail,
         },
+        "public_check": crosscheck,
+        "bvp": bvp_read(game),
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,
@@ -550,6 +792,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict) -> dict:
             "reason": reason,
             "advantage_team": adv_team.name,
             "public_edge": public_edge,
+            "public_trusted": public_trusted,
             "edge_strong": edge_strong,
             "confidence": confidence,
             "edge_threshold": EDGE_THRESHOLD,

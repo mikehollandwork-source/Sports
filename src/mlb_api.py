@@ -34,6 +34,7 @@ BASE = "https://statsapi.mlb.com/api/v1"
 SPORT_ID = 1
 TIMEOUT = 20
 POLITE_DELAY = 0.1
+SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
@@ -63,12 +64,17 @@ class Team:
     # Filled by enrich_with_stats():
     offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
     starter_fip_last5: float | None = None
+    starter_fip_season: float | None = None  # probable starter's season FIP (stable anchor)
     bullpen_fip_last5: float | None = None
     starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
     bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
     platoon_factor: float = 1.0
     games_last5: list = field(default_factory=list)  # per-game results + opp strength
     sos: dict = field(default_factory=dict)          # avg opp strength faced (see analysis)
+    bvp_ops: float | None = None   # this lineup's PA-weighted career OPS vs the opp starter
+    bvp_pa: int = 0                # total career PA behind that OPS (sample size / trust)
+    bvp_hand_ops: float | None = None  # team OPS vs the opp starter's HAND (big sample)
+    bvp_hand_pa: int = 0               # PA behind the vs-hand number
 
 
 @dataclass
@@ -147,6 +153,85 @@ def _team_from_raw(raw: dict) -> Team:
 
 def _season_for(date: str) -> int:
     return dt.date.fromisoformat(date).year
+
+
+def _ip_to_innings(ip) -> float:
+    """MLB innings-pitched string '5.2' (5 and 2/3) -> 5.667."""
+    try:
+        whole, _, frac = str(ip).partition(".")
+        return int(whole or 0) + (int(frac or 0) / 3.0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+_VS_HAND_CACHE: dict = {}
+
+
+def team_vs_hand(team_id: int, season: int) -> dict:
+    """A team's season OPS split vs right- and left-handed pitching (big sample, the
+    backbone for shrinking tiny exact-BvP numbers). {'R': {ops, pa}, 'L': {ops, pa}}.
+    Season-to-date (not point-in-time) - fine for the live board's context."""
+    key = (team_id, season)
+    if key in _VS_HAND_CACHE:
+        return _VS_HAND_CACHE[key]
+    out = {"R": {"ops": None, "pa": 0}, "L": {"ops": None, "pa": 0}}
+    try:
+        data = _get(f"teams/{team_id}/stats", stats="statSplits", group="hitting",
+                    season=season, sitCodes="vr,vl")
+        for s in data.get("stats", []):
+            for sp in s.get("splits", []):
+                code = sp.get("split", {}).get("code", "")
+                hand = {"vr": "R", "vl": "L"}.get(code)
+                if not hand:
+                    continue
+                st = sp.get("stat", {})
+                try:
+                    out[hand] = {"ops": float(st.get("ops", 0) or 0),
+                                 "pa": int(st.get("plateAppearances", 0) or 0)}
+                except (ValueError, TypeError):
+                    pass
+    except Exception as exc:
+        log.warning("team vs-hand split failed for %s: %s", team_id, exc)
+    _VS_HAND_CACHE[key] = out
+    return out
+
+
+def batter_vs_pitcher(batter_id: int, pitcher_id: int) -> dict:
+    """A batter's CAREER line vs a specific pitcher: {pa, ops}. Career (not season)
+    because per-season BvP samples are near-zero. Empty when never faced."""
+    try:
+        data = _get(f"people/{batter_id}/stats", stats="vsPlayerTotal",
+                    group="hitting", opposingPlayerId=pitcher_id)
+    except Exception:
+        return {"pa": 0, "ops": 0.0}
+    for s in data.get("stats", []):
+        for sp in s.get("splits", []):
+            st = sp.get("stat", {})
+            try:
+                return {"pa": int(st.get("plateAppearances", 0) or 0),
+                        "ops": float(st.get("ops", 0) or 0)}
+            except (ValueError, TypeError):
+                return {"pa": 0, "ops": 0.0}
+    return {"pa": 0, "ops": 0.0}
+
+
+def pitcher_season_line(pitcher_id: int, season: int, as_of: str | None = None) -> dict:
+    """A pitcher's season-to-date totals (point-in-time): {ip, hr, bb, hbp, k, gs}.
+    Caller computes FIP so the FIP constant stays in one place (analysis)."""
+    ip = 0.0
+    tot = {"hr": 0, "bb": 0, "hbp": 0, "k": 0, "gs": 0}
+    for sp in _full_gamelog(pitcher_id, "pitching", season):
+        if as_of and sp.get("date", "") >= as_of:
+            continue
+        st = sp.get("stat", {})
+        ip += _ip_to_innings(st.get("inningsPitched", "0"))
+        tot["hr"] += int(st.get("homeRuns", 0) or 0)
+        tot["bb"] += int(st.get("baseOnBalls", 0) or 0)
+        tot["hbp"] += int(st.get("hitByPitch", 0) or 0)
+        tot["k"] += int(st.get("strikeOuts", 0) or 0)
+        tot["gs"] += int(st.get("gamesStarted", 0) or 0)
+    tot["ip"] = round(ip, 2)
+    return tot
 
 
 # --- game logs ----------------------------------------------------------------
@@ -336,15 +421,8 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
 _TEAM_GAMELOG_CACHE: dict[tuple, tuple] = {}
 
 
-def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> list[dict]:
-    """
-    Last 5 completed games as per-game dicts with runs/hits scored & allowed and
-    the opponent's season strength (for the SOS-adjusted win-condition back-test).
-    With as_of, only games strictly before that date count (point-in-time).
-
-    Team-level hitting game-log gives runs/hits scored; pitching gives runs/hits
-    allowed; the two are aligned by date.
-    """
+def _team_gamelog(team_id: int, season: int) -> tuple[list[dict], dict[str, dict]]:
+    """(hitting splits, pitching-by-date) for a team-season, fetched once & cached."""
     key = (team_id, season)
     if key not in _TEAM_GAMELOG_CACHE:
         data = _get(f"teams/{team_id}/stats", stats="gameLog",
@@ -359,8 +437,105 @@ def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> l
                 elif grp == "pitching":
                     pit_by_date[sp.get("date", "")] = sp
         _TEAM_GAMELOG_CACHE[key] = (hit_splits, pit_by_date)
-    hit_splits, pit_by_date = _TEAM_GAMELOG_CACHE[key]
+    return _TEAM_GAMELOG_CACHE[key]
 
+
+def team_home_away_split(team_id: int, season: int, as_of: str | None = None) -> dict:
+    """Point-in-time home vs away run differential per game AND straight-up W-L.
+    With as_of, only games strictly before it count (no lookahead). Wins derived
+    from each game's run diff (no ties in baseball).
+    {home/away: {games, rd_per_g, wins, losses}}."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    acc = {"home": {"g": 0, "rs": 0, "ra": 0, "w": 0},
+           "away": {"g": 0, "rs": 0, "ra": 0, "w": 0}}
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        side = "home" if sp.get("isHome") else "away"
+        rs = int(sp.get("stat", {}).get("runs", 0) or 0)
+        ra = int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
+        acc[side]["g"] += 1
+        acc[side]["rs"] += rs
+        acc[side]["ra"] += ra
+        if rs > ra:
+            acc[side]["w"] += 1
+    out = {}
+    for s in ("home", "away"):
+        g, w = acc[s]["g"], acc[s]["w"]
+        out[s] = {"games": g,
+                  "rd_per_g": round((acc[s]["rs"] - acc[s]["ra"]) / g, 3) if g else None,
+                  "wins": w, "losses": g - w}
+    return out
+
+
+def team_season_form(team_id: int, season: int, as_of: str | None = None) -> dict:
+    """Point-in-time season quality: games, run-diff/game, win%. With as_of, only
+    games strictly before it count (no lookahead). Wins derived from each game's
+    run diff (no ties in baseball)."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    g = wins = rd = 0
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        rs = int(sp.get("stat", {}).get("runs", 0) or 0)
+        ra = int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0)
+        g += 1
+        rd += rs - ra
+        wins += 1 if rs > ra else 0
+    return {"games": g,
+            "rd_per_g": round(rd / g, 3) if g else None,
+            "win_pct": round(wins / g, 3) if g else None}
+
+
+_DIVISION_CACHE: dict[int, dict[int, int]] = {}
+
+
+def team_divisions(season: int) -> dict[int, int]:
+    """{team_id: division_id} for the season (fetched once)."""
+    if season not in _DIVISION_CACHE:
+        data = _get("teams", sportId=SPORT_ID, season=season)
+        _DIVISION_CACHE[season] = {t["id"]: t["division"]["id"]
+                                   for t in data.get("teams", []) if t.get("division", {}).get("id")}
+    return _DIVISION_CACHE[season]
+
+
+def team_division_form(team_id: int, season: int, opp_division: int,
+                       as_of: str | None = None) -> dict:
+    """Point-in-time run-diff/game vs `opp_division` and overall, plus the delta
+    (vs-division minus overall) - i.e. does this team over/under-perform vs that
+    division beyond its usual self. {vs_div_games, vs_div_rd, overall_rd, delta}."""
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
+    divs = team_divisions(season)
+    tot = {"g": 0, "rd": 0}
+    vsd = {"g": 0, "rd": 0}
+    for sp in hit_splits:
+        date = sp.get("date", "")
+        if as_of and date >= as_of:
+            continue
+        rd = (int(sp.get("stat", {}).get("runs", 0) or 0)
+              - int(pit_by_date.get(date, {}).get("stat", {}).get("runs", 0) or 0))
+        tot["g"] += 1
+        tot["rd"] += rd
+        if divs.get(sp.get("opponent", {}).get("id")) == opp_division:
+            vsd["g"] += 1
+            vsd["rd"] += rd
+    overall = tot["rd"] / tot["g"] if tot["g"] else None
+    vsdiv = vsd["rd"] / vsd["g"] if vsd["g"] else None
+    return {"vs_div_games": vsd["g"],
+            "vs_div_rd": round(vsdiv, 3) if vsdiv is not None else None,
+            "overall_rd": round(overall, 3) if overall is not None else None,
+            "delta": round(vsdiv - overall, 3) if vsdiv is not None and overall is not None else None}
+
+
+def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> list[dict]:
+    """
+    Last 5 completed games as per-game dicts with runs/hits scored & allowed and
+    the opponent's season strength (for the SOS-adjusted win-condition back-test).
+    With as_of, only games strictly before that date count (point-in-time).
+    """
+    hit_splits, pit_by_date = _team_gamelog(team_id, season)
     games = [sp for sp in hit_splits if not as_of or sp.get("date", "") < as_of]
     out: list[dict] = []
     for sp in games[-5:]:
@@ -434,6 +609,27 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
         sos["bat_opp_win"] = (opp_win_num / park_den) if park_den else 0.5
 
+        # --- batter-vs-pitcher: this lineup's PA-weighted CAREER OPS vs the OPPOSING
+        # starter (display context; samples are tiny so it carries a PA count). ---
+        opp_sp = (game.away if is_home else game.home).probable_pitcher
+        if opp_sp:
+            pa_tot = ops_w = 0.0
+            for h in hitters:
+                try:
+                    bvp = batter_vs_pitcher(h.player_id, opp_sp.player_id)
+                except Exception:
+                    continue
+                if bvp["pa"] > 0:
+                    pa_tot += bvp["pa"]
+                    ops_w += bvp["ops"] * bvp["pa"]
+            team.bvp_ops = round(ops_w / pa_tot, 3) if pa_tot else None
+            team.bvp_pa = int(pa_tot)
+            # big-sample backbone: team OPS vs the opposing starter's hand
+            if opp_sp.hand in ("R", "L"):
+                vh = team_vs_hand(team.team_id, season).get(opp_sp.hand, {})
+                team.bvp_hand_ops = vh.get("ops")
+                team.bvp_hand_pa = int(vh.get("pa", 0) or 0)
+
         # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
             try:
@@ -443,6 +639,16 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
             except Exception as exc:
                 log.warning("starter FIP failed for %s: %s", team.name, exc)
+            # season-to-date starter FIP (stable anchor; calibrated 55% lever)
+            try:
+                t = pitcher_season_line(team.probable_pitcher.player_id, season, as_of=as_of)
+                if t["ip"] >= SEASON_FIP_MIN_IP:
+                    from .analysis import FIP_CONSTANT
+                    team.starter_fip_season = round(
+                        (13 * t["hr"] + 3 * (t["bb"] + t["hbp"]) - 2 * t["k"]) / t["ip"]
+                        + FIP_CONSTANT, 3)
+            except Exception as exc:
+                log.warning("starter season FIP failed for %s: %s", team.name, exc)
 
         try:
             starter_id = team.probable_pitcher.player_id if team.probable_pitcher else None
