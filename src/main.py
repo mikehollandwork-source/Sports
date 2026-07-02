@@ -72,8 +72,13 @@ def run(date: str) -> dict:
             enrich_with_stats(g, date)
         except Exception as exc:
             log.warning("stats enrichment failed for %s: %s", g.game_pk, exc)
+        try:   # before evaluation: the weather x power nudge needs it in the margin
+            g.weather = weather.forecast_for(g.venue, g.start_time)
+        except Exception as exc:
+            log.warning("weather failed for %s: %s", g.game_pk, exc)
         r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts, wiki_counts)
         r["game_datetime"] = g.start_time
+        r["weather"] = g.weather
         results.append(r)
 
     # Line source = ESPN (true open + current moneyline for every game). For any
@@ -98,10 +103,6 @@ def run(date: str) -> dict:
     for g, r in zip(games, results):
         _attach_line(g, r, slate)
         _attach_situational(g, r, date)
-        try:
-            r["weather"] = weather.forecast_for(r.get("venue", ""), r.get("game_datetime"))
-        except Exception as exc:
-            log.warning("weather failed for %s: %s", g.game_pk, exc)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls

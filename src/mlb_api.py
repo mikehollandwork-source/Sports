@@ -90,6 +90,7 @@ class Game:
     venue: str = ""
     park_factor: float = 1.0
     start_time: str = ""   # first-pitch ISO datetime (UTC), e.g. "2026-06-25T23:10:00Z"
+    weather: dict | None = None   # game-time conditions (main attaches pre-evaluation)
 
 
 # --- schedule -----------------------------------------------------------------

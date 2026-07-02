@@ -81,6 +81,16 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
 
+# Weather x power (calibrated 2026-04-13..06-26, 486 open-air games): in hot/windy
+# conditions the power team won 57% vs 52% mild (+5%, ~1 SE - wired at user request,
+# so sized conservatively: capped BELOW home field). Open-air only; the nudge goes
+# to the higher-ISO side, scaled by the ISO gap.
+WX_HOT_TEMP = 85      # deg F at first pitch
+WX_WINDY_MPH = 12     # wind speed
+WX_ISO_FLOOR = 0.010  # blended-ISO gap below this = no meaningful power edge
+WX_ISO_SCALE = 2.5    # tilt = min(scale * gap, cap)
+WX_TILT_CAP = 0.08
+
 # Play taxonomy (from the 06-26..07-01 graded-lean autopsy). Count the five winner
 # signals - margin, favorite, line toward, consistency, BvP not against:
 #   PICK = >= PICK_MIN_SIGNALS hits (the >=2 tier went 62% +5.66u, stacking to
@@ -387,6 +397,12 @@ def win_condition_core(team_games_last5: list, team_fip: float | None,
 
 
 # --- decision -----------------------------------------------------------------
+def _blended_iso(team: Team) -> float | None:
+    line = _blend_offense_lines(offense_line(team.offense),
+                                offense_line(team.season_offense))
+    return line.get("iso_neutral") if line else None
+
+
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
     b = bvp_read(game)
@@ -396,6 +412,17 @@ def statistical_favorite(game: Game) -> tuple[Team, float, float]:
             hs += tilt
         else:
             as_ += tilt
+    # weather x power: hot/windy open air helps the higher-ISO lineup
+    wx = getattr(game, "weather", None)
+    if (wx and wx.get("roof") == "open"
+            and (wx.get("temp_f", 0) >= WX_HOT_TEMP or wx.get("wind_mph", 0) >= WX_WINDY_MPH)):
+        hi, ai = _blended_iso(game.home), _blended_iso(game.away)
+        if hi is not None and ai is not None and abs(hi - ai) >= WX_ISO_FLOOR:
+            tilt = min(WX_ISO_SCALE * abs(hi - ai), WX_TILT_CAP)
+            if hi > ai:
+                hs += tilt
+            else:
+                as_ += tilt
     winner = game.home if hs >= as_ else game.away
     return winner, hs, as_
 
