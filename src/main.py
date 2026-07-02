@@ -120,8 +120,10 @@ def run(date: str) -> dict:
 
     picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
     leans = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "lean"]
-    fades = sum(1 for r in results if _play(r) == "fade")
-    log.info("Board: %d pick(s), %d lean(s), %d fade(s)", len(picks), len(leans), fades)
+    locks = sum(1 for r in results if _play(r) == "lock")
+    stay = sum(1 for r in results if _play(r) == "stay_away")
+    log.info("Board: %d pick(s), %d lean(s), %d lock(s), %d stay-away",
+             len(picks), len(leans), locks, stay)
 
     return {
         "date": date,
@@ -266,14 +268,12 @@ def _attach_line(game, result: dict, slate: list) -> None:
                       (b_hit, "BvP")):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
-    # the opponent's mirrored 9-1 profile: line moved TOWARD them and the public
-    # is on them or silent (in the graded record, no-fade + line-confirmed went 9-1)
     away, home = result["matchup"].split(" @ ")
     opp_name = home if adv == away else away
     shift = info.get("implied_shift")
     maj = (result.get("public_majority") or {}).get("team")
-    opp_profile = (shift is not None and shift <= -LINE_CONFIRM_MIN
-                   and (maj is None or maj == opp_name))
+    lock_profile = (shift is not None and shift <= -LINE_CONFIRM_MIN
+                    and (maj is None or maj == opp_name))
     if len(hits) >= PICK_MIN_SIGNALS:
         pc["play"] = "pick"
         pc["status"] = "pick"
@@ -286,30 +286,57 @@ def _attach_line(game, result: dict, slate: list) -> None:
         if len(hits) >= 4:
             star.append(f"{len(hits)}/5 signals")
         pc["starred"] = star
-    elif opp_profile:
-        pc["play"] = "fade"
-        pc["status"] = "fade"
+    elif lock_profile and pc.get("opponent_moneyline") is not None:
+        # LOCK (the 9-1 profile): the line moved toward the OPPONENT and the
+        # public isn't against them - bet the opponent at its captured price.
+        pc["play"] = "lock"
+        pc["status"] = "lock"
+        pc["lock_bet"] = opp_name
+        pc["lock_odds"] = int(pc["opponent_moneyline"])
         pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
-                        f"them (9-1 profile); our side hit {len(hits)}/5")
+                        f"them (the 9-1 profile); our side hit {len(hits)}/5")
     elif len(hits) >= 1:
         pc["play"] = "lean"
         pc["status"] = "lean"
         pc["reason"] = f"1/5 signals — {', '.join(hits)}"
     else:
-        pc["play"] = "pass"
-        pc["status"] = "pass"
-        pc["reason"] = f"0/5 signals, no fade profile — missed: {', '.join(misses)}"
+        # STAY AWAY: no merit on either read. The only tracked action in this
+        # pile is fading wherever the MONEY sits (unanimous money%); with no
+        # clean money read the game is listed but never bet.
+        pc["play"] = "stay_away"
+        pc["status"] = "stay_away"
+        ms = (result.get("public_check") or {}).get("money_side")
+        pc["stay_bet"] = None
+        pc["stay_odds"] = None
+        if ms in ("home", "away"):
+            bet_side = "away" if ms == "home" else "home"
+            bet_team = away if bet_side == "away" else home
+            adv_is_home = adv == home
+            bet_is_adv = (bet_side == "home") == adv_is_home
+            odds = pc.get("advantage_moneyline") if bet_is_adv else pc.get("opponent_moneyline")
+            if odds is not None:
+                pc["stay_bet"] = bet_team
+                pc["stay_odds"] = int(odds)
+        money_team = (home if ms == "home" else away) if ms in ("home", "away") else None
+        pc["reason"] = (f"0/5 signals — fade the money (on {money_team})"
+                        if pc["stay_bet"] else "0/5 signals — no clean money read, no bet")
 
 
 def _play(g: dict) -> str:
-    """The game's play type: 'pick' / 'lean' / 'fade' / 'pass'. Older frozen
-    snapshots map: flagged or strong-tier -> pick-era leans stay what they were."""
+    """The game's play type: 'pick' / 'lean' / 'lock' / 'stay_away'. Older frozen
+    snapshots: flagged / strong-tier -> lean; old 'fade' (the same 9-1 rule) ->
+    lock; 'pass' -> stay_away."""
     pc = g.get("pick_criteria", {})
-    if pc.get("play") in ("pick", "lean", "fade", "pass"):
-        return pc["play"]
+    play = pc.get("play")
+    if play in ("pick", "lean", "lock", "stay_away"):
+        return play
+    if play == "fade":
+        return "lock"
+    if play == "pass":
+        return "stay_away"
     if g.get("flagged") or pc.get("lean_tier") == "strong":
         return "lean"
-    return "pass"
+    return "stay_away"
 
 
 def _is_play(g: dict) -> bool:
@@ -399,7 +426,7 @@ def _public_evidence(g: dict) -> str:
         p = [int(round(v)) for v in co["pcts"].values()]
         if len(p) >= 2:
             bits.append(f"covers {p[0]}/{p[1]}%")
-    labels = {"scoresodds_bets": "S&O", "vsin_bets": "VSiN", "oddsshark_bets": "Shark"}
+    labels = {"scoresodds_bets": "S&O", "vsin_bets": "VSiN", "polymarket_bets": "Poly"}
     books = det.get("books") or {}
     for name, bk in books.items():
         bits.append(f"{labels.get(name, name)} {int(bk['away'])}/{int(bk['home'])}%")
@@ -514,16 +541,15 @@ def _situational_phrase(g: dict) -> str | None:
             f"{a['abbr']} {a['wins']}-{a['losses']} road")
 
 
-def _fade_line(g: dict) -> str:
-    """One-liner for a FADE: the side to bet (against the stat favorite), its price,
-    and which lean signals failed."""
+def _stay_line(g: dict) -> str:
+    """One-liner for a STAY-AWAY game: the money-fade bet when there is one."""
     pc = g["pick_criteria"]
-    adv = pc["advantage_team"]
-    away, home = g["matchup"].split(" @ ")
-    opp = _short(g, home if adv == away else away)
-    oml = pc.get("opponent_moneyline")
-    oml_s = f" ({oml:+d})" if isinstance(oml, int) else ""
-    return f"🔄 {_state_tag(g)}{g['matchup']} → bet {opp}{oml_s} — {pc.get('reason', '')}"
+    bet = pc.get("stay_bet")
+    if bet:
+        odds = pc.get("stay_odds")
+        odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
+        return f"🔄 {_state_tag(g)}{g['matchup']} → bet {bet}{odds_s} — {pc.get('reason', '')}"
+    return f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', '')}"
 
 
 def _star(pc: dict) -> list[str]:
@@ -540,10 +566,13 @@ def _game_lines(g: dict) -> list[str]:
     """Readable lines breaking down one matchup for the board. Fades collapse to a
     one-liner naming the side to bet; passes to a plain one-liner."""
     pc = g["pick_criteria"]
-    if _play(g) == "fade":
-        return [_fade_line(g)]
-    if _play(g) == "pass":
-        return [f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', '')}"]
+    if _play(g) == "lock":
+        odds = pc.get("lock_odds")
+        odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
+        return [f"🔒 {_state_tag(g)}{g['matchup']} → **LOCK: bet {pc.get('lock_bet')}"
+                f"{odds_s}** — {pc.get('reason', '')}"]
+    if _play(g) == "stay_away":
+        return [_stay_line(g)]
     c = pc["components"]
     adv = pc["advantage_team"]
     e = c["stat_edge"]
@@ -591,9 +620,11 @@ def build_summary(payload: dict) -> str:
     board, finals = _board_games(games), _finals(games)
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
-    fades = [g for g in board if _play(g) == "fade"]
+    locks = [g for g in board if _play(g) == "lock"]
+    stay = [g for g in board if _play(g) == "stay_away"]
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} pick(s) · {len(leans)} lean(s) · {len(fades)} fade(s)**"
+    out.append(f"**{len(picks)} pick(s) · {len(leans)} lean(s) · {len(locks)} LOCK(s) · "
+               f"{len(stay)} stay-away**"
                + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
                   if picks else ""))
     if finals:
@@ -609,8 +640,9 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_✅ = PICK (2+ signals). ⭐ = pick on a proven-hot combo (margin+favorite+line, or "
-               "4+ signals). 🔸 = LEAN (1 signal). 🔄 = FADE: bet against the stat side (their "
-               "line+public profile went 9-1). ▫️ = no play. 🔴 = live._")
+               "4+ signals). 🔸 = LEAN (1 signal). 🔒 = LOCK (9-1 profile: line + public both "
+               "favor the other side - bet them). 🔄 = STAY AWAY money-fade. ▫️ = stay away, "
+               "no clean money read. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -647,7 +679,8 @@ def _telegram_records_lines() -> list[str]:
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
     for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
-                           ("Fades", "fades", False)):
+                           ("Locks", "locks", False),
+                           ("Stay-away fades", "fades", False)):
         tag = " (hypothetical)" if hyp else ""
         rec = grade.windowed_records(ledger[key], today)
         if not rec:
@@ -668,12 +701,12 @@ def telegram_text(payload: dict) -> str:
 
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
-    fades = [g for g in board if _play(g) == "fade"]
-    passes = [g for g in board if _play(g) == "pass"]
+    locks = [g for g in board if _play(g) == "lock"]
+    stay = [g for g in board if _play(g) == "stay_away"]
 
     L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} pick(s) · {len(leans)} lean(s) · {len(fades)} fade(s)"
-         + (f" · {len(passes)} pass" if passes else "")]
+         f"{len(picks)} pick(s) · {len(leans)} lean(s) · {len(locks)} LOCK(s) · "
+         f"{len(stay)} stay-away"]
     if finals:
         L.append(f"({len(finals)} final → moved to the record)")
 
@@ -714,24 +747,30 @@ def telegram_text(payload: dict) -> str:
     if not picks and not leans:
         L += ["", "No picks or leans on the slate."]
 
-    if fades:
-        L += ["", "— FADES (bet against the stat side) —"]
-        for g in fades:
+    if locks:
+        L += ["", "— LOCKS (the 9-1 profile: bet the other side) —"]
+        for g in locks:
             aa, ha = _abbrs(g)
             pc = g["pick_criteria"]
-            adv_name = pc["advantage_team"]
-            away, home = g["matchup"].split(" @ ")
-            opp = _short(g, home if adv_name == away else away)
-            oml = pc.get("opponent_moneyline")
-            oml_s = f" ({oml:+d})" if isinstance(oml, int) else ""
             tag = "🔴 " if g.get("state") == "live" else ""
-            L.append(f"🔄 {tag}{aa} @ {ha} → bet {opp}{oml_s} — {pc.get('reason', '')}")
-    if passes:
-        L += ["", "— no play —"]
-        for g in passes:
+            odds = pc.get("lock_odds")
+            odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
+            L.append(f"🔒 {tag}{aa} @ {ha} → bet {_short(g, pc.get('lock_bet'))}{odds_s}"
+                     f" — {pc.get('reason', '')}")
+
+    if stay:
+        L += ["", "— STAY AWAY (only action: fade the money) —"]
+        for g in stay:
             aa, ha = _abbrs(g)
+            pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
-            L.append(f"▫️ {tag}{aa} @ {ha} — {g['pick_criteria'].get('reason', '')}")
+            bet = pc.get("stay_bet")
+            if bet:
+                odds = pc.get("stay_odds")
+                odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
+                L.append(f"🔄 {tag}{aa} @ {ha} → bet {_short(g, bet)}{odds_s} — {pc.get('reason', '')}")
+            else:
+                L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', '')}")
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 

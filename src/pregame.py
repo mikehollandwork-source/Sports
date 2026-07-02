@@ -28,7 +28,9 @@ from .mlb_api import SPORT_ID, _get
 log = logging.getLogger("pregame")
 
 OUTPUT_DIR = picks_main.OUTPUT_DIR
-DUE_MIN, DUE_MAX = 15, 45   # fire when a slot is this many minutes away (~T-30)
+DUE_MIN, DUE_MAX = 10, 30   # fire when a slot is this many minutes away (~T-15;
+                            # Actions cron is 15-min granular and often late, so
+                            # this is as close to "15 min before" as it can aim)
 
 
 def schedule_slots(date: str) -> dict[str, list[int]]:

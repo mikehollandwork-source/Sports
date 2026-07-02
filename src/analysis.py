@@ -68,7 +68,7 @@ SOS_CLAMP = (0.80, 1.25)
 # Each signal becomes a "lean toward the home team" in [-1, 1]; the weighted
 # blend's sign picks the public-majority side. Raise PUBLIC_W_FORUM toward 1.0 to
 # make the forum the sole voice; lower it to let consensus matter more.
-PUBLIC_W_FORUM = 0.65
+PUBLIC_W_FORUM = 0.75   # forum votes are few, so each weighs more (user call)
 PUBLIC_W_CONSENSUS = 0.35
 PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, weighted
                          # like covers consensus (the blend normalizes by weights present)
@@ -80,6 +80,8 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 #   robust gaps get a small vote; they can tilt a close lean, not manufacture one).
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
+BVP_PEN_SHARE = 0.35   # the tilt blends starter BvP with bullpen BvP (late innings)
+PEN_BVP_MIN_PA = 100   # career PA behind the pen number before it joins the tilt
 
 # Weather x power (calibrated 2026-04-13..06-26, 486 open-air games): in hot/windy
 # conditions the power team won 57% vs 52% mild (+5%, ~1 SE - wired at user request,
@@ -405,10 +407,19 @@ def _blended_iso(team: Team) -> float | None:
 
 def statistical_favorite(game: Game) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
-    b = bvp_read(game)
-    if b and b.get("meaningful") and b.get("edge_team"):   # BvP nudge, meaningful gaps only
-        tilt = min(b["gap"] - BVP_FLOOR, BVP_TILT_CAP)
-        if b["edge_team"] == game.home.name:
+    # BvP nudge: starter matchup blended with the bullpen matchup (the arms that
+    # finish the game), meaningful combined gaps only
+    b, pen = bvp_read(game), pen_bvp_read(game)
+    sgap = (b["home_eff"] - b["away_eff"]) if b else None
+    pgap = ((pen["home_ops"] - pen["away_ops"])
+            if pen and pen["total_pa"] >= PEN_BVP_MIN_PA else None)
+    if sgap is not None and pgap is not None:
+        gap = (1 - BVP_PEN_SHARE) * sgap + BVP_PEN_SHARE * pgap
+    else:
+        gap = sgap if sgap is not None else pgap
+    if gap is not None and abs(gap) >= BVP_FLOOR:
+        tilt = min(abs(gap) - BVP_FLOOR, BVP_TILT_CAP)
+        if gap > 0:
             hs += tilt
         else:
             as_ += tilt
@@ -621,7 +632,20 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     """
     out = {"sources": [], "majority_side": None, "agree": 0, "dissent": 0,
            "trusted": True, "verdict": "no public read", "note": "no public lean to check",
-           "flags": [], "line": "unknown", "money": "unknown"}
+           "flags": [], "line": "unknown", "money": "unknown", "money_side": None}
+    # money side is computed even without a public majority - the stay-away pile
+    # fades the money on games with no other read
+    money_sides0: list[str] = []
+    for name, rows in (extra_public or {}).items():
+        if not name.endswith("_money"):
+            continue
+        for row in rows:
+            side, _ = _source_side(game, row)
+            if side:
+                money_sides0.append(side)
+            break
+    out["money_side"] = (money_sides0[0]
+                         if money_sides0 and len(set(money_sides0)) == 1 else None)
     if majority is None:
         return out
     out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
@@ -681,6 +705,7 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     # Sharp signal: where the MONEY is vs where the tickets (public) are. Money on
     # the opposite side from the public is the classic "the % doesn't match the
     # dollars" tell - and a tailwind when it's on our fade side.
+    out["money_side"] = money_side
     if money_side:
         out["money"] = "with public" if money_side == ms else "against public"
         if out["money"] == "against public":
