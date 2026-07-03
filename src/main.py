@@ -541,6 +541,21 @@ def _situational_phrase(g: dict) -> str | None:
             f"{a['abbr']} {a['wins']}-{a['losses']} road")
 
 
+def _lock_bet(g: dict) -> tuple[str | None, int | None]:
+    """The LOCK's bet side + price. Frozen snapshots from before lock_bet existed
+    (old 'fade' schema) fall back to the opponent of the stat side at its captured
+    price - the same fallback grading uses, so display and record always match."""
+    pc = g["pick_criteria"]
+    bet, odds = pc.get("lock_bet"), pc.get("lock_odds")
+    if bet is None:
+        away, home = g["matchup"].split(" @ ")
+        adv = pc.get("advantage_team")
+        bet = home if adv == away else away
+        oml = pc.get("opponent_moneyline")
+        odds = int(oml) if oml is not None else None
+    return bet, odds
+
+
 def _stay_line(g: dict) -> str:
     """One-liner for a STAY-AWAY game: the money-fade bet when there is one."""
     pc = g["pick_criteria"]
@@ -567,9 +582,9 @@ def _game_lines(g: dict) -> list[str]:
     one-liner naming the side to bet; passes to a plain one-liner."""
     pc = g["pick_criteria"]
     if _play(g) == "lock":
-        odds = pc.get("lock_odds")
+        bet, odds = _lock_bet(g)
         odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-        return [f"🔒 {_state_tag(g)}{g['matchup']} → **LOCK: bet {pc.get('lock_bet')}"
+        return [f"🔒 {_state_tag(g)}{g['matchup']} → **LOCK: bet {bet}"
                 f"{odds_s}** — {pc.get('reason', '')}"]
     if _play(g) == "stay_away":
         return [_stay_line(g)]
@@ -753,9 +768,9 @@ def telegram_text(payload: dict) -> str:
             aa, ha = _abbrs(g)
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
-            odds = pc.get("lock_odds")
+            bet, odds = _lock_bet(g)
             odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-            L.append(f"🔒 {tag}{aa} @ {ha} → bet {_short(g, pc.get('lock_bet'))}{odds_s}"
+            L.append(f"🔒 {tag}{aa} @ {ha} → bet {_short(g, bet)}{odds_s}"
                      f" — {pc.get('reason', '')}")
 
     if stay:
