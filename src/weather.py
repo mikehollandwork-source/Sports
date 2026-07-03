@@ -1,5 +1,7 @@
 """
-Game-time ballpark weather, from Open-Meteo (free, no key, datacenter-friendly).
+Game-time ballpark weather, from Open-Meteo with a MET Norway fallback (both
+free, no key, datacenter-friendly). If Open-Meteo times out or errors, we fall
+back to api.met.no so a slow primary never leaves the board without conditions.
 
 Display-only context for now (same discipline as every new signal: it doesn't
 touch the decision until a calibration earns it a vote). The static park factor
@@ -24,7 +26,11 @@ API = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
        "&hourly=temperature_2m,precipitation_probability,wind_speed_10m,wind_direction_10m"
        "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC"
        "&start_date={day}&end_date={day}")
-TIMEOUT = 15
+# MET Norway (api.met.no) - free, no key; requires an identifying User-Agent or
+# it 403s. Returns SI units (C, m/s), converted below.
+MET_API = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={lat}&lon={lon}"
+MET_UA = "mlb-edge-finder/1.0 github.com/mikehollandwork-source/Sports"
+TIMEOUT = 8   # per source; short so a dead primary fails over to the backup fast
 
 # venue name -> (lat, lon, roof) - roof: open / retract / dome
 STADIUMS = {
@@ -73,9 +79,51 @@ def _compass(deg: float) -> str:
     return _COMPASS[int((deg / 22.5) + 0.5) % 16]
 
 
+def _open_meteo(lat: float, lon: float, start: dt.datetime) -> dict:
+    """Open-Meteo conditions at the start hour (already in F / mph). Raises on
+    any failure so the caller can fall back."""
+    r = requests.get(API.format(lat=lat, lon=lon, day=start.strftime("%Y-%m-%d")),
+                     timeout=TIMEOUT)
+    r.raise_for_status()
+    h = r.json()["hourly"]
+    idx = min(range(len(h["time"])),
+              key=lambda i: abs(dt.datetime.fromisoformat(h["time"][i] + ":00+00:00") - start))
+    return {
+        "temp_f": round(h["temperature_2m"][idx]),
+        "wind_mph": round(h["wind_speed_10m"][idx]),
+        "wind_dir": _compass(h["wind_direction_10m"][idx]),
+        "precip_pct": int(h["precipitation_probability"][idx] or 0),
+    }
+
+
+def _met_norway(lat: float, lon: float, start: dt.datetime) -> dict:
+    """MET Norway conditions at the nearest timeseries entry, converted from SI
+    (C -> F, m/s -> mph). Raises on any failure."""
+    # they ask for <=4 decimals (better edge caching) and an identifying UA
+    r = requests.get(MET_API.format(lat=round(lat, 4), lon=round(lon, 4)),
+                     headers={"User-Agent": MET_UA}, timeout=TIMEOUT)
+    r.raise_for_status()
+    series = r.json()["properties"]["timeseries"]
+    e = min(series, key=lambda s: abs(
+        dt.datetime.fromisoformat(s["time"].replace("Z", "+00:00")) - start))
+    inst = e["data"]["instant"]["details"]
+    precip = 0.0
+    for span in ("next_1_hours", "next_6_hours"):
+        d = e["data"].get(span, {}).get("details", {})
+        if "probability_of_precipitation" in d:
+            precip = d["probability_of_precipitation"]
+            break
+    return {
+        "temp_f": round(inst["air_temperature"] * 9 / 5 + 32),
+        "wind_mph": round(inst["wind_speed"] * 2.23694),
+        "wind_dir": _compass(inst.get("wind_from_direction", 0)),
+        "precip_pct": int(precip or 0),
+    }
+
+
 def forecast_for(venue: str, iso_start: str | None) -> dict | None:
     """Conditions at the game's start hour. None when the venue is unknown, the
-    start time is missing, or the fetch fails (board omits the line)."""
+    start time is missing, or BOTH sources fail (board omits the line)."""
     spot = STADIUMS.get(venue or "")
     if not spot or not iso_start:
         return None
@@ -87,22 +135,15 @@ def forecast_for(venue: str, iso_start: str | None) -> dict | None:
     key = (venue, start.strftime("%Y-%m-%dT%H"))
     if key in _CACHE:
         return _CACHE[key]
-    try:
-        r = requests.get(API.format(lat=lat, lon=lon, day=start.strftime("%Y-%m-%d")),
-                         timeout=TIMEOUT)
-        r.raise_for_status()
-        h = r.json()["hourly"]
-        idx = min(range(len(h["time"])),
-                  key=lambda i: abs(dt.datetime.fromisoformat(h["time"][i] + ":00+00:00") - start))
-        out = {
-            "temp_f": round(h["temperature_2m"][idx]),
-            "wind_mph": round(h["wind_speed_10m"][idx]),
-            "wind_dir": _compass(h["wind_direction_10m"][idx]),
-            "precip_pct": int(h["precipitation_probability"][idx] or 0),
-            "roof": roof,
-        }
-    except Exception as exc:
-        log.warning("weather failed for %s: %s", venue, exc)
-        out = None
+
+    out = None
+    for name, fetch in (("open-meteo", _open_meteo), ("met.no", _met_norway)):
+        try:
+            out = {**fetch(lat, lon, start), "roof": roof}
+            if name != "open-meteo":
+                log.info("weather for %s via fallback %s", venue, name)
+            break
+        except Exception as exc:
+            log.warning("weather %s failed for %s: %s", name, venue, exc)
     _CACHE[key] = out
     return out
