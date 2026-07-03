@@ -98,16 +98,21 @@ WX_TILT_CAP = 0.08
 
 # Play taxonomy (from the 06-26..07-01 graded-lean autopsy). Count the five winner
 # signals - margin, favorite, line toward, consistency, BvP not against:
-#   PICK = >= PICK_MIN_SIGNALS hits (the >=2 tier went 62% +5.66u, stacking to
-#          77% at >=3 and 89% at >=4; includes the margin+favorite+line combo).
-#   LEAN = exactly 1 hit.
-#   FADE = the OPPONENT matches the mirrored 9-1 profile: the line moved toward
-#          them (>= LINE_CONFIRM_MIN) and the public is on them or silent
-#          (no-fade + line-confirmed leans went 9-1 in the graded record).
-#   PASS = none of the above; shown one-line, never booked.
+#   PICK = >= PICK_MIN_SIGNALS hits with at least one of margin/line/consistency
+#          (the >=2 tier went 62% +5.66u, stacking to 77% at >=3 and 89% at >=4;
+#          favorite+BvP alone graded 8-10 so that pair only makes a lean). The
+#          9-1 LOCK profile (line toward the opponent + public not against them,
+#          bet the opponent) also lives in the pick column/book.
+#   LEAN = exactly 1 hit (or the demoted favorite+BvP pair).
+#   FADE = everything else (the Vegas special): bet against the unanimous
+#          money% side; no clean money read = listed, never booked.
 PICK_MIN_SIGNALS = 2
 LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
 LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
+# Consistency also tilts the MARGIN itself (user call): the side that hit its
+# SOS-adjusted win condition more often over the last 5 gets a small team_score
+# bump per game of difference (max 5 * 0.04 = 0.20, comparable to the BvP cap).
+CONS_MARGIN_W = 0.04
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
@@ -408,8 +413,16 @@ def _blended_iso(team: Team) -> float | None:
     return line.get("iso_neutral") if line else None
 
 
-def statistical_favorite(game: Game) -> tuple[Team, float, float]:
+def statistical_favorite(game: Game, cons: tuple[int, int] | None = None) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
+    # consistency tilt: (home hits, away hits) out of 5 from the SOS-adjusted
+    # back-test - the steadier side gets CONS_MARGIN_W per game of difference
+    if cons is not None:
+        cdiff = cons[0] - cons[1]
+        if cdiff > 0:
+            hs += CONS_MARGIN_W * cdiff
+        elif cdiff < 0:
+            as_ += CONS_MARGIN_W * -cdiff
     # BvP nudge, innings-projected: each lineup faces the opposing STARTER for his
     # projected innings and the (available-arms) PEN for the rest, so each side's
     # expected matchup OPS = starter_share * starter BvP + (1 - share) * pen BvP.
@@ -827,12 +840,17 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     game.home.platoon_factor = platoon_factor(game.home.offense.get("bats", []), home_opp)
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
-    adv_team, hs, as_ = statistical_favorite(game)
-    majority, majority_detail = public_majority(game, consensus, forum_counts,
-                                                reddit_counts, wiki_counts, extra_public)
-
+    # consistency first: both sides' last-5 win-condition hits feed the margin tilt
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
+    cons_pair = None
+    if wc_home and wc_away:
+        cons_pair = (wc_home["back_test"]["complete_win_condition"],
+                     wc_away["back_test"]["complete_win_condition"])
+
+    adv_team, hs, as_ = statistical_favorite(game, cons_pair)
+    majority, majority_detail = public_majority(game, consensus, forum_counts,
+                                                reddit_counts, wiki_counts, extra_public)
 
     # Cross-check the public read across all sources (covers % + forum + extras);
     # we only fade a read that's corroborated (see public_crosscheck).
@@ -843,7 +861,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     # the public is fading (keeps the public-vs-stats thesis).
     public_edge = bool(majority) and adv_team.team_id != majority.team_id
 
-    # consistency (the former win condition) - kept for the board as context only.
+    # consistency (the former win condition) - a signal AND a margin tilt now.
     adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
     cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
     edge_margin = abs(hs - as_)

@@ -25,7 +25,8 @@ from . import covers, espn, grade, notify, public_sources, reddit, tune, weather
 from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN,
                        PICK_MIN_SIGNALS, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms)
-from .mlb_api import enrich_with_stats, results_for, schedule_for, team_home_away_split
+from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
+                      team_home_away_split)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("main")
@@ -79,6 +80,9 @@ def run(date: str) -> dict:
         r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts, wiki_counts)
         r["game_datetime"] = g.start_time
         r["weather"] = g.weather
+        # HP umpire (display-only): MLB posts the crew close to first pitch, so
+        # this is usually None in the morning and filled by the pre-game refresh.
+        r["umpire_hp"] = hp_umpire(g.game_pk)
         results.append(r)
 
     # Line source = ESPN (true open + current moneyline for every game). For any
@@ -121,9 +125,9 @@ def run(date: str) -> dict:
     picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
     leans = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "lean"]
     locks = sum(1 for r in results if _play(r) == "lock")
-    stay = sum(1 for r in results if _play(r) == "stay_away")
-    log.info("Board: %d pick(s), %d lean(s), %d lock(s), %d stay-away",
-             len(picks), len(leans), locks, stay)
+    fades = sum(1 for r in results if _play(r) == "stay_away")
+    log.info("Board: %d pick(s) (+%d lock(s)), %d lean(s), %d fade(s)",
+             len(picks), locks, len(leans), fades)
 
     return {
         "date": date,
@@ -274,7 +278,11 @@ def _attach_line(game, result: dict, slate: list) -> None:
     maj = (result.get("public_majority") or {}).get("team")
     lock_profile = (shift is not None and shift <= -LINE_CONFIRM_MIN
                     and (maj is None or maj == opp_name))
-    if len(hits) >= PICK_MIN_SIGNALS:
+    # favorite + BvP alone don't make a pick: that exact 2-signal combo graded
+    # 8-10 (-3.50u) while every other 2+ combo was profitable, so a pick needs
+    # at least one of margin / line / consistency among its hits.
+    core_hit = m_hit or l_hit or c_hit
+    if len(hits) >= PICK_MIN_SIGNALS and core_hit:
         pc["play"] = "pick"
         pc["status"] = "pick"
         pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
@@ -298,11 +306,15 @@ def _attach_line(game, result: dict, slate: list) -> None:
     elif len(hits) >= 1:
         pc["play"] = "lean"
         pc["status"] = "lean"
-        pc["reason"] = f"1/5 signals — {', '.join(hits)}"
+        pc["reason"] = (f"{len(hits)}/5 signals but only favorite+BvP "
+                        f"(that combo graded 8-10) — lean, not a pick"
+                        if len(hits) >= PICK_MIN_SIGNALS
+                        else f"1/5 signals — {', '.join(hits)}")
     else:
-        # STAY AWAY: no merit on either read. The only tracked action in this
-        # pile is fading wherever the MONEY sits (unanimous money%); with no
-        # clean money read the game is listed but never bet.
+        # FADE (Vegas special): no merit on either read. The only tracked action
+        # in this pile is fading wherever the MONEY sits (unanimous money%); with
+        # no clean money read the game is listed but never bet. (play value stays
+        # 'stay_away' so older frozen snapshots keep grading identically.)
         pc["play"] = "stay_away"
         pc["status"] = "stay_away"
         ms = (result.get("public_check") or {}).get("money_side")
@@ -318,7 +330,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
                 pc["stay_bet"] = bet_team
                 pc["stay_odds"] = int(odds)
         money_team = (home if ms == "home" else away) if ms in ("home", "away") else None
-        pc["reason"] = (f"0/5 signals — fade the money (on {money_team})"
+        pc["reason"] = (f"0/5 signals — money's on {money_team}, bet the other side"
                         if pc["stay_bet"] else "0/5 signals — no clean money read, no bet")
 
 
@@ -412,38 +424,52 @@ def _cons_pair(g: dict) -> str:
     return f"{aa} {ah}/5 · {ha} {hh}/5"
 
 
+_SRC_LABELS = {"covers": "covers", "forum": "forum", "reddit": "reddit",
+               "scoresodds_bets": "S&O", "vsin_bets": "VSiN", "polymarket_bets": "Poly"}
+
+
+def _public_pairs(det: dict) -> list[tuple[float, float]]:
+    """Every public-% source as an (away%, home%) pair: covers consensus, each
+    book's bet%, and the forum/reddit tallies converted to shares. Wiki attention
+    is NOT a consensus number, so it stays out of the average."""
+    pairs: list[tuple[float, float]] = []
+    co = det.get("consensus")
+    if co:
+        p = list(co.get("pcts", {}).values())
+        if len(p) >= 2:
+            pairs.append((p[0], p[1]))
+    books = det.get("books") or {}
+    for bk in books.values():
+        pairs.append((bk["away"], bk["home"]))
+    so = det.get("sobets")            # pre-books schema (older locked snapshots)
+    if so and not books:
+        pairs.append((so["away"], so["home"]))
+    for key in ("forum", "reddit"):
+        t = det.get(key)
+        if t and (t.get("away", 0) + t.get("home", 0)):
+            tot = t["away"] + t["home"]
+            pairs.append((100.0 * t["away"] / tot, 100.0 * t["home"] / tot))
+    return pairs
+
+
 def _public_evidence(g: dict) -> str:
-    """Who the public is on + each source's numbers, compact. All pairs are
-    away/home, labeled once at the end with the team abbreviations."""
+    """Who the public is on + ONE combined number: every % source averaged per
+    team, labeled with the team abbreviations ('on MIA — MIA 68% v HOU 42%').
+    Per-source detail lives in the JSON and only surfaces on the check line
+    when sources disagree."""
     det = g["public_majority"]["detail"]
     team = g["public_majority"]["team"]
     if not team:
         return "no public read"
     aa, ha = _abbrs(g)
-    bits = []
-    co = det.get("consensus")
-    if co:
-        p = [int(round(v)) for v in co["pcts"].values()]
-        if len(p) >= 2:
-            bits.append(f"covers {p[0]}/{p[1]}%")
-    labels = {"scoresodds_bets": "S&O", "vsin_bets": "VSiN", "polymarket_bets": "Poly"}
-    books = det.get("books") or {}
-    for name, bk in books.items():
-        bits.append(f"{labels.get(name, name)} {int(bk['away'])}/{int(bk['home'])}%")
-    so = det.get("sobets")            # pre-books schema (older locked snapshots)
-    if so and not books:
-        bits.append(f"S&O {int(so['away'])}/{int(so['home'])}%")
-    fo = det.get("forum")
-    if fo:
-        bits.append(f"forum {fo['away']}/{fo['home']}")
-    rd = det.get("reddit")
-    if rd:
-        bits.append(f"reddit {rd['away']}/{rd['home']}")
-    wk = det.get("wiki")
-    if wk:
-        bits.append(f"wiki {_kfmt(wk['away'])}/{_kfmt(wk['home'])}")
-    ev = f" — {' · '.join(bits)} ({aa}/{ha})" if bits else ""
-    return f"on {_short(g, team)}{ev}"
+    pairs = _public_pairs(det)
+    if not pairs:
+        return f"on {_short(g, team)}"
+    ap = round(sum(p[0] for p in pairs) / len(pairs))
+    hp = round(sum(p[1] for p in pairs) / len(pairs))
+    n = len(pairs)
+    return (f"on {_short(g, team)} — {aa} {ap}% v {ha} {hp}% "
+            f"(avg of {n} source{'s' if n > 1 else ''})")
 
 
 def _line_phrase(lc: dict | None) -> str:
@@ -468,33 +494,40 @@ def _line_bullet(pc: dict) -> str | None:
 
 
 def _public_check_phrase(g: dict) -> str | None:
-    """One-line public-consensus cross-check: the verdict, how many sources agree,
-    whether the money moved with or against the public, and any anomaly flags.
-    None when there's no public read to check."""
+    """The public-consensus cross-check, shown ONLY when something's off: sources
+    disagreeing on the public side (named, with who went which way) or an anomaly
+    flag. When every source agrees the check stays behind the scenes (it's in the
+    JSON). Historical note: on sources-split games the majority side still won
+    59% (19-13), so disagreement is a caution, not a veto."""
     cc = g.get("public_check")
     if not cc or not cc.get("majority_side"):
         return None
-    plain = {"corroborated": "all sources agree", "mostly agrees": "most sources agree",
-             "sources split": "sources disagree", "unconfirmed": "only 1 source"}
-    v = cc.get("verdict", "unconfirmed")
-    parts = [plain.get(v, v)]
-    n = len(cc.get("sources", []))
-    if n > 1:
-        parts.append(f"{cc.get('agree', 0)}/{n} sources")
+    if not cc.get("dissent") and not cc.get("flags"):
+        return None
+    parts = []
+    if cc.get("dissent"):
+        ms = cc["majority_side"]
+        maj_team = _short(g, g["matchup"].split(" @ ")[1 if ms == "home" else 0])
+        other = _short(g, g["matchup"].split(" @ ")[0 if ms == "home" else 1])
+        with_names = [_SRC_LABELS.get(s["name"], s["name"])
+                      for s in cc.get("sources", []) if s.get("agrees")]
+        against = [_SRC_LABELS.get(s["name"], s["name"])
+                   for s in cc.get("sources", []) if not s.get("agrees")]
+        parts.append(f"sources disagree — {', '.join(against)} on {other}"
+                     + (f"; {', '.join(with_names)} on {maj_team}" if with_names else ""))
     line = cc.get("line", "unknown")
-    if line == "with public":
-        parts.append("line with public")
-    elif line == "against public":
+    if line == "against public":
         parts.append("line AGAINST public (RLM)")
     money = cc.get("money", "unknown")
-    if money == "with public":
-        parts.append("$ with public")
-    elif money == "against public":
+    if money == "against public":
         parts.append("$ AGAINST public")
-    s = " · ".join(parts)
-    if cc.get("flags"):
-        s += " · ⚠️ " + "; ".join(cc["flags"])
-    return s
+    s = " · ".join(parts) if parts else ""
+    flags = [f for f in cc.get("flags", [])         # drop the two flags the parts above
+             if "other side from the public" not in f    # already say ('$ AGAINST' / RLM)
+             and "reverse line move" not in f]
+    if flags:
+        s += (" · " if s else "") + "⚠️ " + "; ".join(flags)
+    return s or None
 
 
 def _bvp_phrase(g: dict) -> str | None:
@@ -530,6 +563,12 @@ def _pen_bvp_phrase(g: dict) -> str | None:
             f"{aa} {b['away_ops']:.3f} v {ha} {b['home_ops']:.3f} ({b['total_pa']} PA)")
 
 
+def _ump_phrase(g: dict) -> str | None:
+    """'HP ump: John Doe' once MLB posts the crew (display-only context)."""
+    u = g.get("umpire_hp")
+    return f"HP ump: {u}" if u else None
+
+
 def _situational_phrase(g: dict) -> str | None:
     """'NYY 24-15 home · BOS 18-21 road' — this-season straight-up situational
     records (display-only context). None when unavailable."""
@@ -557,7 +596,8 @@ def _lock_bet(g: dict) -> tuple[str | None, int | None]:
 
 
 def _stay_line(g: dict) -> str:
-    """One-liner for a STAY-AWAY game: the money-fade bet when there is one."""
+    """One-liner for a FADE (Vegas special) game: the money-fade bet when there
+    is one. (play value is still 'stay_away' for snapshot compatibility.)"""
     pc = g["pick_criteria"]
     bet = pc.get("stay_bet")
     if bet:
@@ -578,13 +618,13 @@ def _star(pc: dict) -> list[str]:
 
 
 def _game_lines(g: dict) -> list[str]:
-    """Readable lines breaking down one matchup for the board. Fades collapse to a
-    one-liner naming the side to bet; passes to a plain one-liner."""
+    """Readable lines breaking down one matchup for the board. LOCK picks and
+    fades collapse to a one-liner naming the side to bet."""
     pc = g["pick_criteria"]
     if _play(g) == "lock":
         bet, odds = _lock_bet(g)
         odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-        return [f"🔒 {_state_tag(g)}{g['matchup']} → **LOCK: bet {bet}"
+        return [f"🔒 {_state_tag(g)}{g['matchup']} → **PICK (LOCK): bet {bet}"
                 f"{odds_s}** — {pc.get('reason', '')}"]
     if _play(g) == "stay_away":
         return [_stay_line(g)]
@@ -617,6 +657,9 @@ def _game_lines(g: dict) -> list[str]:
     wx = _weather_phrase(g)
     if wx:
         lines.append(f"   • weather: {wx} _(context)_")
+    ump = _ump_phrase(g)
+    if ump:
+        lines.append(f"   • {ump} _(context)_")
     sit = _situational_phrase(g)
     if sit:
         lines.append(f"   • this season: {sit} _(context)_")
@@ -636,10 +679,11 @@ def build_summary(payload: dict) -> str:
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
     locks = [g for g in board if _play(g) == "lock"]
-    stay = [g for g in board if _play(g) == "stay_away"]
+    fades = [g for g in board if _play(g) == "stay_away"]
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} pick(s) · {len(leans)} lean(s) · {len(locks)} LOCK(s) · "
-               f"{len(stay)} stay-away**"
+    out.append(f"**{len(picks) + len(locks)} pick(s)"
+               + (f" (incl. {len(locks)} 🔒)" if locks else "")
+               + f" · {len(leans)} lean(s) · {len(fades)} fade(s)**"
                + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
                   if picks else ""))
     if finals:
@@ -655,9 +699,10 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_✅ = PICK (2+ signals). ⭐ = pick on a proven-hot combo (margin+favorite+line, or "
-               "4+ signals). 🔸 = LEAN (1 signal). 🔒 = LOCK (9-1 profile: line + public both "
-               "favor the other side - bet them). 🔄 = STAY AWAY money-fade. ▫️ = stay away, "
-               "no clean money read. 🔴 = live._")
+               "4+ signals). 🔒 = LOCK pick (9-1 profile: line + public both favor the other "
+               "side - bet them; graded with the picks). 🔸 = LEAN (1 signal). 🔄 = FADE "
+               "(Vegas special: no signals, bet against the money side). ▫️ = no clean money "
+               "read, no bet. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -689,21 +734,26 @@ def _ml_str(pc: dict) -> str:
 
 
 def _telegram_records_lines() -> list[str]:
-    """Day/Week/Month/YTD records for both books, laid out one window per line."""
+    """Day/Week/Month/YTD records per book plus the all-time combined row, laid
+    out one window per line. Picks include the 🔒 LOCK plays; Fades are the
+    Vegas-special money-fades."""
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    for name, key, hyp in (("Picks", "picks", False), ("Leans", "leans", False),
-                           ("Fades", "fades", False),
-                           ("Stay away", "stay_away", False)):
-        tag = " (hypothetical)" if hyp else ""
-        rec = grade.windowed_records(ledger[key], today)
+    books = [("Picks", ledger["picks"]), ("Leans", ledger["leans"]),
+             ("Fades", ledger["fades"]),
+             ("All plays", grade.combined_book(ledger))]
+    for name, book in books:
+        rec = grade.windowed_records(book, today)
         if not rec:
-            out.append(f"{name}{tag}: no settled bets yet")
+            out.append(f"{name}: no settled bets yet")
             continue
-        out.append(f"{name}{tag}:")
+        out.append(f"{name}:")
         for label, (w, l, u) in rec:
             out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
+        if name == "All plays":
+            w, l, u = grade._tally(book["entries"])
+            out.append(f"   • All-time: {w}-{l} ({u:+.2f}u)")
     return out
 
 
@@ -717,15 +767,16 @@ def telegram_text(payload: dict) -> str:
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
     locks = [g for g in board if _play(g) == "lock"]
-    stay = [g for g in board if _play(g) == "stay_away"]
+    fades = [g for g in board if _play(g) == "stay_away"]
 
     L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} pick(s) · {len(leans)} lean(s) · {len(locks)} LOCK(s) · "
-         f"{len(stay)} stay-away"]
+         f"{len(picks) + len(locks)} pick(s)"
+         + (f" (incl. {len(locks)} 🔒)" if locks else "")
+         + f" · {len(leans)} lean(s) · {len(fades)} fade(s)"]
     if finals:
         L.append(f"({len(finals)} final → moved to the record)")
 
-    for g in picks + leans:
+    def block(g):
         pc = g["pick_criteria"]
         aa, ha = _abbrs(g)
         adv = _short(g, pc["advantage_team"])
@@ -736,12 +787,12 @@ def telegram_text(payload: dict) -> str:
         star = _star(pc)
         kind = _play(g).upper()
         mark = "⭐" if star else ("✅" if kind == "PICK" else "🔸")
-        L += ["",
-              f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
-              f"   {aa} @ {ha}",
-              f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
-              f"   👥 public {_public_evidence(g)}",
-              f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"]
+        L.extend(["",
+                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
+                  f"   {aa} @ {ha}",
+                  f"   edge: {edge} ({emargin}) · consistency {_cons_pair(g)}",
+                  f"   👥 public {_public_evidence(g)}",
+                  f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
@@ -754,28 +805,35 @@ def telegram_text(payload: dict) -> str:
         wx = _weather_phrase(g)
         if wx:
             L.append(f"   🌤 {wx}")
+        ump = _ump_phrase(g)
+        if ump:
+            L.append(f"   🧑‍⚖️ {ump}")
         sit = _situational_phrase(g)
         if sit:
             L.append(f"   📅 {sit}")
         L.append(f"   ✅ {pc['reason']}"
                  + (f" · ⭐ {', '.join(star)}" if star else ""))
-    if not picks and not leans:
+
+    # the pick column: full pick blocks, then the 🔒 LOCK plays (graded as picks)
+    for g in picks:
+        block(g)
+    for g in locks:
+        aa, ha = _abbrs(g)
+        pc = g["pick_criteria"]
+        tag = "🔴 " if g.get("state") == "live" else ""
+        bet, odds = _lock_bet(g)
+        odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
+        L += ["", f"🔒 {tag}PICK (LOCK) {_short(g, bet)}{odds_s}",
+              f"   {aa} @ {ha}",
+              f"   ✅ {pc.get('reason', '')}"]
+    for g in leans:
+        block(g)
+    if not picks and not locks and not leans:
         L += ["", "No picks or leans on the slate."]
 
-    if locks:
-        L += ["", "— LOCKS (the 9-1 profile: bet the other side) —"]
-        for g in locks:
-            aa, ha = _abbrs(g)
-            pc = g["pick_criteria"]
-            tag = "🔴 " if g.get("state") == "live" else ""
-            bet, odds = _lock_bet(g)
-            odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-            L.append(f"🔒 {tag}{aa} @ {ha} → bet {_short(g, bet)}{odds_s}"
-                     f" — {pc.get('reason', '')}")
-
-    if stay:
-        L += ["", "— STAY AWAY (only action: fade the money) —"]
-        for g in stay:
+    if fades:
+        L += ["", "— FADES (Vegas special: bet against the money) —"]
+        for g in fades:
             aa, ha = _abbrs(g)
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""

@@ -149,6 +149,20 @@ def results_for(date: str) -> dict[int, dict]:
     return out
 
 
+def hp_umpire(game_pk: int) -> str | None:
+    """The home-plate umpire's name from the game's boxscore officials. MLB posts
+    the crew shortly before first pitch, so the morning run usually gets None and
+    the pre-game refresh fills it in. Display-only context; fails soft."""
+    try:
+        data = _get(f"game/{game_pk}/boxscore")
+        for o in data.get("officials", []):
+            if o.get("officialType") == "Home Plate":
+                return o.get("official", {}).get("fullName") or None
+    except Exception:
+        pass
+    return None
+
+
 def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")
