@@ -114,6 +114,17 @@ LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
 # SOS-adjusted win condition more often over the last 5 gets a small team_score
 # bump per game of difference (max 5 * 0.04 = 0.20, comparable to the BvP cap).
 CONS_MARGIN_W = 0.04
+# Umpire x strikeouts (feeds the same matchup layer as BvP): a big-zone HP ump
+# (K/gm well above league, from output/ump_tendencies_<season>.json built by
+# src/umpire.py) hurts the strikeout-prone lineup more, so the margin tilts
+# toward the lower-K side. The ump is only posted near first pitch, so this
+# fires at the pre-game refresh; unknown ump / no table / thin sample = no tilt.
+UMP_MIN_GAMES = 12    # ump needs this many games behind the tendency
+UMP_K_EXTRA = 0.7     # Ks/game above league that counts as a big zone
+UMP_KGAP_FLOOR = 0.015  # blended lineup K% gap below this = no meaningful edge
+UMP_TILT_SCALE = 2.0    # tilt = min(scale * K% gap, cap)
+UMP_TILT_CAP = 0.06
+
 # Public-margin gate (106-game backtest of avg public % vs outcomes): a MILD
 # public lean (50-70%) is the sharp side - it wins 56-60% and picks made INTO it
 # went 3-5 (38%) / all stat sides into it 12-19 (-7.52u). A HEAVY lean
@@ -421,6 +432,12 @@ def _blended_iso(team: Team) -> float | None:
     return line.get("iso_neutral") if line else None
 
 
+def _blended_kpct(team: Team) -> float | None:
+    line = _blend_offense_lines(offense_line(team.offense),
+                                offense_line(team.season_offense))
+    return line.get("k_pct") if line else None
+
+
 def statistical_favorite(game: Game, cons: tuple[int, int] | None = None) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
     # consistency tilt: (home hits, away hits) out of 5 from the SOS-adjusted
@@ -467,6 +484,19 @@ def statistical_favorite(game: Game, cons: tuple[int, int] | None = None) -> tup
         if hi is not None and ai is not None and abs(hi - ai) >= WX_ISO_FLOOR:
             tilt = min(WX_ISO_SCALE * abs(hi - ai), WX_TILT_CAP)
             if hi > ai:
+                hs += tilt
+            else:
+                as_ += tilt
+    # umpire x strikeouts: a big-zone HP ump hurts the strikeout-prone lineup
+    # more - tilt toward the lower-K side (only known near first pitch, so this
+    # lands at the pre-game refresh; fail-soft when unknown)
+    u = getattr(game, "ump_tend", None)
+    if (u and u.get("games", 0) >= UMP_MIN_GAMES
+            and (u.get("k_extra") or 0) >= UMP_K_EXTRA):
+        hk, ak = _blended_kpct(game.home), _blended_kpct(game.away)
+        if hk is not None and ak is not None and abs(hk - ak) >= UMP_KGAP_FLOOR:
+            tilt = min(UMP_TILT_SCALE * abs(hk - ak), UMP_TILT_CAP)
+            if hk < ak:      # home lineup strikes out less -> zone helps them
                 hs += tilt
             else:
                 as_ += tilt

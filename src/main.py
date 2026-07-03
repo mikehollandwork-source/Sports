@@ -21,10 +21,11 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune, weather, wiki
+from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN,
-                       PICK_MIN_SIGNALS, PUBLIC_HEAVY, _canon_abbr, _implied,
-                       evaluate_game, find_slate_line, line_confirms)
+                       PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA, UMP_MIN_GAMES,
+                       _canon_abbr, _implied, evaluate_game, find_slate_line,
+                       line_confirms)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
                       team_home_away_split)
 
@@ -77,12 +78,20 @@ def run(date: str) -> dict:
             g.weather = weather.forecast_for(g.venue, g.start_time)
         except Exception as exc:
             log.warning("weather failed for %s: %s", g.game_pk, exc)
+        # HP umpire before evaluation too: a big-zone ump tilts the margin
+        # (umpire.tendency). MLB posts the crew close to first pitch, so the
+        # morning run usually gets None and the pre-game refresh fills it in.
+        try:
+            g.umpire_hp = hp_umpire(g.game_pk)
+            g.ump_tend = umpire.tendency(g.umpire_hp, int(date[:4]))
+        except Exception as exc:
+            log.warning("umpire failed for %s: %s", g.game_pk, exc)
+            g.umpire_hp, g.ump_tend = None, None
         r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts, wiki_counts)
         r["game_datetime"] = g.start_time
         r["weather"] = g.weather
-        # HP umpire (display-only): MLB posts the crew close to first pitch, so
-        # this is usually None in the morning and filled by the pre-game refresh.
-        r["umpire_hp"] = hp_umpire(g.game_pk)
+        r["umpire_hp"] = g.umpire_hp
+        r["ump_tend"] = g.ump_tend
         results.append(r)
 
     # Line source = ESPN (true open + current moneyline for every game). For any
@@ -593,9 +602,19 @@ def _pen_bvp_phrase(g: dict) -> str | None:
 
 
 def _ump_phrase(g: dict) -> str | None:
-    """'HP ump: John Doe' once MLB posts the crew (display-only context)."""
+    """'HP ump: John Doe — big zone (K +0.9/gm)' once MLB posts the crew. The
+    tendency comes from the committed ump table; a big-zone ump also tilts the
+    margin toward the lower-K lineup (see analysis)."""
     u = g.get("umpire_hp")
-    return f"HP ump: {u}" if u else None
+    if not u:
+        return None
+    t = g.get("ump_tend")
+    if t and t.get("games", 0) >= UMP_MIN_GAMES:
+        ke = t.get("k_extra") or 0
+        zone = ("big zone" if ke >= UMP_K_EXTRA
+                else "tight zone" if ke <= -UMP_K_EXTRA else "neutral zone")
+        return f"HP ump: {u} — {zone} (K {ke:+.1f}/gm, {t['games']} gm)"
+    return f"HP ump: {u}"
 
 
 def _situational_phrase(g: dict) -> str | None:
