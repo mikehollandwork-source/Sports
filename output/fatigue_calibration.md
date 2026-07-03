@@ -2,6 +2,16 @@
 
 **1296 games.**
 
+## Road-trip depth, home-field controlled (the decisive cut)
+AWAY games only — win rate by the away team's road_streak. A decline across bands = real incremental fatigue; flat = just ordinary away disadvantage. (Away baseline ≈ 47%.)
+
+| away team's road_streak | away games | win rate |
+|---|---|---|
+| 1-2 | 438 | 49% |
+| 3-5 | 574 | 46% |
+| 6-8 | 250 | 48% |
+| 9-+ | 34 | 35% |
+
 ## Head-to-head — the MORE-fatigued team's win rate (want < 50%)
 
 | signal | games | tired team won |
