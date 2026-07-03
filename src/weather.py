@@ -79,6 +79,19 @@ def _compass(deg: float) -> str:
     return _COMPASS[int((deg / 22.5) + 0.5) % 16]
 
 
+def _resolve(venue: str) -> tuple[float, float, str] | None:
+    """Coords+roof for a venue, tolerant of MLB's sponsor-prefixed names (e.g.
+    'UNIQLO Field at Dodger Stadium' -> Dodger Stadium). Exact match first, then a
+    substring match either way so a renamed park still resolves."""
+    v = venue or ""
+    if v in STADIUMS:
+        return STADIUMS[v]
+    for name, spot in STADIUMS.items():
+        if name in v or v in name:
+            return spot
+    return None
+
+
 def _open_meteo(lat: float, lon: float, start: dt.datetime) -> dict:
     """Open-Meteo conditions at the start hour (already in F / mph). Raises on
     any failure so the caller can fall back."""
@@ -124,7 +137,7 @@ def _met_norway(lat: float, lon: float, start: dt.datetime) -> dict:
 def forecast_for(venue: str, iso_start: str | None) -> dict | None:
     """Conditions at the game's start hour. None when the venue is unknown, the
     start time is missing, or BOTH sources fail (board omits the line)."""
-    spot = STADIUMS.get(venue or "")
+    spot = _resolve(venue)
     if not spot or not iso_start:
         return None
     lat, lon, roof = spot
