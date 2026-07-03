@@ -35,6 +35,7 @@ SPORT_ID = 1
 TIMEOUT = 20
 POLITE_DELAY = 0.1
 SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
+PEN_BVP_MAX_ARMS = 6       # opposing relievers per game checked for bullpen BvP
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
@@ -65,6 +66,7 @@ class Team:
     offense: dict = field(default_factory=dict)   # last-5 rate line (see analysis)
     starter_fip_last5: float | None = None
     starter_fip_season: float | None = None  # probable starter's season FIP (stable anchor)
+    starter_proj_ip: float | None = None     # projected innings (season IP per start)
     bullpen_fip_last5: float | None = None
     starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
     bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
@@ -75,6 +77,9 @@ class Team:
     bvp_pa: int = 0                # total career PA behind that OPS (sample size / trust)
     bvp_hand_ops: float | None = None  # team OPS vs the opp starter's HAND (big sample)
     bvp_hand_pa: int = 0               # PA behind the vs-hand number
+    pen_bvp_ops: float | None = None   # lineup's career OPS vs the opp BULLPEN (late game)
+    pen_bvp_pa: int = 0                # career PA behind the pen number
+    season_offense: dict = field(default_factory=dict)  # season counting stats (anchor)
 
 
 @dataclass
@@ -86,6 +91,7 @@ class Game:
     venue: str = ""
     park_factor: float = 1.0
     start_time: str = ""   # first-pitch ISO datetime (UTC), e.g. "2026-06-25T23:10:00Z"
+    weather: dict | None = None   # game-time conditions (main attaches pre-evaluation)
 
 
 # --- schedule -----------------------------------------------------------------
@@ -143,6 +149,20 @@ def results_for(date: str) -> dict[int, dict]:
     return out
 
 
+def hp_umpire(game_pk: int) -> str | None:
+    """The home-plate umpire's name from the game's boxscore officials. MLB posts
+    the crew shortly before first pitch, so the morning run usually gets None and
+    the pre-game refresh fills it in. Display-only context; fails soft."""
+    try:
+        data = _get(f"game/{game_pk}/boxscore")
+        for o in data.get("officials", []):
+            if o.get("officialType") == "Home Plate":
+                return o.get("official", {}).get("fullName") or None
+    except Exception:
+        pass
+    return None
+
+
 def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")
@@ -162,6 +182,32 @@ def _ip_to_innings(ip) -> float:
         return int(whole or 0) + (int(frac or 0) / 3.0)
     except (ValueError, TypeError):
         return 0.0
+
+
+_SEASON_OFF_CACHE: dict = {}
+
+
+def team_season_offense(team_id: int, season: int) -> dict:
+    """A team's season-to-date hitting counting stats in the same shape as the
+    last-5 aggregation (the season anchor for the offense blend). Cached; {} on
+    failure. Season-to-date (not point-in-time) - fine for the live board."""
+    key = (team_id, season)
+    if key in _SEASON_OFF_CACHE:
+        return _SEASON_OFF_CACHE[key]
+    agg: dict = {}
+    try:
+        data = _get(f"teams/{team_id}/stats", stats="season", group="hitting",
+                    season=season)
+        for st in data.get("stats", []):
+            for sp in st.get("splits", []):
+                raw = sp.get("stat", {})
+                agg = {k: float(raw.get(api, 0) or 0) for k, api in HIT_FIELDS.items()}
+                agg["park_factor"] = 1.0   # a season mixes parks ~evenly
+                break
+    except Exception as exc:
+        log.warning("season offense failed for %s: %s", team_id, exc)
+    _SEASON_OFF_CACHE[key] = agg
+    return agg
 
 
 _VS_HAND_CACHE: dict = {}
@@ -558,6 +604,20 @@ def team_last5_gamelog(team_id: int, season: int, as_of: str | None = None) -> l
     return out
 
 
+def _pen_available(pid: int, season: int, date: str) -> bool:
+    """False when the reliever pitched on BOTH of the two days before `date` -
+    the classic 'unavailable tonight' pattern. Errors default to available (the
+    game log is cached, so this rides on fetches the pen-FIP pass already makes)."""
+    try:
+        recent = {sp.get("date") for sp in _last_n_gamelog(pid, "pitching", season, 4,
+                                                           as_of=date)}
+    except Exception:
+        return True
+    d = dt.date.fromisoformat(date)
+    return not ({(d - dt.timedelta(days=1)).isoformat(),
+                 (d - dt.timedelta(days=2)).isoformat()} <= recent)
+
+
 def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
     """Active-roster pitchers other than today's probable starter (the bullpen)."""
     data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
@@ -604,7 +664,9 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                 opp_fip_w += pa
             bats.append((h.hand, pa))
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
+        team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
         team.offense = agg
+        team.season_offense = team_season_offense(team.team_id, season)
         team.offense["bats"] = bats  # consumed by analysis.platoon_factor
         sos["bat_opp_fip"] = (opp_fip_num / opp_fip_w) if opp_fip_w else None
         sos["bat_opp_win"] = (opp_win_num / park_den) if park_den else 0.5
@@ -642,6 +704,8 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
             # season-to-date starter FIP (stable anchor; calibrated 55% lever)
             try:
                 t = pitcher_season_line(team.probable_pitcher.player_id, season, as_of=as_of)
+                if t.get("gs"):
+                    team.starter_proj_ip = round(t["ip"] / t["gs"], 2)
                 if t["ip"] >= SEASON_FIP_MIN_IP:
                     from .analysis import FIP_CONSTANT
                     team.starter_fip_season = round(
@@ -670,5 +734,26 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
             team.games_last5 = team_last5_gamelog(team.team_id, season, as_of=as_of)
         except Exception as exc:
             log.warning("last-5 game log failed for %s: %s", team.name, exc)
+
+    # --- bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen's AVAILABLE
+    # arms (a reliever who pitched both of the last two days is almost certainly
+    # down tonight). Capped at PEN_BVP_MAX_ARMS to bound API load; exact career
+    # numbers only (no vs-hand backbone - the pen mixes hands).
+    for team, opp in ((game.home, game.away), (game.away, game.home)):
+        try:
+            opp_sp_id = opp.probable_pitcher.player_id if opp.probable_pitcher else None
+            pen = [pid for pid in reliever_ids(opp.team_id, date, opp_sp_id)
+                   if _pen_available(pid, season, date)][:PEN_BVP_MAX_ARMS]
+            pa_tot = ops_w = 0.0
+            for bid in getattr(team, "_hitter_ids", []):
+                for pid in pen:
+                    b = batter_vs_pitcher(bid, pid)
+                    if b["pa"] > 0:
+                        pa_tot += b["pa"]
+                        ops_w += b["ops"] * b["pa"]
+            team.pen_bvp_ops = round(ops_w / pa_tot, 3) if pa_tot else None
+            team.pen_bvp_pa = int(pa_tot)
+        except Exception as exc:
+            log.warning("pen BvP failed for %s: %s", team.name, exc)
 
     return game

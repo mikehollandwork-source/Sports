@@ -240,7 +240,7 @@ def forum_majority(teams: list[tuple[str, str]], date: str) -> dict[str, int]:
     return counts
 
 
-FORUM_MAX_THREADS = 20  # most-recent threads to crawl for today's posts
+FORUM_MAX_THREADS = 40  # most-recent threads to crawl for today's posts
 
 
 def _todays_thread_posts(listing_soup: BeautifulSoup, date: str,
@@ -254,14 +254,30 @@ def _todays_thread_posts(listing_soup: BeautifulSoup, date: str,
         tsoup, _, _ = _fetch(url)
         if tsoup is None:
             continue
-        for brick in tsoup.select(".covers-CoversForum-postBrick"):
-            stamp = brick.find("time", attrs={"datetime": True})
-            if not stamp or stamp.get("datetime", "")[:10] != date:
-                continue
-            body_el = brick.select_one(".raw-post-body")
-            body = body_el.get_text(" ", strip=True) if body_el else ""
-            if body:
-                posts.append(body)
+        pages = [tsoup]
+        # long threads paginate - today's posts are usually on the LAST pages, so
+        # follow up to 3 more pages from the pagination container (fail soft)
+        try:
+            extra = []
+            for a in tsoup.select(".covers-CoversForum-paginationContainer a[href]"):
+                u = _abs_forum(a["href"])
+                if u != url and u not in extra:
+                    extra.append(u)
+            for u in extra[-3:]:
+                psoup, _, _ = _fetch(u)
+                if psoup is not None:
+                    pages.append(psoup)
+        except Exception as exc:
+            log.warning("thread pagination failed: %s", exc)
+        for page in pages:
+            for brick in page.select(".covers-CoversForum-postBrick"):
+                stamp = brick.find("time", attrs={"datetime": True})
+                if not stamp or stamp.get("datetime", "")[:10] != date:
+                    continue
+                body_el = brick.select_one(".raw-post-body")
+                body = body_el.get_text(" ", strip=True) if body_el else ""
+                if body:
+                    posts.append(body)
     return posts
 
 

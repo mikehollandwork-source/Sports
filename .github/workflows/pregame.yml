@@ -7,7 +7,8 @@ name: Pre-game refresh
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/15 0-3,16-23 * * *"   # ~12:00-23:00 ET, covers afternoon -> late games
+    - cron: "*/10 0-4,15-23 * * *"   # ~11:00-00:00 ET; GitHub throttles this hard,
+                                     # the wide due-horizon in src/pregame.py compensates
 
 permissions:
   contents: write

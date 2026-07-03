@@ -41,6 +41,12 @@ LEAGUE_SB_RATE = 0.018   # SB per PA
 
 # offense component weights (sum ~1.0; wOBA is the backbone)
 W_WOBA, W_ISO, W_DISC, W_SPEED = 0.55, 0.20, 0.15, 0.10
+# Season anchor for the offense rates. The POINT of the offense index is current
+# form ("who's better at the moment"), so last-5 keeps the majority; the season
+# line only sands the worst 5-game noise off (~190 team PA is a tiny sample).
+# The graded-game audit showed the offense/ISO gaps separate winners from losers,
+# so a steadier estimate of them should sharpen the margin.
+OFF_SEASON_WEIGHT = 0.40
 # pitching weights: starters throw ~55% of innings, bullpen ~45%
 W_SP, W_BP = 0.55, 0.45
 # The probable starter's season FIP is the single biggest single-game lever
@@ -62,7 +68,7 @@ SOS_CLAMP = (0.80, 1.25)
 # Each signal becomes a "lean toward the home team" in [-1, 1]; the weighted
 # blend's sign picks the public-majority side. Raise PUBLIC_W_FORUM toward 1.0 to
 # make the forum the sole voice; lower it to let consensus matter more.
-PUBLIC_W_FORUM = 0.65
+PUBLIC_W_FORUM = 0.75   # forum votes are few, so each weighs more (user call)
 PUBLIC_W_CONSENSUS = 0.35
 PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, weighted
                          # like covers consensus (the blend normalizes by weights present)
@@ -74,14 +80,40 @@ PUBLIC_W_SOBETS = 0.35   # Scores & Odds bet% — an independent book number, we
 #   robust gaps get a small vote; they can tilt a close lean, not manufacture one).
 BVP_FLOOR = 0.05
 BVP_TILT_CAP = 0.10
+BVP_PEN_SHARE = 0.35   # FALLBACK pen share when a starter has no projected innings;
+                       # normally the split is innings-projected per side (see
+                       # statistical_favorite: opposing starter's season IP/start / 9)
+PEN_BVP_MIN_PA = 100   # career PA behind the pen number before it joins the tilt
+PROJ_IP_CLAMP = (3.0, 7.5)   # sane bounds on a projected start
 
-# The lean bar (from the 06-26..07-01 graded-lean autopsy): a game is a LEAN only
-# when EVERY winner signal hits - margin, favorite, line moved toward the lean,
-# consistency, BvP not against. Everything else is a FADE (bet against the stat
-# favorite). There is no separate "pick" tier.
-LEAN_STRONG_MARGIN = 0.30    # stat-edge margin bar (64% at/above vs 48% below)
-LEAN_MIN_CONSISTENCY = 3     # advantage team's consistency hits out of 5 (73% at >=3)
-LEAN_ELEVATED_MARGIN = 0.45  # 'very high' margin; 2+ very-high indicators = ⭐ lean
+# Weather x power (calibrated 2026-04-13..06-26, 486 open-air games): in hot/windy
+# conditions the power team won 57% vs 52% mild (+5%, ~1 SE - wired at user request,
+# so sized conservatively: capped BELOW home field). Open-air only; the nudge goes
+# to the higher-ISO side, scaled by the ISO gap.
+WX_HOT_TEMP = 85      # deg F at first pitch
+WX_WINDY_MPH = 12     # wind speed
+WX_ISO_FLOOR = 0.010  # blended-ISO gap below this = no meaningful power edge
+WX_ISO_SCALE = 2.5    # tilt = min(scale * gap, cap)
+WX_TILT_CAP = 0.08
+
+# Play taxonomy (from the 06-26..07-01 graded-lean autopsy). Count the five winner
+# signals - margin, favorite, line toward, consistency, BvP not against:
+#   PICK = >= PICK_MIN_SIGNALS hits with at least one of margin/line/consistency
+#          (the >=2 tier went 62% +5.66u, stacking to 77% at >=3 and 89% at >=4;
+#          favorite+BvP alone graded 8-10 so that pair only makes a lean).
+#   COIN FLIP = the old LOCK profile (line toward the opponent + public not
+#          against them, bet the opponent) - back-tested to a coin flip (2-4),
+#          so it's its own separately-graded category.
+#   LEAN = exactly 1 hit (or the demoted favorite+BvP pair).
+#   FADE = everything else (the Vegas special): bet against the unanimous
+#          money% side; no clean money read = listed, never booked.
+PICK_MIN_SIGNALS = 2
+LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
+LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
+# Consistency also tilts the MARGIN itself (user call): the side that hit its
+# SOS-adjusted win condition more often over the last 5 gets a small team_score
+# bump per game of difference (max 5 * 0.04 = 0.20, comparable to the BvP cap).
+CONS_MARGIN_W = 0.04
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
@@ -114,7 +146,9 @@ LINE_BIG = 0.08           # ~30c+; treat as news, verify before trusting
 
 def _apply_tuning() -> None:
     """Override the decision params from output/tuning.json (written by the
-    bankroll auto-tuner). Absent/invalid file -> the defaults above stand."""
+    bankroll auto-tuner). DISABLED for now (user request) - the auto-tuner is
+    off, so the defaults above always stand."""
+    return
     import json
     import os
     path = os.path.join(os.path.dirname(__file__), "..", "output", "tuning.json")
@@ -200,8 +234,21 @@ def opp_offense_factor(opp_woba: float | None, opp_win: float | None) -> float:
     return _clamp(1.0 + W_SOS_STAT * woba_idx + W_SOS_WIN * win_idx)
 
 
+def _blend_offense_lines(last5: dict, season: dict) -> dict:
+    """Blend the last-5 rate line with the season rate line (form-forward:
+    last-5 gets 1-OFF_SEASON_WEIGHT). Falls back to whichever exists."""
+    if not season:
+        return last5
+    if not last5:
+        return season
+    keys = ("woba_neutral", "iso_neutral", "bb_pct", "k_pct", "sb_rate")
+    return {k: (1 - OFF_SEASON_WEIGHT) * last5[k] + OFF_SEASON_WEIGHT * season[k]
+            for k in keys}
+
+
 def offense_index(team: Team) -> float:
-    line = offense_line(team.offense)
+    line = _blend_offense_lines(offense_line(team.offense),
+                                offense_line(team.season_offense))
     if not line:
         return 0.0
     # strength-of-schedule: scale run production by the pitching the bats faced
@@ -361,15 +408,61 @@ def win_condition_core(team_games_last5: list, team_fip: float | None,
 
 
 # --- decision -----------------------------------------------------------------
-def statistical_favorite(game: Game) -> tuple[Team, float, float]:
+def _blended_iso(team: Team) -> float | None:
+    line = _blend_offense_lines(offense_line(team.offense),
+                                offense_line(team.season_offense))
+    return line.get("iso_neutral") if line else None
+
+
+def statistical_favorite(game: Game, cons: tuple[int, int] | None = None) -> tuple[Team, float, float]:
     hs, as_ = team_score(game.home) + HOME_FIELD, team_score(game.away)   # home-field bump
-    b = bvp_read(game)
-    if b and b.get("meaningful") and b.get("edge_team"):   # BvP nudge, meaningful gaps only
-        tilt = min(b["gap"] - BVP_FLOOR, BVP_TILT_CAP)
-        if b["edge_team"] == game.home.name:
+    # consistency tilt: (home hits, away hits) out of 5 from the SOS-adjusted
+    # back-test - the steadier side gets CONS_MARGIN_W per game of difference
+    if cons is not None:
+        cdiff = cons[0] - cons[1]
+        if cdiff > 0:
+            hs += CONS_MARGIN_W * cdiff
+        elif cdiff < 0:
+            as_ += CONS_MARGIN_W * -cdiff
+    # BvP nudge, innings-projected: each lineup faces the opposing STARTER for his
+    # projected innings and the (available-arms) PEN for the rest, so each side's
+    # expected matchup OPS = starter_share * starter BvP + (1 - share) * pen BvP.
+    b, pen = bvp_read(game), pen_bvp_read(game)
+    pen_ok = pen is not None and pen["total_pa"] >= PEN_BVP_MIN_PA
+
+    def _starter_share(opposing: Team) -> float:
+        ip = getattr(opposing, "starter_proj_ip", None)
+        if not ip:
+            return 1 - BVP_PEN_SHARE
+        return max(PROJ_IP_CLAMP[0], min(PROJ_IP_CLAMP[1], ip)) / 9.0
+
+    def _expected(side: str, opposing: Team) -> float | None:
+        sv = b[f"{side}_eff"] if b else None
+        pv = pen[f"{side}_ops"] if pen_ok else None
+        if sv is not None and pv is not None:
+            share = _starter_share(opposing)
+            return share * sv + (1 - share) * pv
+        return sv if sv is not None else pv
+
+    eh, ea = _expected("home", game.away), _expected("away", game.home)
+    gap = (eh - ea) if eh is not None and ea is not None else None
+    if gap is not None and abs(gap) >= BVP_FLOOR:
+        tilt = min(abs(gap) - BVP_FLOOR, BVP_TILT_CAP)
+        if gap > 0:
             hs += tilt
         else:
             as_ += tilt
+    # weather x power: hot/windy open air helps the higher-ISO lineup
+    wx = getattr(game, "weather", None)
+    if (wx and wx.get("roof") == "open"
+            and (wx.get("temp_f", 0) >= WX_HOT_TEMP or wx.get("wind_mph", 0) >= WX_WINDY_MPH)):
+        hi, ai = _blended_iso(game.home), _blended_iso(game.away)
+        if hi is not None and ai is not None and abs(hi - ai) >= WX_ISO_FLOOR:
+            tilt = min(WX_ISO_SCALE * abs(hi - ai), WX_TILT_CAP)
+            if hi > ai:
+                hs += tilt
+            else:
+                as_ += tilt
     winner = game.home if hs >= as_ else game.away
     return winner, hs, as_
 
@@ -568,7 +661,20 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     """
     out = {"sources": [], "majority_side": None, "agree": 0, "dissent": 0,
            "trusted": True, "verdict": "no public read", "note": "no public lean to check",
-           "flags": [], "line": "unknown", "money": "unknown"}
+           "flags": [], "line": "unknown", "money": "unknown", "money_side": None}
+    # money side is computed even without a public majority - the stay-away pile
+    # fades the money on games with no other read
+    money_sides0: list[str] = []
+    for name, rows in (extra_public or {}).items():
+        if not name.endswith("_money"):
+            continue
+        for row in rows:
+            side, _ = _source_side(game, row)
+            if side:
+                money_sides0.append(side)
+            break
+    out["money_side"] = (money_sides0[0]
+                         if money_sides0 and len(set(money_sides0)) == 1 else None)
     if majority is None:
         return out
     out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
@@ -628,6 +734,7 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
     # Sharp signal: where the MONEY is vs where the tickets (public) are. Money on
     # the opposite side from the public is the classic "the % doesn't match the
     # dollars" tell - and a tailwind when it's on our fade side.
+    out["money_side"] = money_side
     if money_side:
         out["money"] = "with public" if money_side == ms else "against public"
         if out["money"] == "against public":
@@ -706,6 +813,25 @@ def bvp_read(game: Game) -> dict | None:
     }
 
 
+def pen_bvp_read(game: Game) -> dict | None:
+    """Bullpen BvP: each lineup's career OPS vs the OPPOSING bullpen - the arms
+    likely to close the game out. Exact career numbers only (the pen mixes hands,
+    so no vs-hand backbone); meaningful needs a real gap AND a real sample.
+    Display context only."""
+    h, a = game.home, game.away
+    if h.pen_bvp_ops is None or a.pen_bvp_ops is None:
+        return None
+    gap = round(h.pen_bvp_ops - a.pen_bvp_ops, 3)
+    total = h.pen_bvp_pa + a.pen_bvp_pa
+    return {
+        "home_ops": h.pen_bvp_ops, "away_ops": a.pen_bvp_ops,
+        "home_pa": h.pen_bvp_pa, "away_pa": a.pen_bvp_pa, "total_pa": total,
+        "edge_team": (h.name if gap > 0 else a.name) if gap else None,
+        "gap": abs(gap),
+        "meaningful": abs(gap) >= BVP_FLOOR and total >= 100,
+    }
+
+
 def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
                   extra_public: dict | None = None, reddit_counts: dict | None = None,
                   wiki_counts: dict | None = None) -> dict:
@@ -715,12 +841,17 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     game.home.platoon_factor = platoon_factor(game.home.offense.get("bats", []), home_opp)
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
-    adv_team, hs, as_ = statistical_favorite(game)
-    majority, majority_detail = public_majority(game, consensus, forum_counts,
-                                                reddit_counts, wiki_counts, extra_public)
-
+    # consistency first: both sides' last-5 win-condition hits feed the margin tilt
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
+    cons_pair = None
+    if wc_home and wc_away:
+        cons_pair = (wc_home["back_test"]["complete_win_condition"],
+                     wc_away["back_test"]["complete_win_condition"])
+
+    adv_team, hs, as_ = statistical_favorite(game, cons_pair)
+    majority, majority_detail = public_majority(game, consensus, forum_counts,
+                                                reddit_counts, wiki_counts, extra_public)
 
     # Cross-check the public read across all sources (covers % + forum + extras);
     # we only fade a read that's corroborated (see public_crosscheck).
@@ -731,7 +862,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     # the public is fading (keeps the public-vs-stats thesis).
     public_edge = bool(majority) and adv_team.team_id != majority.team_id
 
-    # consistency (the former win condition) - kept for the board as context only.
+    # consistency (the former win condition) - a signal AND a margin tilt now.
     adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
     cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
     edge_margin = abs(hs - as_)
@@ -782,6 +913,7 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
         },
         "public_check": crosscheck,
         "bvp": bvp_read(game),
+        "bvp_pen": pen_bvp_read(game),
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,

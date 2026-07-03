@@ -37,6 +37,8 @@ log = logging.getLogger("public_sources")
 
 SCORESODDS_URL = "https://www.scoresandodds.com/mlb/consensus-picks"
 VSIN_URL = "https://data.vsin.com/mlb/betting-splits/"
+POLYMARKET_URL = ("https://gamma-api.polymarket.com/events"
+                  "?closed=false&limit=100&tag_slug=mlb")
 
 TIMEOUT = 20
 POLITE_DELAY = 1.0
@@ -217,6 +219,51 @@ def vsin_splits() -> list[dict]:
     return out
 
 
+def polymarket_consensus() -> list[dict]:
+    """Polymarket MLB game markets: each price is the real-money crowd's implied
+    win % - another independent public read. Best-effort against the public gamma
+    API (endpoint/params UNVERIFIED - fail soft to []); a market maps to a game
+    when its two outcomes resolve to two MLB teams."""
+    import json as _json
+    try:
+        resp = SESSION.get(POLYMARKET_URL, timeout=TIMEOUT)
+        resp.raise_for_status()
+        events = resp.json()
+        if DEBUG:
+            _dump("polymarket_events.json", _json.dumps(events)[:800000])
+    except Exception as exc:
+        log.warning("polymarket fetch failed: %s", exc)
+        return []
+    out: list[dict] = []
+    seen: set = set()
+    try:
+        for ev in events if isinstance(events, list) else events.get("data", []):
+            for m in ev.get("markets", []) or [ev]:
+                try:
+                    outcomes = m.get("outcomes")
+                    prices = m.get("outcomePrices")
+                    if isinstance(outcomes, str):
+                        outcomes = _json.loads(outcomes)
+                    if isinstance(prices, str):
+                        prices = _json.loads(prices)
+                    if not outcomes or not prices or len(outcomes) != 2:
+                        continue
+                    t1, t2 = _name_abbr(str(outcomes[0])), _name_abbr(str(outcomes[1]))
+                    if not t1 or not t2 or t1 == t2 or (t1, t2) in seen:
+                        continue
+                    p1, p2 = float(prices[0]) * 100, float(prices[1]) * 100
+                    if not (5 <= p1 <= 95 and 5 <= p2 <= 95):
+                        continue
+                    seen.add((t1, t2))
+                    out.append({"away_abbr": t1, "home_abbr": t2,
+                                "away_pct": round(p1), "home_pct": round(p2)})
+                except Exception:
+                    continue
+    except Exception as exc:
+        log.warning("polymarket parse failed: %s", exc)
+    return out
+
+
 def _split(rows: list[dict], kind: str) -> list[dict]:
     """Project {away/home}_{kind} fields into the {away_pct, home_pct} row shape."""
     return [{"away_abbr": r["away_abbr"], "home_abbr": r["home_abbr"],
@@ -246,4 +293,11 @@ def all_sources() -> dict[str, list[dict]]:
             out[f"{name}_money"] = money
         log.info("%s: %d bets row(s), %d money row(s)", name,
                  len(out[f"{name}_bets"]), len(money))
+    try:
+        poly = polymarket_consensus()
+    except Exception as exc:
+        log.warning("polymarket failed: %s", exc)
+        poly = []
+    out["polymarket_bets"] = poly
+    log.info("polymarket: %d market row(s)", len(poly))
     return out
