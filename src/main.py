@@ -297,14 +297,16 @@ def _attach_line(game, result: dict, slate: list) -> None:
             star.append(f"{len(hits)}/5 signals")
         pc["starred"] = star
     elif lock_profile and pc.get("opponent_moneyline") is not None:
-        # LOCK (the 9-1 profile): the line moved toward the OPPONENT and the
-        # public isn't against them - bet the opponent at its captured price.
+        # LOCK: the line moved toward the OPPONENT and the public isn't against
+        # them - bet the opponent at its captured price. Direct back-test says
+        # this mirrored profile is a coin flip (2-4), unlike the 10-2 same-side
+        # cell it was copied from - kept on the board per user call, marked ⚠️.
         pc["play"] = "lock"
         pc["status"] = "lock"
         pc["lock_bet"] = opp_name
         pc["lock_odds"] = int(pc["opponent_moneyline"])
         pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
-                        f"them (the 9-1 profile); our side hit {len(hits)}/5")
+                        f"them — coin flip historically (2-4); our side hit {len(hits)}/5")
     elif len(hits) >= 1:
         pc["play"] = "lean"
         pc["status"] = "lean"
@@ -627,7 +629,7 @@ def _game_lines(g: dict) -> list[str]:
         bet, odds = _lock_bet(g)
         odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
         return [f"🔒 {_state_tag(g)}{g['matchup']} → **PICK (LOCK): bet {bet}"
-                f"{odds_s}** — {pc.get('reason', '')}"]
+                f"{odds_s}** ⚠️ coin flip — {pc.get('reason', '')}"]
     if _play(g) == "stay_away":
         return [_stay_line(g)]
     c = pc["components"]
@@ -701,10 +703,10 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_✅ = PICK (2+ signals). ⭐ = pick on a proven-hot combo (margin+favorite+line, or "
-               "4+ signals). 🔒 = LOCK pick (9-1 profile: line + public both favor the other "
-               "side - bet them; graded with the picks). 🔸 = LEAN (1 signal). 🔄 = FADE "
-               "(Vegas special: no signals, bet against the money side). ▫️ = no clean money "
-               "read, no bet. 🔴 = live._")
+               "4+ signals). 🔒 = LOCK pick (line + public both favor the other side - bet "
+               "them; ⚠️ coin flip historically (2-4), graded with the picks). 🔸 = LEAN "
+               "(1 signal). 🔄 = FADE (Vegas special: no signals, bet against the money side). "
+               "▫️ = no clean money read, no bet. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -825,7 +827,7 @@ def telegram_text(payload: dict) -> str:
         tag = "🔴 " if g.get("state") == "live" else ""
         bet, odds = _lock_bet(g)
         odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-        L += ["", f"🔒 {tag}PICK (LOCK) {_short(g, bet)}{odds_s}",
+        L += ["", f"🔒 {tag}PICK (LOCK) {_short(g, bet)}{odds_s} · ⚠️ coin flip",
               f"   {aa} @ {ha}",
               f"   ✅ {pc.get('reason', '')}"]
     for g in leans:

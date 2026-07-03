@@ -2,9 +2,10 @@
 Grade the board against actual MLB results and keep two running $1/unit bankrolls
 in output/ledger.json:
 
-  - Picks: 2+ of the 5 signals hit (bet the advantage team) PLUS the 9-1 LOCK
+  - Picks: 2+ of the 5 signals hit (bet the advantage team) PLUS the LOCK
     plays (line toward the opponent + public not against them - bet the
-    opponent at its price). Both live in the pick column.
+    opponent at its price; back-tested to a coin flip, kept per user call).
+    Both live in the pick column.
   - Leans: exactly 1 signal. Bet the advantage team.
   - Fades (the Vegas special): every remaining game - the only action is fading
     the team with the most money on it (pc.stay_bet/stay_odds). No clean money
