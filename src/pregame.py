@@ -88,12 +88,13 @@ def run() -> bool:
         return False
     log.info("pre-game slots due: %s (%d game(s))", sorted(due), sum(len(v) for v in due.values()))
 
-    # remember the currently committed picks to detect changes
+    # remember the currently committed picks (incl. LOCK plays) to detect changes
     old_picks = None
     pf = OUTPUT_DIR / f"picks_{date}.json"
     if pf.exists():
         try:
-            old_picks = json.loads(pf.read_text()).get("picks")
+            prev = json.loads(pf.read_text())
+            old_picks = (prev.get("picks"), prev.get("locks"))
         except ValueError:
             pass
 
@@ -110,7 +111,7 @@ def run() -> bool:
     OUTPUT_DIR.mkdir(exist_ok=True)
     state_path.write_text(json.dumps(sorted(processed)))
 
-    if payload.get("picks") != old_picks:
+    if (payload.get("picks"), payload.get("locks")) != old_picks:
         notify.send_telegram(picks_main.telegram_text(payload))
         log.info("picks changed -> telegram sent")
     else:

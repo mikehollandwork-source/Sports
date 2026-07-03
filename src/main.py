@@ -123,17 +123,19 @@ def run(date: str) -> dict:
         r["state"] = states.get(r.get("game_pk"), {}).get("state", "upcoming")
 
     picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
+    lock_bets = [r["pick_criteria"].get("lock_bet") or _lock_bet(r)[0]
+                 for r in results if _play(r) == "lock"]
     leans = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "lean"]
-    locks = sum(1 for r in results if _play(r) == "lock")
     fades = sum(1 for r in results if _play(r) == "stay_away")
     log.info("Board: %d pick(s) (+%d lock(s)), %d lean(s), %d fade(s)",
-             len(picks), locks, len(leans), fades)
+             len(picks), len(lock_bets), len(leans), fades)
 
     return {
         "date": date,
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "games": results,
         "picks": picks,
+        "locks": lock_bets,   # the 🔒 plays in the pick column (bet the opponent)
         "leans": leans,
     }
 
