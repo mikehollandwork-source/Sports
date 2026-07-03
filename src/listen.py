@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import requests
 
@@ -22,6 +23,13 @@ log = logging.getLogger("listen")
 
 API = "https://api.telegram.org/bot{}/{}"
 GO_WORDS = {"go", "/go", "run", "/run"}
+
+
+def _is_go(text: str) -> bool:
+    """True when any word of the message is a go-word - so 'Go!', 'run it',
+    'Go now' all trigger, not just a bare 'go'."""
+    words = re.sub(r"[^a-z/ ]", " ", (text or "").lower()).split()
+    return any(w in GO_WORDS for w in words)
 
 
 def _emit(should_run: bool) -> None:
@@ -50,14 +58,19 @@ def main() -> None:
         return
 
     go = False
+    unrecognized = None
     max_id = None
     for u in updates:
         max_id = u["update_id"]
         m = u.get("message") or u.get("edited_message") or {}
         if str((m.get("chat") or {}).get("id")) != str(chat):
             continue
-        if (m.get("text") or "").strip().lower() in GO_WORDS:
+        text = (m.get("text") or "").strip()
+        if _is_go(text):
             go = True
+        elif text:
+            unrecognized = text
+    log.info("saw %d update(s); go=%s unrecognized=%r", len(updates), go, unrecognized)
 
     if max_id is not None:  # acknowledge everything we just read
         try:
@@ -68,6 +81,10 @@ def main() -> None:
 
     if go:
         notify.send_telegram("🟢 Got it — building today's board, hang tight…")
+    elif unrecognized is not None:
+        # never swallow a message silently: tell the user what would work
+        notify.send_telegram(f"🤖 Saw “{unrecognized[:60]}” but didn't recognize it — "
+                             "text “go” (or “run”) to build the board.")
     _emit(go)
 
 
