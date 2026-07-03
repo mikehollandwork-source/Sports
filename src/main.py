@@ -21,10 +21,11 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune, weather, wiki
+from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN,
-                       PICK_MIN_SIGNALS, _canon_abbr, _implied, evaluate_game,
-                       find_slate_line, line_confirms)
+                       PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA, UMP_MIN_GAMES,
+                       _canon_abbr, _implied, evaluate_game, find_slate_line,
+                       line_confirms)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
                       team_home_away_split)
 
@@ -77,12 +78,20 @@ def run(date: str) -> dict:
             g.weather = weather.forecast_for(g.venue, g.start_time)
         except Exception as exc:
             log.warning("weather failed for %s: %s", g.game_pk, exc)
+        # HP umpire before evaluation too: a big-zone ump tilts the margin
+        # (umpire.tendency). MLB posts the crew close to first pitch, so the
+        # morning run usually gets None and the pre-game refresh fills it in.
+        try:
+            g.umpire_hp = hp_umpire(g.game_pk)
+            g.ump_tend = umpire.tendency(g.umpire_hp, int(date[:4]))
+        except Exception as exc:
+            log.warning("umpire failed for %s: %s", g.game_pk, exc)
+            g.umpire_hp, g.ump_tend = None, None
         r = evaluate_game(g, consensus, forum_counts, extra_public, reddit_counts, wiki_counts)
         r["game_datetime"] = g.start_time
         r["weather"] = g.weather
-        # HP umpire (display-only): MLB posts the crew close to first pitch, so
-        # this is usually None in the morning and filled by the pre-game refresh.
-        r["umpire_hp"] = hp_umpire(g.game_pk)
+        r["umpire_hp"] = g.umpire_hp
+        r["ump_tend"] = g.ump_tend
         results.append(r)
 
     # Line source = ESPN (true open + current moneyline for every game). For any
@@ -284,7 +293,20 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # 8-10 (-3.50u) while every other 2+ combo was profitable, so a pick needs
     # at least one of margin / line / consistency among its hits.
     core_hit = m_hit or l_hit or c_hit
-    if len(hits) >= PICK_MIN_SIGNALS and core_hit:
+    # Public-margin gate: a MILD public lean (< PUBLIC_HEAVY%) against the pick
+    # side has been the sharp side (see analysis.PUBLIC_HEAVY) - picks into it
+    # drop to leans. A heavy lean is the fadeable public and the pick stands.
+    soft_public = False
+    pub_pct = None
+    if maj and maj != adv:
+        pairs = _public_pairs((result.get("public_majority") or {}).get("detail") or {})
+        if pairs:
+            ap = sum(p[0] for p in pairs) / len(pairs)
+            hp = sum(p[1] for p in pairs) / len(pairs)
+            pub_pct = round(hp if maj == home else ap)
+            pc["public_pct_against"] = pub_pct
+            soft_public = pub_pct < PUBLIC_HEAVY
+    if len(hits) >= PICK_MIN_SIGNALS and core_hit and not soft_public:
         pc["play"] = "pick"
         pc["status"] = "pick"
         pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
@@ -310,10 +332,15 @@ def _attach_line(game, result: dict, slate: list) -> None:
     elif len(hits) >= 1:
         pc["play"] = "lean"
         pc["status"] = "lean"
-        pc["reason"] = (f"{len(hits)}/5 signals but only favorite+BvP "
-                        f"(that combo graded 8-10) — lean, not a pick"
-                        if len(hits) >= PICK_MIN_SIGNALS
-                        else f"1/5 signals — {', '.join(hits)}")
+        if len(hits) >= PICK_MIN_SIGNALS and core_hit and soft_public:
+            pc["reason"] = (f"{len(hits)}/5 signals but the public is only mildly on "
+                            f"{maj} ({pub_pct}% < {PUBLIC_HEAVY}) — mild public leans "
+                            f"have been the sharp side; lean, not a pick")
+        elif len(hits) >= PICK_MIN_SIGNALS:
+            pc["reason"] = (f"{len(hits)}/5 signals but only favorite+BvP "
+                            f"(that combo graded 8-10) — lean, not a pick")
+        else:
+            pc["reason"] = f"1/5 signals — {', '.join(hits)}"
     else:
         # FADE (Vegas special): no merit on either read. The only tracked action
         # in this pile is fading wherever the MONEY sits (unanimous money%); with
@@ -519,6 +546,13 @@ def _public_check_phrase(g: dict) -> str | None:
                    for s in cc.get("sources", []) if not s.get("agrees")]
         parts.append(f"sources disagree — {', '.join(against)} on {other}"
                      + (f"; {', '.join(with_names)} on {maj_team}" if with_names else ""))
+        # historical read on split games (23-13, 64%): the forum has been right
+        # when IT's the dissenter (5-2); any other dissenter, stay with the
+        # majority (18-11). Display-only - it doesn't move the play.
+        forum_dissents = any(s["name"] == "forum" and not s.get("agrees")
+                             for s in cc.get("sources", []))
+        parts.append(f"split read: {other if forum_dissents else maj_team} "
+                     f"(64% historically)")
     line = cc.get("line", "unknown")
     if line == "against public":
         parts.append("line AGAINST public (RLM)")
@@ -568,9 +602,19 @@ def _pen_bvp_phrase(g: dict) -> str | None:
 
 
 def _ump_phrase(g: dict) -> str | None:
-    """'HP ump: John Doe' once MLB posts the crew (display-only context)."""
+    """'HP ump: John Doe — big zone (K +0.9/gm)' once MLB posts the crew. The
+    tendency comes from the committed ump table; a big-zone ump also tilts the
+    margin toward the lower-K lineup (see analysis)."""
     u = g.get("umpire_hp")
-    return f"HP ump: {u}" if u else None
+    if not u:
+        return None
+    t = g.get("ump_tend")
+    if t and t.get("games", 0) >= UMP_MIN_GAMES:
+        ke = t.get("k_extra") or 0
+        zone = ("big zone" if ke >= UMP_K_EXTRA
+                else "tight zone" if ke <= -UMP_K_EXTRA else "neutral zone")
+        return f"HP ump: {u} — {zone} (K {ke:+.1f}/gm, {t['games']} gm)"
+    return f"HP ump: {u}"
 
 
 def _situational_phrase(g: dict) -> str | None:
