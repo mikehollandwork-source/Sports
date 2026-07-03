@@ -86,15 +86,21 @@ BVP_PEN_SHARE = 0.35   # FALLBACK pen share when a starter has no projected inni
 PEN_BVP_MIN_PA = 100   # career PA behind the pen number before it joins the tilt
 PROJ_IP_CLAMP = (3.0, 7.5)   # sane bounds on a projected start
 
-# Weather x power (calibrated 2026-04-13..06-26, 486 open-air games): in hot/windy
-# conditions the power team won 57% vs 52% mild (+5%, ~1 SE - wired at user request,
-# so sized conservatively: capped BELOW home field). Open-air only; the nudge goes
-# to the higher-ISO side, scaled by the ISO gap.
-WX_HOT_TEMP = 85      # deg F at first pitch
-WX_WINDY_MPH = 12     # wind speed
-WX_ISO_FLOOR = 0.010  # blended-ISO gap below this = no meaningful power edge
-WX_ISO_SCALE = 2.5    # tilt = min(scale * gap, cap)
-WX_TILT_CAP = 0.08
+# Weather x power: factors into EVERY open-air / retractable game (a fixed dome
+# has no weather). The relative tilt scales continuously with how far conditions
+# sit from a neutral ~70F/calm baseline AND with the lineups' power (ISO) gap -
+# warm/windy air carries and helps the higher-power side; cold air suppresses
+# power and helps the contact side. Capped below home field. (User-directed to
+# factor into every game; the hot/windy split was the only piece calibrated -
+# 486 games, power team 57% hot/windy vs 52% mild - the continuous sizing extends
+# it, kept conservative and capped.)
+WX_NEUTRAL_TEMP = 70    # deg F where the ball carries roughly neutrally
+WX_TEMP_PER10 = 0.35    # "carry" units per 10F above/below neutral (signed)
+WX_WIND_CALM = 8        # mph; wind above this adds carry/variance
+WX_WIND_PER_MPH = 0.05  # carry units per mph above calm
+WX_ISO_FLOOR = 0.010    # blended-ISO gap below this = no side to tilt toward
+WX_GAP_SCALE = 3.0      # tilt = clamp(carry * iso_gap * scale, +/- cap)
+WX_TILT_CAP = 0.08      # stays below home field (0.10)
 
 # Play taxonomy (from the 06-26..07-01 graded-lean autopsy). Count the five winner
 # signals - margin, favorite, line toward, consistency, BvP not against:
@@ -476,17 +482,25 @@ def statistical_favorite(game: Game, cons: tuple[int, int] | None = None) -> tup
             hs += tilt
         else:
             as_ += tilt
-    # weather x power: hot/windy open air helps the higher-ISO lineup
+    # weather x power (every non-dome game): warm/windy air carries and helps the
+    # higher-ISO lineup; cold suppresses power and helps the contact side. The
+    # tilt is continuous in temp/wind and the ISO gap, so a neutral 70F/calm game
+    # nets ~0 while the extremes push toward the cap.
     wx = getattr(game, "weather", None)
-    if (wx and wx.get("roof") == "open"
-            and (wx.get("temp_f", 0) >= WX_HOT_TEMP or wx.get("wind_mph", 0) >= WX_WINDY_MPH)):
+    if wx and wx.get("roof") != "dome":
         hi, ai = _blended_iso(game.home), _blended_iso(game.away)
         if hi is not None and ai is not None and abs(hi - ai) >= WX_ISO_FLOOR:
-            tilt = min(WX_ISO_SCALE * abs(hi - ai), WX_TILT_CAP)
-            if hi > ai:
+            temp = wx.get("temp_f")
+            wind = wx.get("wind_mph") or 0
+            carry = max(0.0, wind - WX_WIND_CALM) * WX_WIND_PER_MPH
+            if temp is not None:
+                carry += (temp - WX_NEUTRAL_TEMP) / 10.0 * WX_TEMP_PER10
+            raw = carry * (hi - ai) * WX_GAP_SCALE
+            tilt = max(-WX_TILT_CAP, min(WX_TILT_CAP, raw))
+            if tilt >= 0:
                 hs += tilt
             else:
-                as_ += tilt
+                as_ += -tilt
     # umpire x strikeouts: a big-zone HP ump hurts the strikeout-prone lineup
     # more - tilt toward the lower-K side (only known near first pitch, so this
     # lands at the pre-game refresh; fail-soft when unknown)
