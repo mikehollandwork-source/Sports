@@ -48,6 +48,18 @@ def main() -> None:
         _emit(False)
         return
 
+    # self-diagnostics: which bot this token belongs to, and whether a webhook
+    # is set (a webhook silently blocks getUpdates - the classic dead-'go' cause)
+    try:
+        me = requests.get(API.format(token, "getMe"), timeout=25).json().get("result", {})
+        log.info("bot: @%s (%s)", me.get("username"), me.get("first_name"))
+        wh = requests.get(API.format(token, "getWebhookInfo"), timeout=25).json().get("result", {})
+        if wh.get("url"):
+            log.warning("WEBHOOK IS SET (%s) - getUpdates gets nothing while a "
+                        "webhook is active; delete it via deleteWebhook", wh["url"])
+    except Exception as exc:
+        log.warning("diagnostics failed: %s", exc)
+
     try:
         resp = requests.get(API.format(token, "getUpdates"), timeout=25)
         resp.raise_for_status()
@@ -63,7 +75,12 @@ def main() -> None:
     for u in updates:
         max_id = u["update_id"]
         m = u.get("message") or u.get("edited_message") or {}
-        if str((m.get("chat") or {}).get("id")) != str(chat):
+        cid = (m.get("chat") or {}).get("id")
+        if str(cid) != str(chat):
+            if cid is not None:   # someone texted the bot from a different chat
+                log.warning("message from unexpected chat id %s (configured "
+                            "TELEGRAM_CHAT_ID differs) - text: %r",
+                            cid, (m.get("text") or "")[:40])
             continue
         text = (m.get("text") or "").strip()
         if _is_go(text):

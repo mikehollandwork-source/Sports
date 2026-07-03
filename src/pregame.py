@@ -82,9 +82,15 @@ def run() -> bool:
         log.warning("schedule fetch failed: %s", exc)
         return False
 
+    # `processed` = slots we've already sent a pre-game board for. A slot is due
+    # once it's inside DUE_HORIZON and not yet pinged - so every slot gets exactly
+    # one refresh+ping at the first poll that catches it within the window, which
+    # (given GitHub's ~2h cron throttling) is the only reliable moment. We do NOT
+    # wait for a tight FINAL_MIN window: a poll almost never lands in it, so slots
+    # would slip past first pitch un-pinged.
     due = due_slots(slots, now, processed)
     if not due:
-        log.info("no unhandled game slot in the next ~%d min (%s)", DUE_HORIZON, date)
+        log.info("no un-pinged game slot in the next ~%d min (%s)", DUE_HORIZON, date)
         return False
     log.info("pre-game slots due: %s (%d game(s))", sorted(due), sum(len(v) for v in due.values()))
 
@@ -102,20 +108,23 @@ def run() -> bool:
     picks_main.write_outputs(payload, date)
     grade.update_ledger(date)  # move any now-final games into the record
 
-    # only slots refreshed close to first pitch are final; farther-out slots stay
-    # unhandled so a later (throttled) firing refreshes them again nearer the start
-    final = {iso for iso in due
-             if (dt.datetime.fromisoformat(iso.replace("Z", "+00:00")) - now
-                 ).total_seconds() / 60.0 <= FINAL_MIN}
-    processed |= final
+    # mark every due slot pinged so later (throttled) polls don't re-send it
+    processed |= set(due)
     OUTPUT_DIR.mkdir(exist_ok=True)
     state_path.write_text(json.dumps(sorted(processed)))
 
-    if (payload.get("picks"), payload.get("coin_flips")) != old_picks:
-        notify.send_telegram(picks_main.telegram_text(payload))
-        log.info("picks changed -> telegram sent")
+    # one guaranteed board per slot; if the nearest slot is inside FINAL_MIN the
+    # lineups/odds are locked, otherwise it's an earlier heads-up.
+    soonest = min((dt.datetime.fromisoformat(iso.replace("Z", "+00:00")) - now).total_seconds() / 60.0
+                  for iso in due)
+    changed = (payload.get("picks"), payload.get("coin_flips")) != old_picks
+    if soonest <= FINAL_MIN:
+        head = "🔔 first pitch soon — board locked in:\n\n"
     else:
-        log.info("picks unchanged -> no telegram")
+        head = f"⏳ pre-game heads-up (~{int(soonest)} min to first pitch):\n\n"
+    notify.send_telegram(head + picks_main.telegram_text(payload))
+    log.info("telegram sent (%s; soonest %d min)",
+             "picks changed" if changed else "scheduled ping", int(soonest))
     return True
 
 
