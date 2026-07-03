@@ -34,4 +34,16 @@ AWAY games only — win rate by the away team's road_streak. A decline across ba
 | crossed 2+ time zones EAST | 39 | 54% |
 | 1500+ mile trip in | 100 | 55% |
 
-_Point-in-time, no lookahead. < ~47% for the fatigued side on a real sample = a genuine dip worth a small margin tilt; ~50% = noise, stays out._
+## ROI vs the CLOSING moneyline — fade the road team (bet home)
+Betting the home team at its ESPN closing price, by the away team's road_streak. Baseline (bet every home team): **-4.4% ROI** over 1304/1304 priced games. If fatigue is a real *market* edge, ROI should climb with trip depth.
+
+| away team's road_streak | bets | home win | ROI |
+|---|---|---|---|
+| 1-2 | 442 | 51% | -7.1% |
+| 3-5 | 578 | 54% | -2.4% |
+| 6-8 | 250 | 52% | -6.9% |
+| 9-+ | 34 | 65% | +17.4% |
+
+_ROI = units per $1. Around −4-5% is the no-edge / vig baseline; a band clearly ABOVE baseline (toward 0 or positive) that grows with depth is a real, priceable fatigue edge worth betting._
+
+_Point-in-time, no lookahead. Win-rate cuts above are the raw signal; the ROI table is the money test against the closing line._
