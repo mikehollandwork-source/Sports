@@ -114,6 +114,13 @@ LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
 # SOS-adjusted win condition more often over the last 5 gets a small team_score
 # bump per game of difference (max 5 * 0.04 = 0.20, comparable to the BvP cap).
 CONS_MARGIN_W = 0.04
+# Public-margin gate (106-game backtest of avg public % vs outcomes): a MILD
+# public lean (50-70%) is the sharp side - it wins 56-60% and picks made INTO it
+# went 3-5 (38%) / all stat sides into it 12-19 (-7.52u). A HEAVY lean
+# (>= PUBLIC_HEAVY %) is the fadeable public - its side wins ~43% and stat sides
+# against it went 4-1 (+3.45u). So a pick facing a mild public lean drops to a
+# lean; facing a heavy one it stands.
+PUBLIC_HEAVY = 70
 
 # Pick decision: a hard gate of THREE must-haves (calibrated against a season of
 # results - see src/wc_calibrate.py & src/edge_calibrate.py):
