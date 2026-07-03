@@ -100,10 +100,10 @@ WX_TILT_CAP = 0.08
 # signals - margin, favorite, line toward, consistency, BvP not against:
 #   PICK = >= PICK_MIN_SIGNALS hits with at least one of margin/line/consistency
 #          (the >=2 tier went 62% +5.66u, stacking to 77% at >=3 and 89% at >=4;
-#          favorite+BvP alone graded 8-10 so that pair only makes a lean). The
-#          LOCK profile (line toward the opponent + public not against them,
-#          bet the opponent) also lives in the pick column/book - back-tested
-#          to a coin flip (2-4), shown with a ⚠️ note.
+#          favorite+BvP alone graded 8-10 so that pair only makes a lean).
+#   COIN FLIP = the old LOCK profile (line toward the opponent + public not
+#          against them, bet the opponent) - back-tested to a coin flip (2-4),
+#          so it's its own separately-graded category.
 #   LEAN = exactly 1 hit (or the demoted favorite+BvP pair).
 #   FADE = everything else (the Vegas special): bet against the unanimous
 #          money% side; no clean money read = listed, never booked.

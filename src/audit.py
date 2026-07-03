@@ -3,7 +3,7 @@ Recurring winners-vs-losers audit: every ~10 days, do exactly what the manual
 graded-game autopsy did - join every settled bet with the frozen signals it was
 made on and report what's working and what isn't.
 
-Per book (picks / leans / fades): record + units. Across picks+leans
+Per book (picks / leans / coin flips / fades): record + units. Across picks+leans
 (the bets ON the stat side): win rate by signal count, by each individual
 signal, and the winners-vs-losers medians of the underlying component gaps
 (margin, FIP, wOBA, ISO). Writes output/audit.{json,md}.
@@ -95,7 +95,8 @@ def _wr(rows: list[dict]) -> str:
 
 def build() -> tuple[dict, str]:
     led = grade.load_ledger()
-    books = {k: led.get(k, {}).get("entries", []) for k in ("picks", "leans", "fades")}
+    books = {k: led.get(k, {}).get("entries", [])
+             for k in ("picks", "leans", "coin_flip", "fades")}
 
     # bets ON the stat side, joined with their frozen signals
     rows: list[dict] = []
@@ -112,7 +113,7 @@ def build() -> tuple[dict, str]:
 
     md = [f"# 10-day audit — generated {dt.datetime.now(EASTERN).date()}", ""]
     md.append("## Books")
-    for k in ("picks", "leans", "fades"):
+    for k in ("picks", "leans", "coin_flip", "fades"):
         b = led.get(k, {})
         r = b.get("record", {})
         md.append(f"- **{k}**: {r.get('wins', 0)}-{r.get('losses', 0)} "
