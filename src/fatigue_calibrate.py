@@ -34,7 +34,8 @@ import math
 import zoneinfo
 from pathlib import Path
 
-from . import mlb_api, weather
+from . import espn, mlb_api, weather
+from .analysis import _canon_abbr
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("fatigue_calibrate")
@@ -68,6 +69,11 @@ def _team_meta(season: int) -> tuple[dict[int, str], dict[int, tuple[float, floa
         if spot:
             coords[t["id"]] = (spot[0], spot[1])
     return names, coords
+
+
+def _team_abbrs(season: int) -> dict[int, str]:
+    data = mlb_api._get("teams", sportId=mlb_api.SPORT_ID, season=season)
+    return {t["id"]: t.get("abbreviation", "") for t in data.get("teams", [])}
 
 
 def _sequences(season: int) -> dict[int, list[dict]]:
@@ -151,6 +157,81 @@ def collect(end: str, days: int) -> list[dict]:
             rows.append({"me": mine, "opp": theirs, "won": mine["won"]})
     log.info("collected %d games (%s..%s)", len(rows), lo, hi)
     return rows
+
+
+def _profit(ml: int, won: bool) -> float:
+    """$1 profit at American ML (loss = -1)."""
+    return (ml / 100 if ml > 0 else 100 / -ml) if won else -1.0
+
+
+def collect_roi(end: str, days: int) -> list[dict]:
+    """One row per completed game keyed on the AWAY team's fatigue (its road_streak
+    etc.), joined with ESPN closing moneylines. This is the clean ROI frame: every
+    game has exactly one away team, so no dedup - and the bet we test is fading the
+    road team (betting the home team) at its closing price."""
+    season = int(end[:4])
+    lo, hi = (_d(end) - dt.timedelta(days=days)).isoformat(), end
+    seqs = _sequences(season)
+    _, coords = _team_meta(season)
+    abbrs = _team_abbrs(season)
+
+    lines_cache: dict[str, list[dict]] = {}
+
+    def closing(date: str, away_ab: str, home_ab: str) -> tuple[int | None, int | None]:
+        if date not in lines_cache:
+            try:
+                lines_cache[date] = espn.lines(date)
+            except Exception as exc:
+                log.warning("espn lines %s failed: %s", date, exc)
+                lines_cache[date] = []
+        a, h = _canon_abbr(away_ab), _canon_abbr(home_ab)
+        for e in lines_cache[date]:
+            if _canon_abbr(e["away_abbr"]) == a and _canon_abbr(e["home_abbr"]) == h:
+                return e.get("away_current"), e.get("home_current")
+        return None, None
+
+    rows = []
+    for tid, games in seqs.items():
+        for i, g in enumerate(games):
+            if g["home"] or not (lo <= g["date"] <= hi):
+                continue   # key each game off its AWAY team
+            away_ml, home_ml = closing(g["date"], abbrs.get(tid, ""),
+                                       abbrs.get(g["opp_id"], ""))
+            prof = _profile(games, i, tid, coords)
+            rows.append({"date": g["date"], "road_streak": prof["road_streak"],
+                         "days_straight": prof["days_straight"],
+                         "games_last7": prof["games_last7"],
+                         "home_won": not g["won"],   # g["won"] is the away team's result
+                         "away_ml": away_ml, "home_ml": home_ml})
+    priced = sum(1 for r in rows if r["home_ml"] is not None)
+    log.info("ROI frame: %d games, %d with a closing line (%s..%s)",
+             len(rows), priced, lo, hi)
+    return rows
+
+
+def _roi_band(rows: list[dict], lo: int, hi: int) -> dict:
+    """Fade the away team on a road_streak in [lo,hi]: bet the HOME team at its
+    closing ML. Reports bets, home win rate, and ROI (units per $1 bet)."""
+    bets = [r for r in rows if lo <= r["road_streak"] <= hi and r["home_ml"] is not None]
+    if not bets:
+        return {"band": f"{lo}-{hi if hi < 99 else '+'}", "bets": 0,
+                "home_win": None, "roi": None}
+    u = sum(_profit(int(r["home_ml"]), r["home_won"]) for r in bets)
+    w = sum(1 for r in bets if r["home_won"])
+    return {"band": f"{lo}-{hi if hi < 99 else '+'}", "bets": len(bets),
+            "home_win": round(w / len(bets), 3), "roi": round(u / len(bets), 3)}
+
+
+def roi_analyze(rows: list[dict]) -> dict:
+    priced = [r for r in rows if r["home_ml"] is not None]
+    base_u = sum(_profit(int(r["home_ml"]), r["home_won"]) for r in priced)
+    return {
+        "games": len(rows),
+        "games_priced": len(priced),
+        "baseline_bet_home_roi": round(base_u / len(priced), 3) if priced else None,
+        "fade_road_team_by_depth": [_roi_band(rows, lo, hi)
+                                    for lo, hi in ((1, 2), (3, 5), (6, 8), (9, 99))],
+    }
 
 
 def _h2h(rows: list[dict], key: str, higher_is_tireder: bool = True) -> dict:
@@ -249,9 +330,28 @@ def summary_md(rep: dict) -> str:
     for b in a["buckets"]:
         wr = f"{b['win_rate']:.0%}" if b["win_rate"] is not None else "—"
         out.append(f"| {b['label']} | {b['n']} | {wr} |")
-    out += ["", "_Point-in-time, no lookahead. < ~47% for the fatigued side on a real "
-            "sample = a genuine dip worth a small margin tilt; ~50% = noise, stays out._"]
+    roi = rep.get("roi")
+    if roi:
+        out += ["", "## ROI vs the CLOSING moneyline — fade the road team (bet home)",
+                f"Betting the home team at its ESPN closing price, by the away team's "
+                f"road_streak. Baseline (bet every home team): "
+                f"**{_pct(roi['baseline_bet_home_roi'])} ROI** over "
+                f"{roi['games_priced']}/{roi['games']} priced games. If fatigue is a "
+                f"real *market* edge, ROI should climb with trip depth.", "",
+                "| away team's road_streak | bets | home win | ROI |", "|---|---|---|---|"]
+        for b in roi["fade_road_team_by_depth"]:
+            hw = f"{b['home_win']:.0%}" if b["home_win"] is not None else "—"
+            out.append(f"| {b['band']} | {b['bets']} | {hw} | {_pct(b['roi'])} |")
+        out += ["", "_ROI = units per $1. Around −4-5% is the no-edge / vig baseline; "
+                "a band clearly ABOVE baseline (toward 0 or positive) that grows with "
+                "depth is a real, priceable fatigue edge worth betting._"]
+    out += ["", "_Point-in-time, no lookahead. Win-rate cuts above are the raw signal; "
+            "the ROI table is the money test against the closing line._"]
     return "\n".join(out)
+
+
+def _pct(x: float | None) -> str:
+    return f"{x:+.1%}" if x is not None else "—"
 
 
 def yesterday_eastern() -> str:
@@ -268,6 +368,12 @@ def main() -> None:
     rep = {"window": f"{(_d(args.end) - dt.timedelta(days=args.days)).isoformat()} → "
                      f"{args.end} ({args.days} days)",
            "analysis": analyze(rows)}
+    # the money test: ROI vs ESPN closing moneylines (slow - one odds fetch per
+    # game-day; wrapped so a partial/odds failure still leaves the win-rate report)
+    try:
+        rep["roi"] = roi_analyze(collect_roi(args.end, args.days))
+    except Exception as exc:
+        log.warning("ROI pass failed (win-rate report still written): %s", exc)
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "fatigue_calibration.json").write_text(json.dumps(rep, indent=2))
     (OUTPUT_DIR / "fatigue_calibration.md").write_text(summary_md(rep))
