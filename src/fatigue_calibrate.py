@@ -117,7 +117,8 @@ def _profile(games: list[dict], i: int, tid: int,
             travel_mi = _haversine(v_prev, v_cur)
             tz_east = (v_cur[1] - v_prev[1]) / 15.0   # +east (longitude rises)
     return {"road_streak": streak, "days_straight": days, "games_last7": last7,
-            "travel_mi": travel_mi, "tz_east": tz_east, "won": g["won"]}
+            "travel_mi": travel_mi, "tz_east": tz_east, "won": g["won"],
+            "home": g["home"]}
 
 
 def collect(end: str, days: int) -> list[dict]:
@@ -181,9 +182,31 @@ def _bucket(rows: list[dict], key: str, lo: float, label: str) -> dict:
     return {"label": label, "n": n, "win_rate": round(won / n, 3) if n else None}
 
 
+def _away_by_streak(rows: list[dict]) -> list[dict]:
+    """The KEY control: among AWAY games only, win rate bucketed by the away
+    team's road_streak. This removes the home-field confound (a road_streak is
+    only >0 for the away team), so a decline ACROSS buckets is real incremental
+    fatigue; flat = the earlier 47% was just ordinary away disadvantage."""
+    bands = [(1, 2), (3, 5), (6, 8), (9, 99)]
+    out = []
+    for lo, hi in bands:
+        n = won = 0
+        for r in rows:
+            for who in ("me", "opp"):
+                p = r[who]
+                if p["home"] or not (lo <= p["road_streak"] <= hi):
+                    continue
+                n += 1
+                won += 1 if (r["won"] if who == "me" else not r["won"]) else 0
+        out.append({"road_streak": f"{lo}-{hi if hi < 99 else '+'}", "away_games": n,
+                    "win_rate": round(won / n, 3) if n else None})
+    return out
+
+
 def analyze(rows: list[dict]) -> dict:
     return {
         "games": len(rows),
+        "away_win_rate_by_road_streak": _away_by_streak(rows),
         "head_to_head": {
             "road_streak (deeper trip)": _h2h(rows, "road_streak"),
             "days_straight (less rest)": _h2h(rows, "days_straight"),
@@ -207,6 +230,15 @@ def summary_md(rep: dict) -> str:
     a = rep["analysis"]
     out = [f"# Travel/schedule fatigue calibration — {rep['window']}", "",
            f"**{a['games']} games.**", "",
+           "## Road-trip depth, home-field controlled (the decisive cut)",
+           "AWAY games only — win rate by the away team's road_streak. A decline "
+           "across bands = real incremental fatigue; flat = just ordinary away "
+           "disadvantage. (Away baseline ≈ 47%.)", "",
+           "| away team's road_streak | away games | win rate |", "|---|---|---|"]
+    for b in a["away_win_rate_by_road_streak"]:
+        wr = f"{b['win_rate']:.0%}" if b["win_rate"] is not None else "—"
+        out.append(f"| {b['road_streak']} | {b['away_games']} | {wr} |")
+    out += ["",
            "## Head-to-head — the MORE-fatigued team's win rate (want < 50%)",
            "", "| signal | games | tired team won |", "|---|---|---|"]
     for label, h in a["head_to_head"].items():
