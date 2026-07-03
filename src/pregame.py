@@ -111,11 +111,17 @@ def run() -> bool:
     OUTPUT_DIR.mkdir(exist_ok=True)
     state_path.write_text(json.dumps(sorted(processed)))
 
-    if (payload.get("picks"), payload.get("coin_flips")) != old_picks:
-        notify.send_telegram(picks_main.telegram_text(payload))
-        log.info("picks changed -> telegram sent")
+    # Always send the board on a FINAL pre-game window (first pitch within
+    # FINAL_MIN) so there's a locked-board ping before every slot - silence
+    # only when this was an early far-out refresh with no pick changes.
+    changed = (payload.get("picks"), payload.get("coin_flips")) != old_picks
+    if changed or final:
+        head = ("🔔 pre-game check — first pitch soon, board locked in:\n\n"
+                if final and not changed else "")
+        notify.send_telegram(head + picks_main.telegram_text(payload))
+        log.info("telegram sent (%s)", "picks changed" if changed else "final pre-game window")
     else:
-        log.info("picks unchanged -> no telegram")
+        log.info("early refresh, picks unchanged -> no telegram")
     return True
 
 
