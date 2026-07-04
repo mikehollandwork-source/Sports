@@ -329,7 +329,10 @@ def _attach_line(game, result: dict, slate: list) -> None:
         pc["lock_odds"] = int(pc["opponent_moneyline"])
         pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
                         f"them — coin flip historically (2-4); our side hit {len(hits)}/5")
-    elif len(hits) >= 1:
+    elif len(hits) >= 1 and not (len(hits) == 1 and f_hit):
+        # A LEAN needs at least one signal the SYSTEM adds - being the market
+        # favorite alone (f_hit only) just echoes Vegas, so it doesn't qualify;
+        # it falls through to the fade bucket below.
         pc["play"] = "lean"
         pc["status"] = "lean"
         if len(hits) >= PICK_MIN_SIGNALS and core_hit and soft_public:
@@ -361,8 +364,9 @@ def _attach_line(game, result: dict, slate: list) -> None:
                 pc["stay_bet"] = bet_team
                 pc["stay_odds"] = int(odds)
         money_team = (home if ms == "home" else away) if ms in ("home", "away") else None
-        pc["reason"] = (f"0/5 signals — money's on {money_team}, bet the other side"
-                        if pc["stay_bet"] else "0/5 signals — no clean money read, no bet")
+        sig = "favorite only (not enough for a lean)" if (len(hits) == 1 and f_hit) else "0/5 signals"
+        pc["reason"] = (f"{sig} — money's on {money_team}, bet the other side"
+                        if pc["stay_bet"] else f"{sig} — no clean money read, no bet")
 
 
 def _play(g: dict) -> str:
