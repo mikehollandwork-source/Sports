@@ -38,9 +38,42 @@ log = logging.getLogger("grade")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 LEDGER_PATH = OUTPUT_DIR / "ledger.json"
+VOIDS_PATH = OUTPUT_DIR / "voids.json"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 STAKE = 1.0
+
+
+def load_voids() -> dict:
+    """Games the sportsbook voided/refunded (no action) - they must NOT be booked
+    as a W or L. User-maintained in output/voids.json: either a bare list or
+    {"voids": [...]}, each item {"date","matchup"} (matchup exactly as the board
+    shows it, full team names) and/or {"game_pk": N}. Returns {pairs, pks}."""
+    try:
+        raw = json.loads(VOIDS_PATH.read_text())
+    except (OSError, ValueError):
+        return {"pairs": set(), "pks": set()}
+    items = raw.get("voids", []) if isinstance(raw, dict) else raw
+    pairs, pks = set(), set()
+    for v in items if isinstance(items, list) else []:
+        if isinstance(v, dict):
+            if v.get("game_pk") is not None:
+                try:
+                    pks.add(int(v["game_pk"]))
+                except (TypeError, ValueError):
+                    pass
+            if v.get("date") and v.get("matchup"):
+                pairs.add((v["date"].strip(), v["matchup"].strip().casefold()))
+        elif isinstance(v, str) and "|" in v:      # "YYYY-MM-DD | Away @ Home"
+            d, m = v.split("|", 1)
+            pairs.add((d.strip(), m.strip().casefold()))
+    return {"pairs": pairs, "pks": pks}
+
+
+def _voided(voids: dict, date: str, matchup: str, game_pk) -> bool:
+    if game_pk is not None and int(game_pk) in voids["pks"]:
+        return True
+    return (date, (matchup or "").strip().casefold()) in voids["pairs"]
 
 
 def american_profit(odds: int, stake: float = STAKE) -> float:
@@ -169,6 +202,7 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict], list[dict
         return [], [], [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
+    voids = load_voids()
 
     pick_entries: list[dict] = []
     lean_entries: list[dict] = []
@@ -179,6 +213,9 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict], list[dict
         adv = pc.get("advantage_team")
         res = results.get(g.get("game_pk"))
         if not adv or not res or not res["final"] or not res["winner"]:
+            continue
+        if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
+            log.info("skip voided game: %s %s", date, g.get("matchup"))
             continue
         play = _play(g)
         if play in ("pick", "lean"):
@@ -216,10 +253,43 @@ def _add(book: dict, entries: list[dict]) -> int:
     return added
 
 
+def _entry_voided(voids: dict, e: dict) -> bool:
+    pk = str(e.get("key", "")).rpartition("#")[2]
+    if pk.isdigit() and int(pk) in voids["pks"]:
+        return True
+    return (e.get("date"), (e.get("matchup") or "").strip().casefold()) in voids["pairs"]
+
+
+def _apply_voids(ledger: dict, voids: dict) -> int:
+    """Remove any already-booked entry the void list now covers (a game the book
+    refunded after we graded it), rebuilding each book's bankroll/record cleanly
+    from the survivors. Returns how many were pulled."""
+    removed = 0
+    for k in ("picks", "leans", "coin_flip", "fades"):
+        book = ledger.get(k)
+        if not book:
+            continue
+        kept = [e for e in book["entries"] if not _entry_voided(voids, e)]
+        if len(kept) != len(book["entries"]):
+            removed += len(book["entries"]) - len(kept)
+            book["entries"] = []
+            book["bankroll"] = 0.0
+            book["record"] = {"wins": 0, "losses": 0, "bets": 0}
+            _add(book, kept)   # replay survivors -> fresh bankroll + bankroll_after
+    return removed
+
+
 def update_ledger(date: str) -> dict:
     """Settle a date into all books. Idempotent per game (game_pk). Dates before
     the ledger's grade_from cutoff (if set) are never booked."""
     ledger = load_ledger()
+    # honor the void list first: pull any game the book refunded after we graded it
+    voids = load_voids()
+    if voids["pairs"] or voids["pks"]:
+        pulled = _apply_voids(ledger, voids)
+        if pulled:
+            log.info("un-booked %d voided game(s) from the ledger", pulled)
+            ledger["review"] = review(ledger["picks"])
     gf = ledger.get("grade_from")
     if gf and date < gf:
         log.info("skip grading %s (before grade_from %s)", date, gf)
