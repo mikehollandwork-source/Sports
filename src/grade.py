@@ -377,18 +377,19 @@ def _tally(entries: list[dict]) -> tuple[int, int, float]:
 
 
 def windowed_records(book: dict, today: dt.date) -> list[tuple[str, tuple[int, int, float]]]:
-    """W-L-units for a book over Day / Week / Month / YTD. Day = the most recent
-    settled date; Week/Month/YTD are calendar windows (since Monday / since the
-    1st / since Jan 1) ending today. Empty list when the book has no settled bets."""
+    """W-L-units for a book over Today / Week / Month / YTD. Today = games settled
+    with TODAY's date only (0-0 until today's games go final - yesterday's plays
+    never carry over); Week/Month/YTD are calendar windows (since Monday / since
+    the 1st / since Jan 1) ending today. Empty list when the book has no bets at all."""
     e = book["entries"]
     if not e:
         return []
-    last = max(x["date"] for x in e)
+    today_s = today.isoformat()
     monday = (today - dt.timedelta(days=today.weekday())).isoformat()
     first = today.replace(day=1).isoformat()
     jan1 = today.replace(month=1, day=1).isoformat()
     windows = [
-        (f"Day ({last})", [x for x in e if x["date"] == last]),
+        (f"Today ({today_s})", [x for x in e if x["date"] == today_s]),
         ("Week", [x for x in e if x["date"] >= monday]),
         ("Month", [x for x in e if x["date"] >= first]),
         ("YTD", [x for x in e if x["date"] >= jan1]),
