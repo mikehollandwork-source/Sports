@@ -112,9 +112,9 @@ WX_TILT_CAP = 0.08      # stays below home field (0.10)
 #          so it's its own separately-graded category.
 #   LEAN = exactly 1 hit that the SYSTEM adds (or the demoted favorite+BvP pair
 #          / soft-public pick). Being the market favorite ALONE doesn't count -
-#          it just echoes Vegas - so a favorite-only game drops to the fade pile.
-#   FADE = everything else (the Vegas special): bet against the unanimous
-#          money% side; no clean money read = listed, never booked.
+#          it just echoes Vegas - so a favorite-only game is no action.
+#   NO ACTION = everything else (0 signals, or favorite-only): listed on the
+#          board, never booked. (The old money-fade "fades" book is retired.)
 PICK_MIN_SIGNALS = 2
 LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
 LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)

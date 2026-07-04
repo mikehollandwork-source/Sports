@@ -135,9 +135,9 @@ def run(date: str) -> dict:
     coin_bets = [r["pick_criteria"].get("lock_bet") or _lock_bet(r)[0]
                  for r in results if _play(r) == "lock"]
     leans = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "lean"]
-    fades = sum(1 for r in results if _play(r) == "stay_away")
-    log.info("Board: %d pick(s), %d lean(s), %d coin flip(s), %d fade(s)",
-             len(picks), len(leans), len(coin_bets), fades)
+    no_action = sum(1 for r in results if _play(r) == "stay_away")
+    log.info("Board: %d pick(s), %d lean(s), %d coin flip(s), %d no-action",
+             len(picks), len(leans), len(coin_bets), no_action)
 
     return {
         "date": date,
@@ -345,28 +345,16 @@ def _attach_line(game, result: dict, slate: list) -> None:
         else:
             pc["reason"] = f"1/5 signals — {', '.join(hits)}"
     else:
-        # FADE (Vegas special): no merit on either read. The only tracked action
-        # in this pile is fading wherever the MONEY sits (unanimous money%); with
-        # no clean money read the game is listed but never bet. (play value stays
-        # 'stay_away' so older frozen snapshots keep grading identically.)
+        # NO ACTION: nothing the system likes (0 signals, or the market favorite
+        # alone, which just echoes Vegas). Listed on the board, never booked. (play
+        # value stays 'stay_away' so older frozen snapshots keep classifying the
+        # same; the retired money-fade bet is gone.)
         pc["play"] = "stay_away"
         pc["status"] = "stay_away"
-        ms = (result.get("public_check") or {}).get("money_side")
         pc["stay_bet"] = None
         pc["stay_odds"] = None
-        if ms in ("home", "away"):
-            bet_side = "away" if ms == "home" else "home"
-            bet_team = away if bet_side == "away" else home
-            adv_is_home = adv == home
-            bet_is_adv = (bet_side == "home") == adv_is_home
-            odds = pc.get("advantage_moneyline") if bet_is_adv else pc.get("opponent_moneyline")
-            if odds is not None:
-                pc["stay_bet"] = bet_team
-                pc["stay_odds"] = int(odds)
-        money_team = (home if ms == "home" else away) if ms in ("home", "away") else None
-        sig = "favorite only (not enough for a lean)" if (len(hits) == 1 and f_hit) else "0/5 signals"
-        pc["reason"] = (f"{sig} — money's on {money_team}, bet the other side"
-                        if pc["stay_bet"] else f"{sig} — no clean money read, no bet")
+        sig = "favorite only" if (len(hits) == 1 and f_hit) else "0/5 signals"
+        pc["reason"] = f"{sig} — no play"
 
 
 def _play(g: dict) -> str:
@@ -648,15 +636,10 @@ def _lock_bet(g: dict) -> tuple[str | None, int | None]:
 
 
 def _stay_line(g: dict) -> str:
-    """One-liner for a FADE (Vegas special) game: the money-fade bet when there
-    is one. (play value is still 'stay_away' for snapshot compatibility.)"""
+    """One-liner for a NO-ACTION game (nothing the system likes; never booked).
+    Legacy frozen snapshots may carry a retired money-fade bet - ignored now."""
     pc = g["pick_criteria"]
-    bet = pc.get("stay_bet")
-    if bet:
-        odds = pc.get("stay_odds")
-        odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-        return f"🔄 {_state_tag(g)}{g['matchup']} → bet {bet}{odds_s} — {pc.get('reason', '')}"
-    return f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', '')}"
+    return f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', 'no play')}"
 
 
 def _star(pc: dict) -> list[str]:
@@ -670,8 +653,8 @@ def _star(pc: dict) -> list[str]:
 
 
 def _game_lines(g: dict) -> list[str]:
-    """Readable lines breaking down one matchup for the board. LOCK picks and
-    fades collapse to a one-liner naming the side to bet."""
+    """Readable lines breaking down one matchup for the board. Coin flips and
+    no-action games collapse to a one-liner."""
     pc = g["pick_criteria"]
     if _play(g) == "lock":
         bet, odds = _lock_bet(g)
@@ -731,10 +714,10 @@ def build_summary(payload: dict) -> str:
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
     coins = [g for g in board if _play(g) == "lock"]
-    fades = [g for g in board if _play(g) == "stay_away"]
+    no_action = [g for g in board if _play(g) == "stay_away"]
     out = [f"# MLB Board — {date}", ""]
     out.append(f"**{len(picks)} pick(s) · {len(leans)} lean(s) · {len(coins)} coin flip(s) · "
-               f"{len(fades)} fade(s)**"
+               f"{len(no_action)} no-play**"
                + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
                   if picks else ""))
     if finals:
@@ -750,10 +733,9 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_✅ = PICK (2+ signals). ⭐ = pick on a proven-hot combo (margin+favorite+line, or "
-               "4+ signals). 🔸 = LEAN (1 signal). 🪙 = COIN FLIP (line + public favor the "
-               "other side - bet them; graded as its own book). 🔄 = FADE (Vegas special: no "
-               "signals, bet against the money side). ▫️ = no clean money read, no bet. "
-               "🔴 = live._")
+               "4+ signals). 🔸 = LEAN (1 system signal; being a favorite alone doesn't count). "
+               "🪙 = COIN FLIP (line + public favor the other side - bet them; graded as its own "
+               "book). ▫️ = no play. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -791,7 +773,7 @@ def _telegram_records_lines() -> list[str]:
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
     books = [("Picks", ledger["picks"]), ("Leans", ledger["leans"]),
-             ("Coin flips", ledger["coin_flip"]), ("Fades", ledger["fades"]),
+             ("Coin flips", ledger["coin_flip"]),
              ("All plays", grade.combined_book(ledger))]
     for name, book in books:
         rec = grade.windowed_records(book, today)
@@ -817,11 +799,11 @@ def telegram_text(payload: dict) -> str:
     picks = [g for g in board if _play(g) == "pick"]
     leans = [g for g in board if _play(g) == "lean"]
     coins = [g for g in board if _play(g) == "lock"]
-    fades = [g for g in board if _play(g) == "stay_away"]
+    no_action = [g for g in board if _play(g) == "stay_away"]
 
     L = [f"⚾ MLB BOARD — {date}",
          f"{len(picks)} pick(s) · {len(leans)} lean(s) · {len(coins)} coin flip(s) · "
-         f"{len(fades)} fade(s)"]
+         f"{len(no_action)} no-play"]
     if finals:
         L.append(f"({len(finals)} final → moved to the record)")
 
@@ -880,19 +862,13 @@ def telegram_text(payload: dict) -> str:
             odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
             L.append(f"🪙 {tag}{aa} @ {ha} → bet {_short(g, bet)}{odds_s} — {pc.get('reason', '')}")
 
-    if fades:
-        L += ["", "— FADES (Vegas special: bet against the money) —"]
-        for g in fades:
+    if no_action:
+        L += ["", "— NO PLAY —"]
+        for g in no_action:
             aa, ha = _abbrs(g)
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
-            bet = pc.get("stay_bet")
-            if bet:
-                odds = pc.get("stay_odds")
-                odds_s = f" ({odds:+d})" if isinstance(odds, int) else ""
-                L.append(f"🔄 {tag}{aa} @ {ha} → bet {_short(g, bet)}{odds_s} — {pc.get('reason', '')}")
-            else:
-                L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', '')}")
+            L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', 'no play')}")
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
