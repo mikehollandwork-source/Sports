@@ -116,8 +116,12 @@ WX_TILT_CAP = 0.08      # stays below home field (0.10)
 #   NO ACTION = everything else (0 signals, or favorite-only): listed on the
 #          board, never booked. (The old money-fade "fades" book is retired.)
 PICK_MIN_SIGNALS = 2
-LEAN_STRONG_MARGIN = 0.30    # stat-edge margin signal (64% at/above vs 48% below)
-LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5 (73%)
+LEAN_STRONG_MARGIN = 0.50    # stat-edge margin signal - raised from .30: the graded
+                             # record showed margin only pays at the extreme (>=.50
+                             # went 75% +1.16u; the .30-.50 band was a drag)
+LEAN_MIN_CONSISTENCY = 3     # consistency signal: advantage team >=3/5. The counted
+                             # metric is now OUT-HIT (more hits than allowed), which
+                             # back-tested 75% +3.92u vs the old complete-win-condition
 # Consistency also tilts the MARGIN itself (user call): the side that hit its
 # SOS-adjusted win condition more often over the last 5 gets a small team_score
 # bump per game of difference (max 5 * 0.04 = 0.20, comparable to the BvP cap).
@@ -894,13 +898,15 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     game.home.platoon_factor = platoon_factor(game.home.offense.get("bats", []), home_opp)
     game.away.platoon_factor = platoon_factor(game.away.offense.get("bats", []), away_opp)
 
-    # consistency first: both sides' last-5 win-condition hits feed the margin tilt
+    # consistency first: both sides' last-5 OUT-HIT counts feed the margin tilt.
+    # (out-hit = more hits than allowed; it back-tested far better than the old
+    # complete-win-condition count, so it's what "consistency" now measures.)
     wc_home = win_condition(game.home, game.away)
     wc_away = win_condition(game.away, game.home)
     cons_pair = None
     if wc_home and wc_away:
-        cons_pair = (wc_home["back_test"]["complete_win_condition"],
-                     wc_away["back_test"]["complete_win_condition"])
+        cons_pair = (wc_home["back_test"]["out_hit"],
+                     wc_away["back_test"]["out_hit"])
 
     adv_team, hs, as_ = statistical_favorite(game, cons_pair)
     majority, majority_detail = public_majority(game, consensus, forum_counts,
@@ -915,9 +921,9 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
     # the public is fading (keeps the public-vs-stats thesis).
     public_edge = bool(majority) and adv_team.team_id != majority.team_id
 
-    # consistency (the former win condition) - a signal AND a margin tilt now.
+    # consistency = last-5 OUT-HIT count (a signal AND a margin tilt).
     adv_wc = wc_home if adv_team.team_id == game.home.team_id else wc_away
-    cons_hits = adv_wc["back_test"]["complete_win_condition"] if adv_wc else 0
+    cons_hits = adv_wc["back_test"]["out_hit"] if adv_wc else 0
     edge_margin = abs(hs - as_)
     edge_conf = _clamp01(edge_margin / EDGE_FULL)
     # Fade strength now requires an ACTUAL fade (public on the other side) and is
