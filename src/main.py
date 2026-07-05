@@ -289,14 +289,15 @@ def _attach_line(game, result: dict, slate: list) -> None:
     maj = (result.get("public_majority") or {}).get("team")
     lock_profile = (shift is not None and shift <= -LINE_CONFIRM_MIN
                     and (maj is None or maj == opp_name))
-    # favorite + BvP alone don't make a pick: that exact 2-signal combo graded
-    # 8-10 (-3.50u) while every other 2+ combo was profitable, so a pick needs
-    # at least one of margin / line / consistency among its hits.
+    # CORE signals carry a play; favorite + BvP are supporting only. The graded
+    # record: bets with a core signal (margin>=.50 / line toward / consistency>=3)
+    # went 11-4 (+3.06u), while no-core bets (favorite-only, BvP-only, favorite+BvP)
+    # went 7-8 (-1.78u). So ANY play now needs a core signal.
     core_hit = m_hit or l_hit or c_hit
-    # Public-margin gate: a MILD public lean (< PUBLIC_HEAVY%) against the pick
-    # side has been the sharp side (see analysis.PUBLIC_HEAVY) - picks into it
-    # drop to leans. A heavy lean is the fadeable public and the pick stands.
-    soft_public = False
+    # Mild-public gate: a public lean UNDER PUBLIC_HEAVY% on the OTHER side has been
+    # the sharp side (both the 106-game study and the live record: our side ~38%
+    # into it). It's now a NO-ACTION, not a demoted lean - that bucket bled -2.23u.
+    mild_public = False
     pub_pct = None
     if maj and maj != adv:
         pairs = _public_pairs((result.get("public_majority") or {}).get("detail") or {})
@@ -305,8 +306,9 @@ def _attach_line(game, result: dict, slate: list) -> None:
             hp = sum(p[1] for p in pairs) / len(pairs)
             pub_pct = round(hp if maj == home else ap)
             pc["public_pct_against"] = pub_pct
-            soft_public = pub_pct < PUBLIC_HEAVY
-    if len(hits) >= PICK_MIN_SIGNALS and core_hit and not soft_public:
+            mild_public = pub_pct < PUBLIC_HEAVY
+    playable = core_hit and not mild_public
+    if playable and len(hits) >= PICK_MIN_SIGNALS:
         pc["play"] = "pick"
         pc["status"] = "pick"
         pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
@@ -329,32 +331,26 @@ def _attach_line(game, result: dict, slate: list) -> None:
         pc["lock_odds"] = int(pc["opponent_moneyline"])
         pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
                         f"them — coin flip historically (2-4); our side hit {len(hits)}/5")
-    elif len(hits) >= 1 and not (len(hits) == 1 and f_hit):
-        # A LEAN needs at least one signal the SYSTEM adds - being the market
-        # favorite alone (f_hit only) just echoes Vegas, so it doesn't qualify;
-        # it falls through to the fade bucket below.
+    elif playable and len(hits) >= 1:
+        # LEAN = a lone core signal (a single margin/line/consistency).
         pc["play"] = "lean"
         pc["status"] = "lean"
-        if len(hits) >= PICK_MIN_SIGNALS and core_hit and soft_public:
-            pc["reason"] = (f"{len(hits)}/5 signals but the public is only mildly on "
-                            f"{maj} ({pub_pct}% < {PUBLIC_HEAVY}) — mild public leans "
-                            f"have been the sharp side; lean, not a pick")
-        elif len(hits) >= PICK_MIN_SIGNALS:
-            pc["reason"] = (f"{len(hits)}/5 signals but only favorite+BvP "
-                            f"(that combo graded 8-10) — lean, not a pick")
-        else:
-            pc["reason"] = f"1/5 signals — {', '.join(hits)}"
+        pc["reason"] = f"1/5 signals — {', '.join(hits)}"
     else:
-        # NO ACTION: nothing the system likes (0 signals, or the market favorite
-        # alone, which just echoes Vegas). Listed on the board, never booked. (play
-        # value stays 'stay_away' so older frozen snapshots keep classifying the
-        # same; the retired money-fade bet is gone.)
+        # NO ACTION: no core signal (favorite/BvP alone don't carry a play), or the
+        # public is mildly on the other side (the sharp fade). Listed, never booked.
+        # (play value stays 'stay_away' so older frozen snapshots classify the same.)
         pc["play"] = "stay_away"
         pc["status"] = "stay_away"
         pc["stay_bet"] = None
         pc["stay_odds"] = None
-        sig = "favorite only" if (len(hits) == 1 and f_hit) else "0/5 signals"
-        pc["reason"] = f"{sig} — no play"
+        if mild_public:
+            why = f"public mildly on {maj} ({pub_pct}% < {PUBLIC_HEAVY}) — sharp fade, no play"
+        elif not core_hit and hits:
+            why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
+        else:
+            why = "0/5 signals — no play"
+        pc["reason"] = why
 
 
 def _play(g: dict) -> str:
@@ -437,7 +433,7 @@ def _cons_pair(g: dict) -> str:
 
     def hits(side: str):
         try:
-            return g["consistency"][side]["back_test"]["complete_win_condition"]
+            return g["consistency"][side]["back_test"]["out_hit"]
         except (KeyError, TypeError):
             return None
 
