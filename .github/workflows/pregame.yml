@@ -1,14 +1,14 @@
-name: Pre-game refresh
+name: Board refresh
 
-# Polls every ~15 min during MLB game hours and, ~30 min before each distinct
-# first-pitch time, regenerates picks once (simultaneous games = one run) and
-# Telegrams the result. Actions cron is ~15-min granular and can be delayed, so
-# "30 min before" is approximate; the per-day state file dedupes each slot.
+# Rebuilds the whole board on every firing so picks always reflect the latest
+# lineups/lines/odds. Asks for every 5 minutes, all day - GitHub throttles
+# scheduled crons hard (~2h between firings), so this just runs as often as the
+# platform allows. Started games stay frozen (main._lock_started_games);
+# Telegram only fires when the pick set changes, so frequent runs don't spam.
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 0-4,15-23 * * *"   # ~11:00-00:00 ET; GitHub throttles this hard,
-                                     # the wide due-horizon in src/pregame.py compensates
+    - cron: "*/5 * * * *"   # max frequency; GitHub throttles to whatever it allows
 
 permissions:
   contents: write
