@@ -80,6 +80,9 @@ class Team:
     pen_bvp_ops: float | None = None   # lineup's career OPS vs the opp BULLPEN (late game)
     pen_bvp_pa: int = 0                # career PA behind the pen number
     season_offense: dict = field(default_factory=dict)  # season counting stats (anchor)
+    form_delta: float | None = None   # lineup hot/cold: PA-weighted avg of each
+                                      # hitter's last-5 wOBA minus his season wOBA
+    player_form: list = field(default_factory=list)  # per-hitter deltas for the board
 
 
 @dataclass
@@ -422,6 +425,68 @@ def _people(ids: list[int]) -> dict[int, dict]:
     return {p["id"]: p for p in data.get("people", [])}
 
 
+def _season_hitting(ids: list[int], season: int) -> dict[int, dict]:
+    """{player_id: season hitting stat dict} in one batched people call."""
+    if not ids:
+        return {}
+    data = _get("people", personIds=",".join(str(i) for i in ids),
+                hydrate=f"stats(group=[hitting],type=[season],season={season})")
+    out: dict[int, dict] = {}
+    for p in data.get("people", []):
+        for s in p.get("stats", []):
+            for sp in s.get("splits", []):
+                out[p["id"]] = sp.get("stat", {})
+    return out
+
+
+# standard linear weights; denominator AB + BB + SF + HBP
+def raw_woba(ab, h, d2, d3, hr, bb, hbp, sf) -> float | None:
+    den = ab + bb + sf + hbp
+    if not den:
+        return None
+    singles = h - d2 - d3 - hr
+    return (0.69 * bb + 0.72 * hbp + 0.88 * singles
+            + 1.24 * d2 + 1.56 * d3 + 1.95 * hr) / den
+
+
+FORM_MIN_PA5 = 8       # hitter needs this many last-5 PA to count toward form
+FORM_MIN_SEASON_PA = 80  # ...and this season sample for a stable baseline
+
+
+def _lineup_form(per_hitter: list[tuple], season: int) -> tuple[float | None, list[dict]]:
+    """(team form delta, per-player list). per_hitter = [(name, last5 agg), ...].
+    Each qualifying hitter's delta = last-5 wOBA minus HIS OWN season wOBA; the
+    team number is the last-5-PA-weighted average (who's actually hot matters in
+    proportion to how much he's hitting)."""
+    ids = [pid for pid, _n, _l in per_hitter]
+    season_by_id = _season_hitting(ids, season)
+    players, num, den = [], 0.0, 0.0
+    for pid, name, l5 in per_hitter:
+        st = season_by_id.get(pid) or {}
+        try:
+            pa5 = l5["pa"]
+            spa = float(st.get("plateAppearances", 0) or 0)
+            if pa5 < FORM_MIN_PA5 or spa < FORM_MIN_SEASON_PA:
+                continue
+            w5 = raw_woba(l5["ab"], l5["h"], l5["2b"], l5["3b"], l5["hr"],
+                          l5["bb"], l5["hbp"], l5["sf"])
+            ws = raw_woba(float(st.get("atBats", 0) or 0), float(st.get("hits", 0) or 0),
+                          float(st.get("doubles", 0) or 0), float(st.get("triples", 0) or 0),
+                          float(st.get("homeRuns", 0) or 0), float(st.get("baseOnBalls", 0) or 0),
+                          float(st.get("hitByPitch", 0) or 0), float(st.get("sacFlies", 0) or 0))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if w5 is None or ws is None:
+            continue
+        delta = round(w5 - ws, 3)
+        players.append({"name": name, "delta": delta, "woba5": round(w5, 3),
+                        "woba_season": round(ws, 3), "pa5": int(pa5)})
+        num += delta * pa5
+        den += pa5
+    players.sort(key=lambda p: -p["delta"])
+    return (round(num / den, 3) if den else None), players
+
+
 def probable_hands(game: Game) -> None:
     """Fill each probable pitcher's throwing hand."""
     ids = [t.probable_pitcher.player_id for t in (game.home, game.away) if t.probable_pitcher]
@@ -647,6 +712,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         park_num = park_den = 0.0
         opp_fip_num = opp_fip_w = opp_win_num = 0.0
         bats = []  # (bat_hand, pa) for platoon factor
+        per_hitter = []  # (pid, name, last5 line) for the hot/cold form pass
         for h in hitters:
             try:
                 line = hitter_last5(h.player_id, team.name, season, as_of=as_of)
@@ -663,7 +729,13 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
                 opp_fip_num += line["opp_fip"] * pa
                 opp_fip_w += pa
             bats.append((h.hand, pa))
+            per_hitter.append((h.player_id, h.name, line))
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
+        # hot/cold form: each hitter's last-5 wOBA vs his own season baseline
+        try:
+            team.form_delta, team.player_form = _lineup_form(per_hitter, season)
+        except Exception as exc:
+            log.warning("lineup form failed for %s: %s", team.name, exc)
         team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
         team.offense = agg
         team.season_offense = team_season_offense(team.team_id, season)

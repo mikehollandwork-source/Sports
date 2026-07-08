@@ -22,10 +22,10 @@ import zoneinfo
 from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
-from .analysis import (LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN, LINE_CONFIRM_MIN,
-                       PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA, UMP_MIN_GAMES,
-                       _canon_abbr, _implied, evaluate_game, find_slate_line,
-                       line_confirms)
+from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
+                       LINE_CONFIRM_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA,
+                       UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
+                       find_slate_line, line_confirms)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
                       team_home_away_split)
 
@@ -134,18 +134,17 @@ def run(date: str) -> dict:
     picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
     coin_bets = [r["pick_criteria"].get("lock_bet") or _lock_bet(r)[0]
                  for r in results if _play(r) == "lock"]
-    leans = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "lean"]
     no_action = sum(1 for r in results if _play(r) == "stay_away")
-    log.info("Board: %d pick(s), %d lean(s), %d coin flip(s), %d no-action",
-             len(picks), len(leans), len(coin_bets), no_action)
+    log.info("Board: %d play(s), %d coin flip(s), %d no-action",
+             len(picks), len(coin_bets), no_action)
 
     return {
         "date": date,
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "games": results,
-        "picks": picks,
+        "picks": picks,            # the PLAYS (single tier now)
         "coin_flips": coin_bets,   # the 🪙 plays (bet the opponent; own book)
-        "leans": leans,
+        "leans": [],               # retired tier, kept for payload-shape compat
     }
 
 
@@ -307,8 +306,22 @@ def _attach_line(game, result: dict, slate: list) -> None:
             pub_pct = round(hp if maj == home else ap)
             pc["public_pct_against"] = pub_pct
             mild_public = pub_pct < PUBLIC_HEAVY
+    # Player-form PROBATION signal: is the play side's lineup hotter (vs its own
+    # season baselines) than the opponent's by >= FORM_DIFF_FLOOR? Recorded and
+    # audited only - it does NOT count toward the play until it proves out.
+    fm = result.get("form") or {}
+    adv_side = "home" if adv == home else "away"
+    fa = (fm.get(adv_side) or {}).get("delta")
+    fo = (fm.get("away" if adv_side == "home" else "home") or {}).get("delta")
+    pc["form_edge"] = (None if fa is None or fo is None or abs(fa - fo) < FORM_DIFF_FLOOR
+                       else fa > fo)
+    pc["form_gap"] = round(fa - fo, 3) if fa is not None and fo is not None else None
+    # ONE play tier (user call - no more pick/lean split): a game is a PLAY when
+    # it clears both gates (core signal + not a mild-public fade). The internal
+    # play value stays "pick" so frozen snapshots and grading classify the same;
+    # legacy "lean" snapshots also grade into the plays book.
     playable = core_hit and not mild_public
-    if playable and len(hits) >= PICK_MIN_SIGNALS:
+    if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
         pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
@@ -331,11 +344,6 @@ def _attach_line(game, result: dict, slate: list) -> None:
         pc["lock_odds"] = int(pc["opponent_moneyline"])
         pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
                         f"them — coin flip historically (2-4); our side hit {len(hits)}/5")
-    elif playable and len(hits) >= 1:
-        # LEAN = a lone core signal (a single margin/line/consistency).
-        pc["play"] = "lean"
-        pc["status"] = "lean"
-        pc["reason"] = f"1/5 signals — {', '.join(hits)}"
     else:
         # NO ACTION: no core signal (favorite/BvP alone don't carry a play), or the
         # public is mildly on the other side (the sharp fade). Listed, never booked.
@@ -354,25 +362,27 @@ def _attach_line(game, result: dict, slate: list) -> None:
 
 
 def _play(g: dict) -> str:
-    """The game's play type: 'pick' / 'lean' / 'lock' / 'stay_away'. Older frozen
-    snapshots: flagged / strong-tier -> lean; old 'fade' (the same 9-1 rule) ->
-    lock; 'pass' -> stay_away."""
+    """The game's play type: 'pick' (a PLAY) / 'lock' (coin flip) / 'stay_away'.
+    The pick/lean split is retired - legacy 'lean' frozen snapshots classify as
+    plays; old 'fade' (the 9-1 rule) -> lock; 'pass' -> stay_away."""
     pc = g.get("pick_criteria", {})
     play = pc.get("play")
-    if play in ("pick", "lean", "lock", "stay_away"):
+    if play == "lean":
+        return "pick"
+    if play in ("pick", "lock", "stay_away"):
         return play
     if play == "fade":
         return "lock"
     if play == "pass":
         return "stay_away"
     if g.get("flagged") or pc.get("lean_tier") == "strong":
-        return "lean"
+        return "pick"
     return "stay_away"
 
 
 def _is_play(g: dict) -> bool:
-    """Full board block = pick or lean (the sides we bet ON)."""
-    return _play(g) in ("pick", "lean")
+    """Full board block = a PLAY (the side we bet ON)."""
+    return _play(g) == "pick"
 
 
 def _ranked(games: list) -> list:
@@ -589,6 +599,28 @@ def _pen_bvp_phrase(g: dict) -> str | None:
             f"{aa} {b['away_ops']:.3f} v {ha} {b['home_ops']:.3f} ({b['total_pa']} PA)")
 
 
+def _form_phrase(g: dict) -> str | None:
+    """Hot/cold lineup form vs each hitter's own season baseline, with the
+    standout bat per side: '🔥 SEA +.024 (Rodríguez +.115) · ❄️ TOR -.018
+    (Springer -.092)'. Probation signal - display + audit only."""
+    fm = g.get("form") or {}
+    aa, ha = _abbrs(g)
+    bits = []
+    for side, ab in (("away", aa), ("home", ha)):
+        s = fm.get(side)
+        if not s or s.get("delta") is None:
+            continue
+        d = s["delta"]
+        icon = "🔥" if d >= 0.015 else "❄️" if d <= -0.015 else "•"
+        standout = (s.get("hot") or [None])[0] if d >= 0 else (s.get("cold") or [None])[-1]
+        extra = ""
+        if standout:
+            last = standout["name"].split()[-1]
+            extra = f" ({last} {standout['delta']:+.3f})"
+        bits.append(f"{icon} {ab} {d:+.3f}{extra}")
+    return " · ".join(bits) if bits else None
+
+
 def _ump_phrase(g: dict) -> str | None:
     """'HP ump: John Doe — big zone (K +0.9/gm)' once MLB posts the crew. The
     tendency comes from the committed ump table; a big-zone ump also tilts the
@@ -667,8 +699,8 @@ def _game_lines(g: dict) -> list[str]:
     pub = _public_evidence(g)
     tag = _state_tag(g)
     star = _star(pc)
-    kind = _play(g).upper()
-    mark = "⭐" if star else ("✅" if kind == "PICK" else "🔸")
+    kind = "PLAY"
+    mark = "⭐" if star else "✅"
     lines = [
         f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
         + (f" · ⭐ {', '.join(star)}" if star else ""),
@@ -685,6 +717,9 @@ def _game_lines(g: dict) -> list[str]:
     pen = _pen_bvp_phrase(g)
     if pen:
         lines.append(f"   • pen BvP: {pen} _(context)_")
+    fp = _form_phrase(g)
+    if fp:
+        lines.append(f"   • form: {fp} _(probation signal)_")
     wx = _weather_phrase(g)
     if wx:
         lines.append(f"   • weather: {wx} _(context)_")
@@ -708,11 +743,10 @@ def build_summary(payload: dict) -> str:
     games = payload.get("games", [])
     board, finals = _board_games(games), _finals(games)
     picks = [g for g in board if _play(g) == "pick"]
-    leans = [g for g in board if _play(g) == "lean"]
     coins = [g for g in board if _play(g) == "lock"]
     no_action = [g for g in board if _play(g) == "stay_away"]
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} pick(s) · {len(leans)} lean(s) · {len(coins)} coin flip(s) · "
+    out.append(f"**{len(picks)} play(s) · {len(coins)} coin flip(s) · "
                f"{len(no_action)} no-play**"
                + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
                   if picks else ""))
@@ -728,10 +762,9 @@ def build_summary(payload: dict) -> str:
         out.append("_No upcoming or live games — full slate is final (see the record below)._")
         out.append("")
 
-    out.append("_✅ = PICK (2+ signals). ⭐ = pick on a proven-hot combo (margin+favorite+line, or "
-               "4+ signals). 🔸 = LEAN (1 system signal; being a favorite alone doesn't count). "
-               "🪙 = COIN FLIP (line + public favor the other side - bet them; graded as its own "
-               "book). ▫️ = no play. 🔴 = live._")
+    out.append("_✅ = PLAY (core signal + not a mild-public fade). ⭐ = play on a proven-hot "
+               "combo (margin+favorite+line, or 4+ signals). 🪙 = COIN FLIP (line + public "
+               "favor the other side - bet them; own book). ▫️ = no play. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -768,8 +801,7 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    books = [("Picks", ledger["picks"]), ("Leans", ledger["leans"]),
-             ("Coin flips", ledger["coin_flip"]),
+    books = [("Plays", ledger["plays"]), ("Coin flips", ledger["coin_flip"]),
              ("All plays", grade.combined_book(ledger))]
     for name, book in books:
         rec = grade.windowed_records(book, today)
@@ -793,12 +825,11 @@ def telegram_text(payload: dict) -> str:
     board, finals = _board_games(games), _finals(games)
 
     picks = [g for g in board if _play(g) == "pick"]
-    leans = [g for g in board if _play(g) == "lean"]
     coins = [g for g in board if _play(g) == "lock"]
     no_action = [g for g in board if _play(g) == "stay_away"]
 
     L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} pick(s) · {len(leans)} lean(s) · {len(coins)} coin flip(s) · "
+         f"{len(picks)} play(s) · {len(coins)} coin flip(s) · "
          f"{len(no_action)} no-play"]
     if finals:
         L.append(f"({len(finals)} final → moved to the record)")
@@ -812,8 +843,8 @@ def telegram_text(payload: dict) -> str:
         tag = "🔴 LIVE · " if g.get("state") == "live" else ""
         frozen = " [frozen]" if g.get("state") == "live" else ""
         star = _star(pc)
-        kind = _play(g).upper()
-        mark = "⭐" if star else ("✅" if kind == "PICK" else "🔸")
+        kind = "PLAY"
+        mark = "⭐" if star else "✅"
         L.extend(["",
                   f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
                   f"   {aa} @ {ha}",
@@ -829,6 +860,9 @@ def telegram_text(payload: dict) -> str:
         pen = _pen_bvp_phrase(g)
         if pen:
             L.append(f"   🧯 pen BvP {pen}")
+        fp = _form_phrase(g)
+        if fp:
+            L.append(f"   📈 form: {fp}")
         wx = _weather_phrase(g)
         if wx:
             L.append(f"   🌤 {wx}")
@@ -843,10 +877,8 @@ def telegram_text(payload: dict) -> str:
 
     for g in picks:
         block(g)
-    for g in leans:
-        block(g)
-    if not picks and not leans:
-        L += ["", "No picks or leans on the slate."]
+    if not picks:
+        L += ["", "No plays on the slate."]
 
     if coins:
         L += ["", "— COIN FLIPS (line + public on the other side — bet them; own record) —"]

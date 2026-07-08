@@ -2,14 +2,13 @@
 Grade the board against actual MLB results and keep two running $1/unit bankrolls
 in output/ledger.json:
 
-  - Picks: 2+ of the 5 signals hit. Bet the advantage team.
-  - Leans: exactly 1 signal the system adds (being the market favorite alone
-    doesn't count). Bet the advantage team.
+  - Plays: the single betting tier (pick/lean split retired). A play needs a
+    core signal (margin/line/consistency) and can't be into a mild public fade.
+    Bet the advantage team.
   - Coin flips: the old LOCK profile (line toward the opponent + public not
-    against them - bet the opponent at its price). Back-tested to a coin flip
-    (2-4), so it's its own separately-graded book.
-  - Everything else is NO ACTION - listed on the board, never booked. (The old
-    money-fade "fades" book is retired; leans_faded is frozen history.)
+    against them - bet the opponent at its price). Own book.
+  - Everything else is NO ACTION - listed on the board, never booked.
+    (leans_faded is frozen history.)
 
 Each bet is $1 on the advantage team at its **pre-game moneyline** captured from
 covers' odds page (pick_criteria.advantage_moneyline). A game whose real price
@@ -90,7 +89,7 @@ def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
-            "picks": _empty_book(), "leans": _empty_book(), "coin_flip": _empty_book(),
+            "plays": _empty_book(), "coin_flip": _empty_book(),
             "leans_faded": _empty_book()}
 
 
@@ -100,7 +99,7 @@ def load_ledger() -> dict:
         old = json.loads(LEDGER_PATH.read_text())
     except (OSError, ValueError):
         return led
-    if "picks" in old and "leans" in old:
+    if "plays" in old or ("picks" in old and "leans" in old):
         old.setdefault("leans_faded", _empty_book())   # added after the two-book schema
         if old.get("locks", {}).get("entries"):        # brief 'locks' naming era
             old.setdefault("fades", _empty_book())
@@ -131,6 +130,13 @@ def load_ledger() -> dict:
         # taxonomy v8: fades (the money-fade "Vegas special") are retired - those
         # no-signal games are no-action now, so drop the book entirely.
         old.pop("fades", None)
+        # taxonomy v9: the pick/lean split is retired - one PLAYS book. Merge
+        # both old books' entries (replayed so bankroll/record rebuild cleanly).
+        if "plays" not in old:
+            merged = _empty_book()
+            for k in ("picks", "leans"):
+                _add(merged, (old.pop(k, None) or {}).get("entries", []))
+            old["plays"] = merged
         return old
     # migrate the old single-book schema (picks only) into the new layout
     if old.get("entries") is not None:
@@ -179,34 +185,35 @@ def _is_opponent_bet(e: dict) -> bool:
 
 
 def _play(g: dict) -> str:
-    """Mirror of main._play. Older frozen snapshots: flagged / strong-tier map to
-    lean; old 'fade' (same 9-1 rule) -> lock; anything unclassified -> stay_away."""
+    """Mirror of main._play (single PLAYS tier: legacy 'lean' counts as a play).
+    Old 'fade' (same 9-1 rule) -> lock; anything unclassified -> stay_away."""
     pc = g.get("pick_criteria", {})
     play = pc.get("play")
-    if play in ("pick", "lean", "lock", "stay_away"):
+    if play == "lean":
+        return "pick"
+    if play in ("pick", "lock", "stay_away"):
         return play
     if play == "fade":
         return "lock"
     if g.get("flagged") or pc.get("lean_tier") == "strong":
-        return "lean"
+        return "pick"
     return "stay_away"
 
 
-def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
-    """Settle every final game into (pick, lean, coin-flip) entries. Picks/leans
-    bet the advantage team; coin flips are the LOCK-profile plays betting the
-    opponent (lock_bet/lock_odds). No-signal games are no-action (never booked).
-    Unpriced bets are never booked."""
+def grade_date(date: str) -> tuple[list[dict], list[dict]]:
+    """Settle every final game into (play, coin-flip) entries. Plays bet the
+    advantage team; coin flips are the LOCK-profile plays betting the opponent
+    (lock_bet/lock_odds). No-action games are never booked; unpriced bets are
+    never booked."""
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         log.warning("no picks file for %s", date)
-        return [], [], []
+        return [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
     voids = load_voids()
 
-    pick_entries: list[dict] = []
-    lean_entries: list[dict] = []
+    play_entries: list[dict] = []
     coin_entries: list[dict] = []
     for g in payload.get("games", []):
         pc = g.get("pick_criteria", {})
@@ -218,11 +225,10 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
             log.info("skip voided game: %s %s", date, g.get("matchup"))
             continue
         play = _play(g)
-        if play in ("pick", "lean"):
+        if play == "pick":
             odds = _price(g, "advantage_moneyline")
             if odds is not None:
-                entry = _settle(date, g, res, adv, res["winner"] == adv, odds)
-                (pick_entries if play == "pick" else lean_entries).append(entry)
+                play_entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
         elif play == "lock":
             bet = pc.get("lock_bet")
             odds = pc.get("lock_odds")
@@ -231,8 +237,8 @@ def grade_date(date: str) -> tuple[list[dict], list[dict], list[dict]]:
                 odds = _price(g, "opponent_moneyline")
             if bet and odds is not None:
                 coin_entries.append(_settle(date, g, res, bet, res["winner"] == bet, int(odds)))
-        # play == "stay_away" is no-action now (fades retired): never booked.
-    return pick_entries, lean_entries, coin_entries
+        # play == "stay_away" is no-action: never booked.
+    return play_entries, coin_entries
 
 
 def _add(book: dict, entries: list[dict]) -> int:
@@ -262,7 +268,7 @@ def _apply_voids(ledger: dict, voids: dict) -> int:
     refunded after we graded it), rebuilding each book's bankroll/record cleanly
     from the survivors. Returns how many were pulled."""
     removed = 0
-    for k in ("picks", "leans", "coin_flip"):
+    for k in ("plays", "coin_flip"):
         book = ledger.get(k)
         if not book:
             continue
@@ -292,16 +298,13 @@ def update_ledger(date: str) -> dict:
         log.info("skip grading %s (before grade_from %s)", date, gf)
         save_ledger(ledger)
         return ledger
-    pe, le, ce = grade_date(date)
-    added = (_add(ledger["picks"], pe) + _add(ledger["leans"], le)
-             + _add(ledger["coin_flip"], ce))
+    pe, ce = grade_date(date)
+    added = _add(ledger["plays"], pe) + _add(ledger["coin_flip"], ce)
     if added:
-        ledger["review"] = review(ledger["picks"])
-        log.info("graded %s: picks %+.2f (%d-%d), leans %+.2f (%d-%d), "
-                 "coin flips %+.2f (%d-%d)",
-                 date, ledger["picks"]["bankroll"], ledger["picks"]["record"]["wins"],
-                 ledger["picks"]["record"]["losses"], ledger["leans"]["bankroll"],
-                 ledger["leans"]["record"]["wins"], ledger["leans"]["record"]["losses"],
+        ledger["review"] = review(ledger["plays"])
+        log.info("graded %s: plays %+.2f (%d-%d), coin flips %+.2f (%d-%d)",
+                 date, ledger["plays"]["bankroll"], ledger["plays"]["record"]["wins"],
+                 ledger["plays"]["record"]["losses"],
                  ledger["coin_flip"]["bankroll"], ledger["coin_flip"]["record"]["wins"],
                  ledger["coin_flip"]["record"]["losses"])
     else:
@@ -329,10 +332,10 @@ def review(book: dict) -> dict:
 
 def review_line(ledger: dict | None = None) -> str:
     ledger = ledger or load_ledger()
-    rev = ledger.get("review") or review(ledger["picks"])
+    rev = ledger.get("review") or review(ledger["plays"])
     if not rev["losses"]:
         return ""
-    return (f"**Loss review (picks):** {rev['losses']} loss(es) — "
+    return (f"**Loss review (plays):** {rev['losses']} loss(es) — "
             f"{rev['losses_as_underdog']} as a dog, {rev['losses_as_favorite']} as a favorite.")
 
 
@@ -346,7 +349,7 @@ def _book_line(name: str, book: dict, hypothetical: bool = False) -> str:
 def combined_book(ledger: dict) -> dict:
     """Every settled bet across all live books as one synthetic book (for the
     all-plays combined record row)."""
-    entries = [e for k in ("picks", "leans", "coin_flip")
+    entries = [e for k in ("plays", "coin_flip")
                for e in ledger[k]["entries"]]
     return {"entries": entries}
 
@@ -356,8 +359,7 @@ def bankroll_line(ledger: dict | None = None) -> str:
     ledger = ledger or load_ledger()
     comb = combined_book(ledger)
     w, l, u = _tally(comb["entries"])
-    return (_book_line("Picks", ledger["picks"]) + "  ·  "
-            + _book_line("Leans", ledger["leans"]) + "  ·  "
+    return (_book_line("Plays", ledger["plays"]) + "  ·  "
             + _book_line("Coin flips", ledger["coin_flip"]) + "  ·  "
             + f"**All plays: {u:+.2f}u** ({w}-{l})"
             + "  _($1/bet at pre-game moneyline)_")
@@ -401,8 +403,7 @@ def records_block(ledger: dict | None = None, today: dt.date | None = None) -> s
     ledger = ledger or load_ledger()
     today = today or dt.datetime.now(EASTERN).date()
     lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
-    books = [("Picks", ledger["picks"]), ("Leans", ledger["leans"]),
-             ("Coin flips", ledger["coin_flip"]),
+    books = [("Plays", ledger["plays"]), ("Coin flips", ledger["coin_flip"]),
              ("All plays", combined_book(ledger))]
     for name, book in books:
         rec = windowed_records(book, today)
