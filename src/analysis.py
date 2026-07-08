@@ -137,6 +137,15 @@ UMP_KGAP_FLOOR = 0.015  # blended lineup K% gap below this = no meaningful edge
 UMP_TILT_SCALE = 2.0    # tilt = min(scale * K% gap, cap)
 UMP_TILT_CAP = 0.06
 
+# Player form (hot/cold, user call): each lineup hitter's last-5 wOBA vs his OWN
+# season wOBA, last-5-PA-weighted into a team delta (mlb_api._lineup_form). This
+# is lineup-aware in a way the team-level season blend isn't - it credits the
+# specific bats that are hot/cold tonight. ON PROBATION: recorded as a signal
+# (pick_criteria.form_edge) and shown on the board, but it does NOT move the
+# margin or the play until the graded record shows it's profitable - the 10-day
+# audit measures its with/without spread, same path every signal walked.
+FORM_DIFF_FLOOR = 0.015  # form-delta gap below this = no read (noise)
+
 # Public-margin gate (106-game backtest of avg public % vs outcomes): a MILD
 # public lean (50-70%) is the sharp side - it wins 56-60% and picks made INTO it
 # went 3-5 (38%) / all stat sides into it 12-19 (-7.52u). A HEAVY lean
@@ -973,6 +982,10 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
         "public_check": crosscheck,
         "bvp": bvp_read(game),
         "bvp_pen": pen_bvp_read(game),
+        "form": {
+            "home": _form_summary(game.home),
+            "away": _form_summary(game.away),
+        },
         "betting_lines": betting_lines(game, consensus, majority),
         "consistency": {
             "home": wc_home,
@@ -999,6 +1012,20 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
         "flagged": flagged,
         "pick": adv_team.name if flagged else None,
     }
+
+
+def _form_summary(team: Team) -> dict | None:
+    """Compact hot/cold read for the board: the lineup's form delta plus its
+    hottest and coldest qualifying bats. None when no form read (thin samples)."""
+    delta = getattr(team, "form_delta", None)
+    players = getattr(team, "player_form", None) or []
+    if delta is None or not players:
+        return None
+    return {"delta": delta,
+            "hot": [{"name": p["name"], "delta": p["delta"]} for p in players[:2]
+                    if p["delta"] > 0],
+            "cold": [{"name": p["name"], "delta": p["delta"]} for p in players[-2:]
+                     if p["delta"] < 0]}
 
 
 def _team_stats(team: Team) -> dict:
