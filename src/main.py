@@ -274,20 +274,32 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # BvP counts as a hit unless it exists AND points the other way (same
     # semantics the >=2-of-5 backtest was measured with).
     b_hit = not (bvp.get("edge_team") and bvp["edge_team"] != adv)
+    away, home = result["matchup"].split(" @ ")
+    # Player-form signal (user call: DIRECT signal): the play side's lineup is
+    # hotter - each hitter's last-5 wOBA vs his own season baseline, PA-weighted -
+    # than the opponent's by >= FORM_DIFF_FLOOR. Counted like favorite/BvP
+    # (supporting: it can't carry a play without a core signal until the audit
+    # proves it); form_edge/form_gap are recorded so the audit measures it.
+    fm = result.get("form") or {}
+    adv_side = "home" if adv == home else "away"
+    fa = (fm.get(adv_side) or {}).get("delta")
+    fo = (fm.get("away" if adv_side == "home" else "home") or {}).get("delta")
+    pc["form_edge"] = (None if fa is None or fo is None or abs(fa - fo) < FORM_DIFF_FLOOR
+                       else fa > fo)
+    pc["form_gap"] = round(fa - fo, 3) if fa is not None and fo is not None else None
+    fh_hit = pc["form_edge"] is True
     hits, misses = [], []
     for ok, label in ((m_hit, f"margin {margin}"),
                       (f_hit, "favorite" if ml is not None else "no price"),
                       (l_hit, "line toward"),
                       (c_hit, f"consistency {cons}/5"),
-                      (b_hit, "BvP")):
+                      (b_hit, "BvP"),
+                      (fh_hit, f"hot lineup ({pc['form_gap']:+.3f})" if fh_hit else "form")):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
-    away, home = result["matchup"].split(" @ ")
     opp_name = home if adv == away else away
     shift = info.get("implied_shift")
     maj = (result.get("public_majority") or {}).get("team")
-    lock_profile = (shift is not None and shift <= -LINE_CONFIRM_MIN
-                    and (maj is None or maj == opp_name))
     # CORE signals carry a play; favorite + BvP are supporting only. The graded
     # record: bets with a core signal (margin>=.50 / line toward / consistency>=3)
     # went 11-4 (+3.06u), while no-core bets (favorite-only, BvP-only, favorite+BvP)
@@ -306,16 +318,6 @@ def _attach_line(game, result: dict, slate: list) -> None:
             pub_pct = round(hp if maj == home else ap)
             pc["public_pct_against"] = pub_pct
             mild_public = pub_pct < PUBLIC_HEAVY
-    # Player-form PROBATION signal: is the play side's lineup hotter (vs its own
-    # season baselines) than the opponent's by >= FORM_DIFF_FLOOR? Recorded and
-    # audited only - it does NOT count toward the play until it proves out.
-    fm = result.get("form") or {}
-    adv_side = "home" if adv == home else "away"
-    fa = (fm.get(adv_side) or {}).get("delta")
-    fo = (fm.get("away" if adv_side == "home" else "home") or {}).get("delta")
-    pc["form_edge"] = (None if fa is None or fo is None or abs(fa - fo) < FORM_DIFF_FLOOR
-                       else fa > fo)
-    pc["form_gap"] = round(fa - fo, 3) if fa is not None and fo is not None else None
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when
     # it clears both gates (core signal + not a mild-public fade). The internal
     # play value stays "pick" so frozen snapshots and grading classify the same;
@@ -324,27 +326,20 @@ def _attach_line(game, result: dict, slate: list) -> None:
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
-        pc["reason"] = f"{len(hits)}/5 signals — {', '.join(hits)}"
+        pc["reason"] = f"{len(hits)}/6 signals — {', '.join(hits)}"
         # ⭐ = the proven-hot combos from the graded record: margin + favorite +
         # line toward (that cell went 10-2), or the 4+-signal sweet spot (8-1).
         star = []
         if m_hit and f_hit and l_hit:
             star.append("margin+favorite+line")
         if len(hits) >= 4:
-            star.append(f"{len(hits)}/5 signals")
+            star.append(f"{len(hits)}/6 signals")
         pc["starred"] = star
-    elif lock_profile and pc.get("opponent_moneyline") is not None:
-        # COIN FLIP (play value stays 'lock' for snapshot compat): the line moved
-        # toward the OPPONENT and the public isn't against them - bet the
-        # opponent at its captured price. Direct back-test says this mirrored
-        # profile is a coin flip (2-4), so it grades in its own book.
-        pc["play"] = "lock"
-        pc["status"] = "lock"
-        pc["lock_bet"] = opp_name
-        pc["lock_odds"] = int(pc["opponent_moneyline"])
-        pc["reason"] = (f"line moved toward {opp_name} and the public isn't against "
-                        f"them — coin flip historically (2-4); our side hit {len(hits)}/5")
     else:
+        # (Coin flips RETIRED per user call - "it's either a pick or not". The
+        # old lock profile bet the opponent on a line move toward them, but it
+        # graded to no edge (2-4 back-test, 3-2 live), so those games are just
+        # no-action now. Legacy frozen locks still display/grade as history.)
         # NO ACTION: no core signal (favorite/BvP alone don't carry a play), or the
         # public is mildly on the other side (the sharp fade). Listed, never booked.
         # (play value stays 'stay_away' so older frozen snapshots classify the same.)
@@ -357,7 +352,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
         elif not core_hit and hits:
             why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
         else:
-            why = "0/5 signals — no play"
+            why = "0/6 signals — no play"
         pc["reason"] = why
 
 
@@ -763,8 +758,8 @@ def build_summary(payload: dict) -> str:
         out.append("")
 
     out.append("_✅ = PLAY (core signal + not a mild-public fade). ⭐ = play on a proven-hot "
-               "combo (margin+favorite+line, or 4+ signals). 🪙 = COIN FLIP (line + public "
-               "favor the other side - bet them; own book). ▫️ = no play. 🔴 = live._")
+               "combo (margin+favorite+line, or 4+ signals). ▫️ = no play. 🔴 = live. "
+               "(🪙 coin flips are retired - legacy games only.)_")
 
     out.append("")
     out.append(grade.records_block())
