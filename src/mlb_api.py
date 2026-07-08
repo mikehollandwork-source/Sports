@@ -479,10 +479,16 @@ def _lineup_form(per_hitter: list[tuple], season: int) -> tuple[float | None, li
         if w5 is None or ws is None:
             continue
         delta = round(w5 - ws, 3)
+        # superstar weighting (user call): a hot STAR moves the team number more
+        # than a hot bench bat - weight by season quality (wOBA vs the ~.320
+        # league mean, floored so weak hitters still count a little).
+        quality = max(0.5, ws / 0.320)
+        weight = pa5 * quality
         players.append({"name": name, "delta": delta, "woba5": round(w5, 3),
-                        "woba_season": round(ws, 3), "pa5": int(pa5)})
-        num += delta * pa5
-        den += pa5
+                        "woba_season": round(ws, 3), "pa5": int(pa5),
+                        "weight": round(weight, 1)})
+        num += delta * weight
+        den += weight
     players.sort(key=lambda p: -p["delta"])
     return (round(num / den, 3) if den else None), players
 
