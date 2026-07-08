@@ -736,8 +736,9 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
             continue
         for row in rows:
             side, _ = _source_side(game, row)
-            if side:
-                money_sides0.append(side)
+            if not side:            # not this game's row - keep scanning
+                continue
+            money_sides0.append(side)
             break
     out["money_side"] = (money_sides0[0]
                          if money_sides0 and len(set(money_sides0)) == 1 else None)
@@ -749,6 +750,8 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
                 continue
             for row in rows:
                 side, pcts = _source_side(game, row)
+                if not side:
+                    continue
                 if side == out["money_side"] and pcts:
                     ps.append(pcts[1] if side == "home" else pcts[0])
                 break
