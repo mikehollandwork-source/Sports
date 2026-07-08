@@ -710,6 +710,9 @@ def _game_lines(g: dict) -> list[str]:
         f"   • public: {pub}",
         f"   • consistency: {cons}",
     ]
+    mp = _money_phrase(g)
+    if mp:
+        lines.append(f"   • {mp}")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -846,6 +849,9 @@ def telegram_text(payload: dict) -> str:
                   f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}",
                   f"   👥 public {_public_evidence(g)}",
                   f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
+        mp = _money_phrase(g)
+        if mp:
+            L.append(f"   {mp}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
