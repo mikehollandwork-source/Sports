@@ -3,7 +3,7 @@ Recurring winners-vs-losers audit: every ~10 days, do exactly what the manual
 graded-game autopsy did - join every settled bet with the frozen signals it was
 made on and report what's working and what isn't.
 
-Per book (plays / coin flips): record + units. Across the plays
+Per book (plays): record + units. Across the plays
 (the bets ON the stat side): win rate by signal count, by each individual
 signal, and the winners-vs-losers medians of the underlying component gaps
 (margin, FIP, wOBA, ISO). Writes output/audit.{json,md}.
@@ -57,8 +57,8 @@ def _signals(g: dict, bet: str) -> dict | None:
         "line": lc.get("status") == "confirms",
         "consistency": cons >= LEAN_MIN_CONSISTENCY,
         "bvp": not (b.get("edge_team") and b["edge_team"] != bet),
-        # PROBATION: hot/cold lineup form (recorded, not counted in the play).
-        # None (no read) counts as neither with nor without.
+        # CHERRY ON TOP: hot/cold lineup form (shows in the count, backtested to
+        # no edge - can't carry a play or a star). None counts as neither.
         "form": pc.get("form_edge"),
         "_margin_val": margin,
     }
@@ -98,8 +98,7 @@ def _wr(rows: list[dict]) -> str:
 
 def build() -> tuple[dict, str]:
     led = grade.load_ledger()
-    books = {k: led.get(k, {}).get("entries", [])
-             for k in ("plays", "coin_flip")}
+    books = {k: led.get(k, {}).get("entries", []) for k in ("plays",)}
 
     # bets ON the stat side, joined with their frozen signals
     rows: list[dict] = []
@@ -116,7 +115,7 @@ def build() -> tuple[dict, str]:
 
     md = [f"# 10-day audit — generated {dt.datetime.now(EASTERN).date()}", ""]
     md.append("## Books")
-    for k in ("plays", "coin_flip"):
+    for k in ("plays",):
         b = led.get(k, {})
         r = b.get("record", {})
         md.append(f"- **{k}**: {r.get('wins', 0)}-{r.get('losses', 0)} "
@@ -142,7 +141,7 @@ def build() -> tuple[dict, str]:
         for k in ("margin", "favorite", "line", "consistency", "bvp", "form"):
             yes = [r for r in rows if r["signals"].get(k) is True]
             no = [r for r in rows if r["signals"].get(k) is False]
-            tag = " (probation)" if k == "form" else ""
+            tag = " (cherry)" if k == "form" else ""
             md.append(f"| {k}{tag} | {_wr(yes)} | {_wr(no)} |")
         md.append("")
         W = [r for r in rows if r["won"]]

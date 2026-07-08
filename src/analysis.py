@@ -741,6 +741,18 @@ def public_crosscheck(game: Game, majority: Team | None, detail: dict,
             break
     out["money_side"] = (money_sides0[0]
                          if money_sides0 and len(set(money_sides0)) == 1 else None)
+    # avg % of dollars on that side across the money sources (for the board)
+    if out["money_side"]:
+        ps = []
+        for name, rows in (extra_public or {}).items():
+            if not name.endswith("_money"):
+                continue
+            for row in rows:
+                side, pcts = _source_side(game, row)
+                if side == out["money_side"] and pcts:
+                    ps.append(pcts[1] if side == "home" else pcts[0])
+                break
+        out["money_pct"] = round(sum(ps) / len(ps)) if ps else None
     if majority is None:
         return out
     out["majority_side"] = "home" if majority.team_id == game.home.team_id else "away"
