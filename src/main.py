@@ -346,11 +346,26 @@ def _attach_line(game, result: dict, slate: list) -> None:
     stance = _book_stance(result)
     pc["book_stance"] = stance
     stance_against = bool(stance and stance.get("against_us") and stance.get("tells"))
-    # ONE play tier (user call - no more pick/lean split): a game is a PLAY when
-    # it clears both gates (core signal + not a mild-public fade). The internal
-    # play value stays "pick" so frozen snapshots and grading classify the same;
-    # legacy "lean" snapshots also grade into the plays book.
-    playable = core_hit and not mild_public
+    # FADE-ONLY board gate (user call, backed by the 186-game backtest): a game
+    # makes the board ONLY as a FADE of Vegas (our side is the team the book does
+    # NOT need) carrying a CORE signal - the high-ROI zone (fade+margin +29.6%,
+    # fade+consistency +15%, fade+line +12.6% ROI/bet). The side VEGAS needs (tail)
+    # is dropped no matter how many signals agree: tailing + our signals graded
+    # NEGATIVE on the full sample (tail+bvp -5.48u, tail+consistency -2.50u, and
+    # -16.2% ROI at >=2 stacked). When there's no clean book read we can't tell
+    # fade from tail, so we fall back to the plain core-signal gate.
+    book = _book_needs(result)
+    pc["vegas"] = book   # frozen for the Vegas record + the fade gate below
+    if book:
+        is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
+        qualifies = core_hit and not is_tail  # fade + core signal only
+    else:
+        is_tail = False
+        qualifies = core_hit                  # no book read -> old behavior
+    # ONE play tier (user call - no more pick/lean split): a game is a PLAY when it
+    # clears the fade gate + core signal and isn't a mild-public fade. The internal
+    # play value stays "pick" so frozen snapshots and grading classify the same.
+    playable = qualifies and not mild_public
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
@@ -384,15 +399,14 @@ def _attach_line(game, result: dict, slate: list) -> None:
         pc["stay_odds"] = None
         if mild_public:
             why = f"public mildly on {maj} ({pub_pct}% < {PUBLIC_HEAVY}) — sharp fade, no play"
+        elif book and is_tail and core_hit:
+            why = (f"on the side Vegas needs ({_short(result, book['bet'])}) — "
+                   f"tailing the book lost even with signals, no play")
         elif not core_hit and hits:
             why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
         else:
             why = "0/7 signals — no play"
         pc["reason"] = why
-
-    # Display-only Vegas read, frozen with the snapshot so the separate Vegas
-    # record grades exactly the bet the board showed. Never touches the decision.
-    pc["vegas"] = _book_needs(result)
 
 
 def _play(g: dict) -> str:
@@ -437,6 +451,18 @@ def _finals(games: list) -> list:
 
 def _state_tag(g: dict) -> str:
     return "🔴 LIVE NOW · " if g.get("state") == "live" else ""
+
+
+def _start_time(g: dict) -> str | None:
+    """First pitch in US/Eastern, e.g. '7:05 PM ET'. None if unknown or the game
+    is already live/final (the state tag covers those)."""
+    if g.get("state") in ("live", "final"):
+        return None
+    d = _parse_iso(g.get("game_datetime"))
+    if not d:
+        return None
+    et = d.astimezone(EASTERN)
+    return et.strftime("%-I:%M %p ET")
 
 
 def _edge_word(strength: float) -> str:
@@ -663,7 +689,21 @@ def _form_phrase(g: dict) -> str | None:
             last = standout["name"].split()[-1]
             extra = f" ({last} {standout['delta']:+.3f})"
         bits.append(f"{icon} {ab} {d:+.3f}{extra}")
-    return " · ".join(bits) if bits else None
+    if not bits:
+        return None
+    # strength of the hotter lineup's EDGE (the gap between the two sides), labeled
+    # strong / moderate / weak off the form-calibration bands.
+    pc = g.get("pick_criteria") or {}
+    gap = pc.get("form_gap")
+    if gap is not None and abs(gap) >= FORM_DIFF_FLOOR:
+        mag = abs(gap)
+        tier = "strong" if mag >= 0.05 else "moderate" if mag >= 0.03 else "weak"
+        adv = pc.get("advantage_team")
+        away, home = g["matchup"].split(" @ ")
+        opp = home if adv == away else away
+        hotter = adv if gap > 0 else opp   # form_gap = advantage delta - opponent delta
+        bits.append(f"edge {_short(g, hotter)} ({tier})")
+    return " · ".join(bits)
 
 
 def _ump_phrase(g: dict) -> str | None:
@@ -858,10 +898,12 @@ def _stay_line(g: dict) -> str:
     pc = g["pick_criteria"]
     mp = _money_phrase(g)
     bk = _book_phrase(g, brief=True)
-    st = _stance_phrase(g, brief=True)
-    return (f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', 'no play')}"
+    stc = _stance_phrase(g, brief=True)
+    tm = _start_time(g)
+    head = f"▫️ {_state_tag(g)}{g['matchup']}" + (f" ({tm})" if tm else "")
+    return (f"{head} — {pc.get('reason', 'no play')}"
             + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
-            + (f" · {st}" if st else ""))
+            + (f" · {stc}" if stc else ""))
 
 
 def _star(pc: dict) -> list[str]:
@@ -893,6 +935,7 @@ def _game_lines(g: dict) -> list[str]:
     mark = "⚠️" if warn else "⭐" if star else "✅"
     lines = [
         f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
+        + (f" · {_start_time(g)}" if _start_time(g) else "")
         + (f" · ⭐ {', '.join(star)}" if star else "")
         + (f" · ⚠️ {warn}" if warn else ""),
         f"   • stat edge: {edge}",
@@ -1046,10 +1089,11 @@ def telegram_text(payload: dict) -> str:
         kind = "PLAY"
         warn = pc.get("stance_warning")
         mark = "⚠️" if warn else "⭐" if star else "✅"
+        st = _start_time(g)
         L.extend(["",
                   f"{mark} {tag}{kind} {adv}{_ml_str(pc)}"
                   + (f"  ⚠️ {warn}" if warn else ""),
-                  f"   {aa} @ {ha}",
+                  f"   {aa} @ {ha}" + (f" · {st}" if st else ""),
                   f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}",
                   f"   👥 public {_public_evidence(g)}",
                   f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
@@ -1103,10 +1147,12 @@ def telegram_text(payload: dict) -> str:
             tag = "🔴 " if g.get("state") == "live" else ""
             mp = _money_phrase(g)
             bk = _book_phrase(g, brief=True)
-            st = _stance_phrase(g, brief=True)
-            L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', 'no play')}"
+            stc = _stance_phrase(g, brief=True)
+            tm = _start_time(g)
+            L.append(f"▫️ {tag}{aa} @ {ha}" + (f" ({tm})" if tm else "")
+                     + f" — {pc.get('reason', 'no play')}"
                      + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
-                     + (f" · {st}" if st else ""))
+                     + (f" · {stc}" if stc else ""))
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
