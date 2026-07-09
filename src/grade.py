@@ -88,8 +88,7 @@ def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
-            "plays": _empty_book(), "leans_faded": _empty_book(),
-            "vegas": _empty_book()}
+            "plays": _empty_book(), "leans_faded": _empty_book()}
 
 
 def load_ledger() -> dict:
@@ -138,9 +137,10 @@ def load_ledger() -> dict:
             old["plays"] = merged
         # taxonomy v10: coin flips removed from the record entirely (user call).
         old.pop("coin_flip", None)
-        # v11: display-only Vegas book (the side the SPORTSBOOK needs). Its own
-        # record - never part of the all-plays/all-time line.
-        old.setdefault("vegas", _empty_book())
+        # v12: the separate display-only Vegas book is removed (user call) - one
+        # picks record only. The book_needs read still drives the fade gate; it's
+        # just no longer tracked as its own W-L.
+        old.pop("vegas", None)
         return old
     # migrate the old single-book schema (picks only) into the new layout
     if old.get("entries") is not None:
@@ -234,29 +234,6 @@ def grade_date(date: str) -> list[dict]:
     return play_entries
 
 
-def grade_vegas(date: str) -> list[dict]:
-    """Settle the display-only Vegas book: $1 on the team the SPORTSBOOK needed
-    (frozen at build time in pick_criteria.vegas). Every game with a read is
-    booked - it's the book's rooting interest, not one of our plays."""
-    picks_path = OUTPUT_DIR / f"picks_{date}.json"
-    if not picks_path.exists():
-        return []
-    payload = json.loads(picks_path.read_text())
-    results = mlb_api.results_for(date)
-    voids = load_voids()
-    entries: list[dict] = []
-    for g in payload.get("games", []):
-        v = g.get("pick_criteria", {}).get("vegas") or {}
-        bet, odds = v.get("bet"), v.get("odds")
-        res = results.get(g.get("game_pk"))
-        if not bet or odds is None or not res or not res["final"] or not res["winner"]:
-            continue
-        if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
-            continue
-        entries.append(_settle(date, g, res, bet, res["winner"] == bet, int(odds)))
-    return entries
-
-
 def _add(book: dict, entries: list[dict]) -> int:
     done = {e["key"] for e in book["entries"]}
     added = 0
@@ -284,7 +261,7 @@ def _apply_voids(ledger: dict, voids: dict) -> int:
     refunded after we graded it), rebuilding each book's bankroll/record cleanly
     from the survivors. Returns how many were pulled."""
     removed = 0
-    for k in ("plays", "vegas"):
+    for k in ("plays",):
         book = ledger.get(k)
         if not book:
             continue
@@ -316,12 +293,6 @@ def update_ledger(date: str) -> dict:
         return ledger
     pe = grade_date(date)
     added = _add(ledger["plays"], pe)
-    # display-only Vegas book: separate record, never in the all-time line
-    va = _add(ledger.setdefault("vegas", _empty_book()), grade_vegas(date))
-    if va:
-        log.info("graded %s: vegas %+.2f (%d-%d)",
-                 date, ledger["vegas"]["bankroll"], ledger["vegas"]["record"]["wins"],
-                 ledger["vegas"]["record"]["losses"])
     if added:
         ledger["review"] = review(ledger["plays"])
         log.info("graded %s: plays %+.2f (%d-%d)",
@@ -421,8 +392,7 @@ def records_block(ledger: dict | None = None, today: dt.date | None = None) -> s
     ledger = ledger or load_ledger()
     today = today or dt.datetime.now(EASTERN).date()
     lines = ["**Records** _($1/bet at pre-game moneyline)_:"]
-    books = [("Plays", ledger["plays"]),
-             ("Vegas (book's side, display only)", ledger.get("vegas") or _empty_book())]
+    books = [("Plays", ledger["plays"])]
     for name, book in books:
         rec = windowed_records(book, today)
         extra = ""

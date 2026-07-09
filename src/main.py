@@ -355,7 +355,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # -16.2% ROI at >=2 stacked). When there's no clean book read we can't tell
     # fade from tail, so we fall back to the plain core-signal gate.
     book = _book_needs(result)
-    pc["vegas"] = book   # frozen for the Vegas record + the fade gate below
+    pc["vegas"] = book   # frozen book_needs read: drives the fade gate + 🏦 display
     if book:
         is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
         qualifies = core_hit and not is_tail  # fade + core signal only
@@ -1009,7 +1009,7 @@ def build_summary(payload: dict) -> str:
     out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
                "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
                "⚠️ = a PLAY the book's informed money is fading (never a ⭐). ▫️ = no play. "
-               "🏦 = the side the BOOK needs (display only, own Vegas record). "
+               "🏦 = the side the BOOK needs (display only). "
                "🕵️/🚨 = the book's informed stance / public being fooled. 🔴 = live._")
 
     out.append("")
@@ -1047,8 +1047,7 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    books = [("Plays", ledger["plays"]),
-             ("🏦 Vegas (book's side · display only)", ledger.get("vegas") or {"entries": []})]
+    books = [("Plays", ledger["plays"])]
     for name, book in books:
         rec = grade.windowed_records(book, today)
         if not rec:
