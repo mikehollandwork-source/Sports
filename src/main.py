@@ -373,7 +373,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # -16.2% ROI at >=2 stacked). When there's no clean book read we can't tell
     # fade from tail, so we fall back to the plain core-signal gate.
     book = _book_needs(result)
-    pc["vegas"] = book   # frozen book_needs read: drives the fade gate + 🏦 display
+    pc["vegas"] = book   # frozen book_needs read: drives the fade gate (behind the scenes)
     if book:
         is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
         qualifies = core_hit and not is_tail  # fade + core signal only
@@ -871,28 +871,6 @@ def _book_stance(g: dict) -> dict | None:
             "fooled": bool(maj and maj != side)}
 
 
-def _book_phrase(g: dict, brief: bool = False) -> str | None:
-    """'🏦 book needs ATH · ~$7M wagered (est) · ...' - display-only book-liability
-    read. Prefers the frozen pick_criteria.vegas snapshot; `brief` = team only."""
-    bn = (g.get("pick_criteria") or {}).get("vegas") or _book_needs(g)
-    if not bn:
-        return None
-    need = _short(g, bn["bet"])
-    if brief:
-        return f"🏦 book needs {need}"
-    away, home = g["matchup"].split(" @ ")
-    aa, ha = _short(g, away), _short(g, home)
-    hh, hw = bn.get("hold_home"), bn.get("hold_away")
-    if hh is None or hw is None:
-        return f"🏦 book needs {need}"
-    def m(x):
-        return f"{'+' if x >= 0 else '-'}${abs(x) / 1e6:.1f}M"
-    who = (f"book profits either way — more on {need}"
-           if hh > 0 and hw > 0 else f"book needs {need}")
-    return (f"🏦 {who} · ~${EST_GAME_HANDLE / 1e6:.0f}M wagered (est, {bn['basis']}) · "
-            f"{ha} win {m(hh)} · {aa} win {m(hw)}")
-
-
 def _stance_phrase(g: dict, brief: bool = False) -> str | None:
     """'🕵️ book stance: ON ATH — public being fooled (money vs tickets, RLM)' when
     the book has left informed tells; a plain liability lean (0 tells) says nothing
@@ -915,12 +893,11 @@ def _stay_line(g: dict) -> str:
     """One-liner for a NO-ACTION game (nothing the system likes; never booked)."""
     pc = g["pick_criteria"]
     mp = _money_phrase(g)
-    bk = _book_phrase(g, brief=True)
     stc = _stance_phrase(g, brief=True)
     tm = _start_time(g)
     head = f"▫️ {_state_tag(g)}{g['matchup']}" + (f" ({tm})" if tm else "")
     return (f"{head} — {pc.get('reason', 'no play')}"
-            + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
+            + (f" · {mp}" if mp else "")
             + (f" · {stc}" if stc else ""))
 
 
@@ -963,9 +940,6 @@ def _game_lines(g: dict) -> list[str]:
     mp = _money_phrase(g)
     if mp:
         lines.append(f"   • {mp}")
-    bk = _book_phrase(g)
-    if bk:
-        lines.append(f"   • {bk} _(display only)_")
     stp = _stance_phrase(g)
     if stp:
         lines.append(f"   • {stp}")
@@ -1027,7 +1001,6 @@ def build_summary(payload: dict) -> str:
     out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
                "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
                "⚠️ = a PLAY the book's informed money is fading (never a ⭐). ▫️ = no play. "
-               "🏦 = the side the BOOK needs (display only). "
                "🕵️/🚨 = the book's informed stance / public being fooled. 🔴 = live._")
 
     out.append("")
@@ -1117,9 +1090,6 @@ def telegram_text(payload: dict) -> str:
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
-        bk = _book_phrase(g)
-        if bk:
-            L.append(f"   {bk}")
         stp = _stance_phrase(g)
         if stp:
             L.append(f"   {stp}")
@@ -1163,12 +1133,11 @@ def telegram_text(payload: dict) -> str:
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
             mp = _money_phrase(g)
-            bk = _book_phrase(g, brief=True)
             stc = _stance_phrase(g, brief=True)
             tm = _start_time(g)
             L.append(f"▫️ {tag}{aa} @ {ha}" + (f" ({tm})" if tm else "")
                      + f" — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
+                     + (f" · {mp}" if mp else "")
                      + (f" · {stc}" if stc else ""))
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
