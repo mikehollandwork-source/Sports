@@ -342,6 +342,35 @@ def build() -> str:
            roi_row("+ margin & BvP & consistency (all three)",
                    [g for g in dogs if has(g, "margin", "bvp", "consistency")]), ""]
 
+    # EXHAUSTIVE: every non-empty subset of all 7 signals, ranked by ROI/bet. A
+    # game counts for a subset when ALL its signals are present. Two pools: every
+    # graded pick, and only the fade-gated ones (our stat side is the team Vegas
+    # does NOT need - the live board condition). Min sample keeps noise out.
+    MINN = 10
+    def combos(pool):
+        out = []
+        for k in range(1, len(SIGNALS) + 1):
+            for cmb in itertools.combinations(SIGNALS, k):
+                sub = [g for g in pool if all(g["sig"].get(s) is True for s in cmb)]
+                if len(sub) >= MINN:
+                    w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
+                    out.append((u / len(sub), w, l, u, len(sub), " + ".join(cmb)))
+        return out
+    def combo_table(title, pool):
+        rows = sorted(combos(pool), reverse=True)
+        lines = [f"## {title} (every signal subset, n≥{MINN}, by ROI/bet)", "",
+                 "| combo | record | units | ROI/bet |", "|---|---|---|---|"]
+        for roi, w, l, u, n, name in rows[:20]:
+            lines.append(f"| {name} | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
+        if len(rows) > 24:
+            lines += ["", "_worst 6:_", "| combo | record | units | ROI/bet |", "|---|---|---|---|"]
+            for roi, w, l, u, n, name in rows[-6:]:
+                lines.append(f"| {name} | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
+        return lines + [""]
+    fade_pool = [g for g in games if "veg_won" in g and g.get("anti_is_adv")]
+    md += combo_table("ALL signal combinations — every graded pick", games)
+    md += combo_table("ALL signal combinations — FADE-GATED picks (live board condition)", fade_pool)
+
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "
               "signal with no recorded input on an older board is excluded from that "
