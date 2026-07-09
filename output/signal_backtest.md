@@ -116,4 +116,27 @@
 |---|---|---|
 | stance-against plays (n=46) | 23-23 (50%) | -4.65u |
 
+## NEW BOARD GATE — fade + core signal (what makes the board now)
+
+| slice | record | units |
+|---|---|---|
+| BOARD: fade + core signal (n=61) | 42-19 (69%) | +12.57u |
+| DROPPED: tail + core signal (was played, now cut) (n=22) | 11-11 (50%) | -2.00u |
+
+## Threshold sweeps on the fade side (does a tighter bar help?)
+
+| margin ≥ | record | units |
+|---|---|---|
+| 0.30 | 32-21 (60%) | +2.49u |
+| 0.40 | 27-12 (69%) | +7.66u |
+| 0.50 | 19-6 (76%) | +7.40u |
+| 0.60 | 7-2 (78%) | +2.79u |
+| 0.70 | 2-1 (67%) | +0.11u |
+
+| consistency (out-hit) ≥ | record | units |
+|---|---|---|
+| 3/5 | 27-13 (68%) | +7.36u |
+| 4/5 | 7-5 (58%) | +0.39u |
+| 5/5 | 4-1 (80%) | +1.99u |
+
 _Point-in-time: signals recomputed from the frozen pre-game snapshot; winners from the MLB Stats API; $1/bet at the frozen moneyline. A signal with no recorded input on an older board is excluded from that row only (see n=)._
