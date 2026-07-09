@@ -60,6 +60,9 @@ def _signals(g: dict, bet: str) -> dict | None:
         # CHERRY ON TOP: hot/cold lineup form (shows in the count, backtested to
         # no edge - can't carry a play or a star). None counts as neither.
         "form": pc.get("form_edge"),
+        # UNPROVEN: sharp-$ (money on us vs tickets on them). Measured here until
+        # the record says whether it earns core/star status.
+        "sharp": pc.get("sharp_money"),
         "_margin_val": margin,
     }
 
@@ -138,10 +141,10 @@ def build() -> tuple[dict, str]:
         md.append("")
         md.append("| signal present | with it | without it |")
         md.append("|---|---|---|")
-        for k in ("margin", "favorite", "line", "consistency", "bvp", "form"):
+        for k in ("margin", "favorite", "line", "consistency", "bvp", "form", "sharp"):
             yes = [r for r in rows if r["signals"].get(k) is True]
             no = [r for r in rows if r["signals"].get(k) is False]
-            tag = " (cherry)" if k == "form" else ""
+            tag = " (cherry)" if k == "form" else " (unproven)" if k == "sharp" else ""
             md.append(f"| {k}{tag} | {_wr(yes)} | {_wr(no)} |")
         md.append("")
         W = [r for r in rows if r["won"]]
