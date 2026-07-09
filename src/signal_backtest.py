@@ -319,6 +319,29 @@ def build() -> str:
         md.append(_row(lab, sub))
     md.append("")
 
+    # Underdog study: our stat side priced as a DOG (ml > 0). Dog wins pay >1u, so
+    # even a sub-50% hit rate can profit. Do dogs carrying the stat signals - edge
+    # margin, BvP, consistency - and especially all three together return +ROI?
+    def roi_row(label, sub):
+        rows = [{"won": g["won"], "odds": g["odds"]} for g in sub]
+        if not rows:
+            return f"| {label} | 0 | — | — |"
+        w, l, u = _units(rows)
+        return f"| {label} (n={len(rows)}) | {w}-{l} ({w / len(rows):.0%}) | {u:+.2f}u | {u / len(rows):+.0%} |"
+    dogs = [g for g in games if (g["sig"].get("_ml") or 0) > 0]
+    def has(g, *ss):
+        return all(g["sig"].get(s) is True for s in ss)
+    md += ["## Underdog study — our stat side priced as a DOG (ml > 0)", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|",
+           roi_row("all underdogs", dogs),
+           roi_row("+ edge margin ≥.50", [g for g in dogs if has(g, "margin")]),
+           roi_row("+ BvP edge", [g for g in dogs if has(g, "bvp")]),
+           roi_row("+ consistency ≥3", [g for g in dogs if has(g, "consistency")]),
+           roi_row("+ margin & BvP", [g for g in dogs if has(g, "margin", "bvp")]),
+           roi_row("+ consistency & BvP", [g for g in dogs if has(g, "consistency", "bvp")]),
+           roi_row("+ margin & BvP & consistency (all three)",
+                   [g for g in dogs if has(g, "margin", "bvp", "consistency")]), ""]
+
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "
               "signal with no recorded input on an older board is excluded from that "
