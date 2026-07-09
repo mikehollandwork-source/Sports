@@ -56,7 +56,8 @@ def _signals(g: dict, bet: str) -> dict | None:
         "favorite": ml is not None and ml < 0,
         "line": lc.get("status") == "confirms",
         "consistency": cons >= LEAN_MIN_CONSISTENCY,
-        "bvp": not (b.get("edge_team") and b["edge_team"] != bet),
+        "bvp": not (b.get("edge_team") and b.get("meaningful", True)
+                    and b["edge_team"] != bet),
         # CHERRY ON TOP: hot/cold lineup form (shows in the count, backtested to
         # no edge - can't carry a play or a star). None counts as neither.
         "form": pc.get("form_edge"),

@@ -268,9 +268,11 @@ def _attach_line(game, result: dict, slate: list) -> None:
     f_hit = ml is not None and ml < 0
     l_hit = info.get("status") == "confirms"
     c_hit = cons >= LEAN_MIN_CONSISTENCY
-    # BvP counts as a hit unless it exists AND points the other way (same
-    # semantics the >=2-of-5 backtest was measured with).
-    b_hit = not (bvp.get("edge_team") and bvp["edge_team"] != adv)
+    # BvP counts as a hit unless a MEANINGFUL read points the other way (the
+    # book's lens: big-sample platoon data votes, a tiny-gap career OPS doesn't -
+    # bvp_read's `meaningful` = gap >= BVP_FLOOR on the shrunk-to-hand numbers).
+    b_hit = not (bvp.get("edge_team") and bvp.get("meaningful", True)
+                 and bvp["edge_team"] != adv)
     away, home = result["matchup"].split(" @ ")
     # Player-form signal (user call: DIRECT signal): the play side's lineup is
     # hotter - each hitter's last-5 wOBA vs his own season baseline, PA-weighted -
@@ -617,6 +619,19 @@ def _pen_bvp_phrase(g: dict) -> str | None:
             f"{aa} {b['away_ops']:.3f} v {ha} {b['home_ops']:.3f} ({b['total_pa']} PA)")
 
 
+def _pen_tax_phrase(g: dict) -> str | None:
+    """'🪫 pen tax: STL 2 arm(s) down' - relievers who threw both of the last two
+    days (their pen FIP is taxed in the margin). None when both pens are fresh."""
+    sa = g.get("statistical_advantage") or {}
+    away, home = g["matchup"].split(" @ ")
+    parts = []
+    for side, name in (("away", away), ("home", home)):
+        n = (sa.get(side) or {}).get("pen_arms_down")
+        if n:
+            parts.append(f"{_short(g, name)} {n} arm(s) down")
+    return "🪫 pen tax: " + " · ".join(parts) if parts else None
+
+
 def _form_phrase(g: dict) -> str | None:
     """Hot/cold lineup form vs each hitter's own season baseline, with the
     standout bat per side: '🔥 SEA +.024 (Rodríguez +.115) · ❄️ TOR -.018
@@ -815,6 +830,9 @@ def _game_lines(g: dict) -> list[str]:
     pen = _pen_bvp_phrase(g)
     if pen:
         lines.append(f"   • pen BvP: {pen} _(context)_")
+    pt = _pen_tax_phrase(g)
+    if pt:
+        lines.append(f"   • {pt}")
     fp = _form_phrase(g)
     if fp:
         lines.append(f"   • form: {fp} _(probation signal)_")
@@ -960,6 +978,9 @@ def telegram_text(payload: dict) -> str:
         pen = _pen_bvp_phrase(g)
         if pen:
             L.append(f"   🧯 pen BvP {pen}")
+        pt = _pen_tax_phrase(g)
+        if pt:
+            L.append(f"   {pt}")
         fp = _form_phrase(g)
         if fp:
             L.append(f"   📈 form: {fp}")

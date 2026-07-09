@@ -49,6 +49,17 @@ W_WOBA, W_ISO, W_DISC, W_SPEED = 0.55, 0.20, 0.15, 0.10
 OFF_SEASON_WEIGHT = 0.40
 # pitching weights: starters throw ~55% of innings, bullpen ~45%
 W_SP, W_BP = 0.55, 0.45
+# xFIP-style HR regression for the LAST-5 samples only (the book's lens: 5-game
+# HR counts are mostly ball-in-play/HR-FB luck). Half the HR term comes from the
+# league HR/9 rate over the sample; season FIP anchors stay raw (real samples).
+LG_HR_PER9 = 1.10
+FIP_HR_REGRESS = 0.50
+# Bullpen tax (the book's "who pitched the last two days" lens): a reliever who
+# threw on BOTH of the last two days is effectively down tonight, so the pen
+# covering his innings rates worse than its raw last-5 FIP. Per-arm bump on the
+# pen FIP, capped.
+PEN_TAX_PER_ARM = 0.02
+PEN_TAX_MAX = 0.06
 # The probable starter's season FIP is the single biggest single-game lever
 # (calibrated: the better starter's team wins ~55%). Blend it with the noisier
 # last-5 team-starter FIP - season is the stable anchor, last-5 catches recent
@@ -349,6 +360,10 @@ def combined_fip(team: Team) -> float | None:
               if sp is not None else team.starter_fip_season)
     bp = _adjusted_fip(team.bullpen_fip_last5, team.bullpen_ip_last5,
                        team.sos.get("bp_opp_woba"), team.sos.get("bp_opp_win"))
+    # bullpen tax: arms that threw both of the last two days are down tonight
+    down = getattr(team, "pen_arms_down", 0) or 0
+    if bp is not None and down:
+        bp *= 1 + min(PEN_TAX_MAX, PEN_TAX_PER_ARM * down)
     if sp is not None and bp is not None:
         return W_SP * sp + W_BP * bp
     if sp is not None:
@@ -1054,6 +1069,7 @@ def _team_stats(team: Team) -> dict:
         "starter_ip_last5": team.starter_ip_last5,
         "bullpen_fip_last5": team.bullpen_fip_last5,
         "bullpen_ip_last5": team.bullpen_ip_last5,
+        "pen_arms_down": getattr(team, "pen_arms_down", 0),
         "combined_fip_sos_adj": round(combined_fip(team), 3) if combined_fip(team) is not None else None,
         "strength_of_schedule": {
             "bat_opp_pitching_factor": round(

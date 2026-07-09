@@ -79,6 +79,7 @@ class Team:
     bvp_hand_pa: int = 0               # PA behind the vs-hand number
     pen_bvp_ops: float | None = None   # lineup's career OPS vs the opp BULLPEN (late game)
     pen_bvp_pa: int = 0                # career PA behind the pen number
+    pen_arms_down: int = 0             # relievers who threw BOTH of the last two days
     season_offense: dict = field(default_factory=dict)  # season counting stats (anchor)
     form_delta: float | None = None   # lineup hot/cold: PA-weighted avg of each
                                       # hitter's last-5 wOBA minus his season wOBA
@@ -394,8 +395,11 @@ def _fip_from_acc(acc: dict) -> dict:
     """Turn accumulated pitching sums into FIP + opponent-offense averages + IP."""
     if acc["ip"] <= 0:
         return {"fip": None, "opp_woba": None, "opp_win": 0.5, "ip": 0.0}
-    from .analysis import FIP_CONSTANT
-    fip = (13 * acc["hr"] + 3 * (acc["bb"] + acc["hbp"]) - 2 * acc["k"]) / acc["ip"] + FIP_CONSTANT
+    from .analysis import FIP_CONSTANT, FIP_HR_REGRESS, LG_HR_PER9
+    # xFIP-style: regress the small-sample HR count toward the league HR/9 rate
+    # over the innings actually thrown (5-game HR totals are mostly luck).
+    hr = (1 - FIP_HR_REGRESS) * acc["hr"] + FIP_HR_REGRESS * (LG_HR_PER9 * acc["ip"] / 9)
+    fip = (13 * hr + 3 * (acc["bb"] + acc["hbp"]) - 2 * acc["k"]) / acc["ip"] + FIP_CONSTANT
     return {
         "fip": round(fip, 3),
         "opp_woba": (acc["opp_woba_ip"] / acc["opp_woba_w"]) if acc["opp_woba_w"] else None,
@@ -795,9 +799,17 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         try:
             starter_id = team.probable_pitcher.player_id if team.probable_pitcher else None
             acc = _new_pitch_acc()
+            d0 = dt.date.fromisoformat(date)
+            last2 = {(d0 - dt.timedelta(days=1)).isoformat(),
+                     (d0 - dt.timedelta(days=2)).isoformat()}
+            down = 0
             for pid in reliever_ids(team.team_id, date, starter_id):
-                _accumulate_pitching(_last_n_gamelog(pid, "pitching", season, 5, as_of=as_of),
-                                     season, acc, as_of)
+                rows = _last_n_gamelog(pid, "pitching", season, 5, as_of=as_of)
+                _accumulate_pitching(rows, season, acc, as_of)
+                # bullpen tax input: this arm threw both of the last two days
+                if last2 <= {r.get("date") for r in rows}:
+                    down += 1
+            team.pen_arms_down = down
             bp = _fip_from_acc(acc)
             team.bullpen_fip_last5 = bp["fip"]
             team.bullpen_ip_last5 = bp["ip"]
