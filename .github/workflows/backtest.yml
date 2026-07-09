@@ -31,21 +31,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Snapshot backtest first (fast, real results) so its report always lands
-      # even if the slow legacy re-derivation below hangs or errors.
+      # Snapshot backtest first (fast, real results); post + COMMIT it immediately
+      # so the report lands without waiting on the slow legacy step below.
       - name: Run signal backtest (snapshot-based, real results)
         run: python -m src.signal_backtest
-
-      - name: Run legacy re-derivation backtest (slow; best-effort)
-        continue-on-error: true
-        timeout-minutes: 20
-        env:
-          BT_END: ${{ github.event.inputs.end }}
-          BT_DAYS: ${{ github.event.inputs.days }}
-        run: |
-          ARGS="--days ${BT_DAYS:-10}"
-          if [ -n "$BT_END" ]; then ARGS="$ARGS --end $BT_END"; fi
-          python -m src.backtest $ARGS
 
       - name: Post backtest issue
         env:
@@ -69,3 +58,15 @@ jobs:
               echo "push retry $i"; sleep 5
             done
           fi
+
+      # Legacy re-derivation backtest last (slow; best-effort, output not committed).
+      - name: Run legacy re-derivation backtest (slow; best-effort)
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          BT_END: ${{ github.event.inputs.end }}
+          BT_DAYS: ${{ github.event.inputs.days }}
+        run: |
+          ARGS="--days ${BT_DAYS:-10}"
+          if [ -n "$BT_END" ]; then ARGS="$ARGS --end $BT_END"; fi
+          python -m src.backtest $ARGS
