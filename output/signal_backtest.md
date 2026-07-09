@@ -159,6 +159,16 @@
 | + consistency & BvP (n=7) | 2-5 (29%) | -2.86u | -41% |
 | + margin & BvP & consistency (all three) | 0 | — | — |
 
+## Every underdog + signal combo (bet the dog, n≥5, by units)
+
+| combo | record | units | ROI/bet |
+|---|---|---|---|
+| margin | 4-1 (80%) | +3.36u | +67% |
+| consistency | 5-7 (42%) | -1.60u | -13% |
+| consistency + bvp | 2-5 (29%) | -2.86u | -41% |
+| bvp | 10-15 (40%) | -3.62u | -14% |
+| (any dog) | 25-34 (42%) | -5.31u | -9% |
+
 ## ALL signal combinations — every graded pick (every signal subset, n≥10, by ROI/bet)
 
 | combo | record | units | ROI/bet |
