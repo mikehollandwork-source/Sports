@@ -337,6 +337,15 @@ def _attach_line(game, result: dict, slate: list) -> None:
     if mild_public and s_hit:
         mild_public = False
         pc["mild_public_overridden"] = "money on us vs tickets on them"
+    # Book-stance read (research playbook): freeze the informed tells the book
+    # leaves when it positions against the public. NOT a veto - the graded record
+    # shows our 'book-informed-side-against-us' plays are our BEST bucket (27-16),
+    # so a hard fade would cut winners. It DOES gate the star: a play where the
+    # book's INFORMED money (>=1 tell) is against us can't be a ⭐ (we're the side
+    # the house is quietly fading), and it earns a ⚠️ on the board.
+    stance = _book_stance(result)
+    pc["book_stance"] = stance
+    stance_against = bool(stance and stance.get("against_us") and stance.get("tells"))
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when
     # it clears both gates (core signal + not a mild-public fade). The internal
     # play value stays "pick" so frozen snapshots and grading classify the same;
@@ -357,7 +366,10 @@ def _attach_line(game, result: dict, slate: list) -> None:
             star.append("margin+favorite+line")
         if proven >= 4:
             star.append(f"{proven}/5 proven signals")
-        pc["starred"] = star
+        # never star a play the book's informed money is fading (⚠️ instead)
+        pc["starred"] = [] if stance_against else star
+        if stance_against:
+            pc["stance_warning"] = f"book's informed money is on {stance['side']}"
     else:
         # (Coin flips RETIRED per user call - "it's either a pick or not". The
         # old lock profile bet the opponent on a line move toward them, but it
@@ -751,6 +763,56 @@ def _book_needs(g: dict) -> dict | None:
             "hold_home": round(hold_home), "hold_away": round(hold_away)}
 
 
+def _book_stance(g: dict) -> dict | None:
+    """Read the sportsbook's *informed* stance - the side the SHARP dollars back -
+    from the tells a book leaves when it positions against the public (the research
+    playbook: money-vs-ticket divergence, reverse line move, a frozen line under
+    heavy public). Returns {side, against_us, tells:[...], strength, fooled}:
+      - side       = the team the SHARP money is on (money-heavy side when it
+                     splits from tickets; else the side the line moved toward)
+      - fooled     = True when the public ticket majority is on the OTHER side
+                     (the public is being funneled off the sharp number)
+      - against_us = the sharp side is NOT our advantage team (we'd be on the
+                     side the smart money is fading)
+      - strength   = number of confirming tells (0 = no informed signal, None)
+    Display + warning only; it does NOT kill a play - the graded record shows our
+    plays with the sharp money against us are our BEST bucket (a hard veto would
+    cut winners). It gates the ⭐ and prints a ⚠️ so the conflict is visible."""
+    cc = g.get("public_check") or {}
+    pc = g.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    away, home = g["matchup"].split(" @ ")
+    maj = (g.get("public_majority") or {}).get("team")
+    ms = cc.get("money_side")
+    money_team = (home if ms == "home" else away) if ms in ("home", "away") else None
+    tells = []
+    side = None
+    # 1) sharp $: dollars concentrated on the side the tickets are NOT on
+    if money_team and maj and money_team != maj:
+        tells.append("money vs tickets")
+        side = money_team
+    # 2) reverse line move: line moved toward the non-public side (sharp action)
+    if cc.get("line") == "against public":
+        tells.append("reverse line move")
+        if side is None and maj:
+            side = home if maj == away else away
+    # 3) heavy public on one side, line didn't confirm to them (book holding firm
+    #    against the crowd) - the sharp side is the one the public is NOT on
+    if maj:
+        pairs = _public_pairs((g.get("public_majority") or {}).get("detail") or {})
+        if pairs:
+            mp = (sum(p[1] for p in pairs) if maj == home else sum(p[0] for p in pairs)) / len(pairs)
+            if mp >= PUBLIC_HEAVY and (pc.get("line_check") or {}).get("status") != "confirms":
+                tells.append(f"line frozen under {round(mp)}% public")
+                if side is None:
+                    side = home if maj == away else away
+    if not tells or side is None:
+        return {"side": None, "against_us": False, "tells": [], "strength": 0, "fooled": False}
+    return {"side": side, "against_us": bool(adv and side != adv),
+            "tells": tells, "strength": len(tells),
+            "fooled": bool(maj and maj != side)}
+
+
 def _book_phrase(g: dict, brief: bool = False) -> str | None:
     """'🏦 book needs ATH · ~$7M wagered (est) · ...' - display-only book-liability
     read. Prefers the frozen pick_criteria.vegas snapshot; `brief` = team only."""
@@ -773,13 +835,33 @@ def _book_phrase(g: dict, brief: bool = False) -> str | None:
             f"{ha} win {m(hh)} · {aa} win {m(hw)}")
 
 
+def _stance_phrase(g: dict, brief: bool = False) -> str | None:
+    """'🕵️ book stance: ON ATH — public being fooled (money vs tickets, RLM)' when
+    the book has left informed tells; a plain liability lean (0 tells) says nothing
+    and returns None. Adds '⚠️ vs OUR pick' when the informed side isn't ours.
+    `brief` = a compact tag for no-play one-liners."""
+    st = (g.get("pick_criteria") or {}).get("book_stance") or _book_stance(g)
+    if not st or not st.get("tells"):
+        return None
+    who = _short(g, st["side"])
+    if brief:
+        return (f"🚨 public fooled → book on {who}" if st["fooled"]
+                else f"🕵️ book on {who}")
+    tail = f" — 🚨 public being fooled ({', '.join(st['tells'])})" if st["fooled"] \
+        else f" ({', '.join(st['tells'])})"
+    warn = " · ⚠️ vs OUR pick" if st.get("against_us") else ""
+    return f"🕵️ book stance: ON {who}{tail}{warn}"
+
+
 def _stay_line(g: dict) -> str:
     """One-liner for a NO-ACTION game (nothing the system likes; never booked)."""
     pc = g["pick_criteria"]
     mp = _money_phrase(g)
     bk = _book_phrase(g, brief=True)
+    st = _stance_phrase(g, brief=True)
     return (f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', 'no play')}"
-            + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else ""))
+            + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
+            + (f" · {st}" if st else ""))
 
 
 def _star(pc: dict) -> list[str]:
@@ -807,10 +889,12 @@ def _game_lines(g: dict) -> list[str]:
     tag = _state_tag(g)
     star = _star(pc)
     kind = "PLAY"
-    mark = "⭐" if star else "✅"
+    warn = pc.get("stance_warning")
+    mark = "⚠️" if warn else "⭐" if star else "✅"
     lines = [
         f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
-        + (f" · ⭐ {', '.join(star)}" if star else ""),
+        + (f" · ⭐ {', '.join(star)}" if star else "")
+        + (f" · ⚠️ {warn}" if warn else ""),
         f"   • stat edge: {edge}",
         f"   • public: {pub}",
         f"   • consistency: {cons}",
@@ -821,6 +905,9 @@ def _game_lines(g: dict) -> list[str]:
     bk = _book_phrase(g)
     if bk:
         lines.append(f"   • {bk} _(display only)_")
+    stp = _stance_phrase(g)
+    if stp:
+        lines.append(f"   • {stp}")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -878,8 +965,9 @@ def build_summary(payload: dict) -> str:
 
     out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
                "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
-               "▫️ = no play. 🏦 = the side the BOOK needs (display only, own Vegas record). "
-               "🔴 = live._")
+               "⚠️ = a PLAY the book's informed money is fading (never a ⭐). ▫️ = no play. "
+               "🏦 = the side the BOOK needs (display only, own Vegas record). "
+               "🕵️/🚨 = the book's informed stance / public being fooled. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -956,9 +1044,11 @@ def telegram_text(payload: dict) -> str:
         frozen = " [frozen]" if g.get("state") == "live" else ""
         star = _star(pc)
         kind = "PLAY"
-        mark = "⭐" if star else "✅"
+        warn = pc.get("stance_warning")
+        mark = "⚠️" if warn else "⭐" if star else "✅"
         L.extend(["",
-                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
+                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}"
+                  + (f"  ⚠️ {warn}" if warn else ""),
                   f"   {aa} @ {ha}",
                   f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}",
                   f"   👥 public {_public_evidence(g)}",
@@ -969,6 +1059,9 @@ def telegram_text(payload: dict) -> str:
         bk = _book_phrase(g)
         if bk:
             L.append(f"   {bk}")
+        stp = _stance_phrase(g)
+        if stp:
+            L.append(f"   {stp}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
@@ -1010,8 +1103,10 @@ def telegram_text(payload: dict) -> str:
             tag = "🔴 " if g.get("state") == "live" else ""
             mp = _money_phrase(g)
             bk = _book_phrase(g, brief=True)
+            st = _stance_phrase(g, brief=True)
             L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else ""))
+                     + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else "")
+                     + (f" · {st}" if st else ""))
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
