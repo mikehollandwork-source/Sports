@@ -31,7 +31,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run backtest
+      # Snapshot backtest first (fast, real results) so its report always lands
+      # even if the slow legacy re-derivation below hangs or errors.
+      - name: Run signal backtest (snapshot-based, real results)
+        run: python -m src.signal_backtest
+
+      - name: Run legacy re-derivation backtest (slow; best-effort)
+        continue-on-error: true
+        timeout-minutes: 20
         env:
           BT_END: ${{ github.event.inputs.end }}
           BT_DAYS: ${{ github.event.inputs.days }}
@@ -39,9 +46,6 @@ jobs:
           ARGS="--days ${BT_DAYS:-10}"
           if [ -n "$BT_END" ]; then ARGS="$ARGS --end $BT_END"; fi
           python -m src.backtest $ARGS
-
-      - name: Run signal backtest (snapshot-based, real results)
-        run: python -m src.signal_backtest
 
       - name: Post backtest issue
         env:
@@ -59,5 +63,9 @@ jobs:
             echo "No report changes."
           else
             git commit -m "Backtest report ($(date -u +%Y-%m-%d))"
-            git push
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
           fi
