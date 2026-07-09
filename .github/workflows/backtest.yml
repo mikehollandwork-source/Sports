@@ -40,10 +40,15 @@ jobs:
           if [ -n "$BT_END" ]; then ARGS="$ARGS --end $BT_END"; fi
           python -m src.backtest $ARGS
 
+      - name: Run signal backtest (snapshot-based, real results)
+        run: python -m src.signal_backtest
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "Backtest $(date -u +%Y-%m-%d)" --body-file output/latest_backtest.md
+        run: |
+          gh issue create --title "Signal backtest $(date -u +%Y-%m-%d)" \
+            --body-file output/signal_backtest.md
 
       - name: Commit report
         run: |
