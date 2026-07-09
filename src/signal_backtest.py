@@ -169,6 +169,37 @@ def build() -> str:
                    [{"won": g["won"], "odds": g["odds"]} for g in veg]))
     md.append("")
 
+    # TAIL Vegas: bet the side the book NEEDS, then pour in one of our signals. A
+    # signal counts only when our stat side IS the Vegas-needed team (not anti_is_adv)
+    # - our signals are computed for the advantage side, so they can only "confirm"
+    # the tail when the advantage side and the book_needs side are the same team.
+    tail_ok = [g for g in veg if g.get("veg_odds") is not None]
+    md += ["## Tailing Vegas (bet the side book_needs) + one of our signals", "",
+           "| slice | record | units |", "|---|---|---|",
+           _row(f"tail Vegas, all games (n={len(tail_ok)})",
+                [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in tail_ok])]
+    tagree = [g for g in tail_ok if not g["anti_is_adv"]]   # book_needs side == our adv
+    md.append(_row(f"  + our stat side agrees (n={len(tagree)})",
+                   [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in tagree]))
+    for s in SIGNALS:
+        sub = [g for g in tagree if g["sig"].get(s) is True]
+        md.append(_row(f"  + agrees & {s} (n={len(sub)})",
+                       [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in sub]))
+    md.append("")
+
+    def ncore_t(g):
+        return sum(1 for s in core if g["sig"].get(s) is True)
+    md += ["## Tail Vegas (stat side agrees) by NUMBER of signals stacked", "",
+           "| signals stacked | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, lab in ((1, "≥1"), (2, "≥2"), (3, "≥3"), (4, "≥4")):
+        sub = [g for g in tagree if ncore_t(g) >= lo]
+        rows = [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in sub]
+        if rows:
+            w, l, u = _units(rows)
+            md.append(f"| {lab} signals (n={len(rows)}) | {w}-{l} ({w/len(rows):.0%}) "
+                      f"| {u:+.2f}u | {u/len(rows):+.1%} |")
+    md.append("")
+
     # FADE Vegas: bet the OPPOSITE side of what the book needs (the team it's
     # exposed to), then pour in one of our signals. A signal only counts when our
     # stat side IS that anti-Vegas team (anti_is_adv) - otherwise our signal points
