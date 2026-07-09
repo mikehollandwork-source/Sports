@@ -1,25 +1,32 @@
 name: Board refresh
 
-# Rebuilds the whole board on every firing so picks always reflect the latest
-# lineups/lines/odds. Asks for every 5 minutes, all day - GitHub throttles
-# scheduled crons hard (~2h between firings), so this just runs as often as the
-# platform allows. Started games stay frozen (main._lock_started_games);
-# Telegram only fires when the pick set changes, so frequent runs don't spam.
+# Keeps the board fresh ALL DAY. GitHub throttles high-frequency scheduled crons
+# hard (a "*/5" cron typically fires once early, then gets dropped for hours),
+# which is why refreshes used to work for the first game and then stop. Instead,
+# a few reliable daily kicks each launch a LONG-RUNNING loop that rebuilds the
+# board every ~5 minutes for ~5 hours, so every game gets refreshes right up to
+# its lock window (main.LOCK_LEAD). A newer kick cancels the older loop (clean
+# handoff), so the four kicks below tile ~9:30am ET -> ~4am ET.
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"   # max frequency; GitHub throttles to whatever it allows
+    - cron: "30 13 * * *"   # ~9:30am ET  (covers midday slate)
+    - cron: "0 18 * * *"    # ~2:00pm ET  (afternoon)
+    - cron: "30 22 * * *"   # ~6:30pm ET  (prime evening slate)
+    - cron: "0 3 * * *"     # ~11:00pm ET (late west-coast games)
 
 permissions:
   contents: write
 
+# newest kick wins: it cancels the running loop and takes over the day
 concurrency:
   group: pregame-refresh
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 300   # under the 6h hard cap; the loop below runs ~4.75h
     steps:
       - uses: actions/checkout@v4
 
@@ -30,24 +37,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Pre-game pick refresh
+      - name: Continuous board refresh loop
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python -m src.pregame
-
-      - name: Commit refreshed picks
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/
-          if git diff --staged --quiet; then
-            echo "No refresh this run."
-          else
-            git commit -m "Pre-game pick refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
-            for i in 1 2 3; do
-              git pull --rebase origin "${{ github.ref_name }}" \
-                && git push origin "HEAD:${{ github.ref_name }}" && break
-              echo "push retry $i"; sleep 5
-            done
-          fi
+          END=$(( $(date +%s) + 285*60 ))   # loop for ~4.75h, then the job ends
+          while [ "$(date +%s)" -lt "$END" ]; do
+            git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
+            python -m src.pregame || echo "pregame errored this tick, continuing"
+            git add output/
+            if ! git diff --staged --quiet; then
+              git commit -m "Pre-game refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
+              for i in 1 2 3 4; do
+                git pull --rebase -X theirs origin "${{ github.ref_name }}" \
+                  && git push origin "HEAD:${{ github.ref_name }}" && break
+                echo "push retry $i"; sleep 5
+              done
+            fi
+            sleep 300   # ~5 min between refreshes
+          done
