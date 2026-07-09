@@ -2,18 +2,18 @@ name: Board refresh
 
 # Keeps the board fresh ALL DAY. GitHub throttles high-frequency scheduled crons
 # hard (a "*/5" cron typically fires once early, then gets dropped for hours),
-# which is why refreshes used to work for the first game and then stop. Instead,
-# a few reliable daily kicks each launch a LONG-RUNNING loop that rebuilds the
-# board every ~5 minutes for ~5 hours, so every game gets refreshes right up to
-# its lock window (main.LOCK_LEAD). A newer kick cancels the older loop (clean
-# handoff), so the four kicks below tile ~9:30am ET -> ~4am ET.
+# which is why refreshes used to work for the first game and then stop. Instead
+# we kick HOURLY from ~noon ET through ~1am ET - hourly crons fire reliably - and
+# each kick launches a loop that rebuilds the board every ~5 min. A newer kick
+# cancels the older loop (clean handoff); if GitHub ever skips an hourly kick the
+# running loop keeps going up to ~4.75h, so coverage is self-healing.
+# (Cron is UTC and fixed; 16:00 UTC = noon ET during EDT. It shifts an hour under
+# EST, which only moves the start ~an hour - harmless.)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 13 * * *"   # ~9:30am ET  (covers midday slate)
-    - cron: "0 18 * * *"    # ~2:00pm ET  (afternoon)
-    - cron: "30 22 * * *"   # ~6:30pm ET  (prime evening slate)
-    - cron: "0 3 * * *"     # ~11:00pm ET (late west-coast games)
+    - cron: "0 16-23 * * *"   # hourly, noon ET -> 7pm ET
+    - cron: "0 0-5 * * *"     # hourly, 8pm ET -> 1am ET (next UTC day)
 
 permissions:
   contents: write
