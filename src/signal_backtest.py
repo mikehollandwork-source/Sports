@@ -69,7 +69,7 @@ def signals(g: dict) -> dict | None:
         "sharp": (None if not cc.get("money_side") or not maj
                   else cc.get("money_side") == side and maj != adv),
         "form": (None if fa is None or fo is None or abs(fa - fo) < 0.015 else fa > fo),
-        "_ml": ml, "_adv": adv,
+        "_ml": ml, "_adv": adv, "_margin": margin, "_cons": cons,
     }
 
 
@@ -251,6 +251,33 @@ def build() -> str:
     md += ["## Our pick when the book's informed money was AGAINST us (⚠️ bucket)", "",
            "| slice | record | units |", "|---|---|---|",
            _row(f"stance-against plays (n={len(ag)})", ag), ""]
+
+    # NEW BOARD GATE (live rule): a pick must be a FADE (our stat side is the team
+    # Vegas does NOT need) carrying a CORE signal (margin/line/consistency). This is
+    # what actually makes the board now - validate it's +EV and see what it drops.
+    def is_core(g):
+        return any(g["sig"].get(s) is True for s in ("margin", "line", "consistency"))
+    gate = [g for g in agree if is_core(g)]                     # fade + core
+    dropped_tail = [g for g in veg if not g["anti_is_adv"] and is_core(g)]  # tail + core (now cut)
+    md += ["## NEW BOARD GATE — fade + core signal (what makes the board now)", "",
+           "| slice | record | units |", "|---|---|---|",
+           _row(f"BOARD: fade + core signal (n={len(gate)})",
+                [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in gate]),
+           _row(f"DROPPED: tail + core signal (was played, now cut) (n={len(dropped_tail)})",
+                [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in dropped_tail]), ""]
+
+    # #5 - do tighter numeric thresholds sharpen a signal? Sweep the margin and
+    # consistency cutoffs on the fade side (bet the anti-Vegas team).
+    md += ["## Threshold sweeps on the fade side (does a tighter bar help?)", "",
+           "| margin ≥ | record | units |", "|---|---|---|"]
+    for thr in (0.30, 0.40, 0.50, 0.60, 0.70):
+        sub = [g for g in agree if (g["sig"].get("_margin") or -9) >= thr]
+        md.append(_row(f"{thr:.2f}", [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]))
+    md += ["", "| consistency (out-hit) ≥ | record | units |", "|---|---|---|"]
+    for thr in (3, 4, 5):
+        sub = [g for g in agree if (g["sig"].get("_cons") or -9) >= thr]
+        md.append(_row(f"{thr}/5", [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]))
+    md.append("")
 
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "
