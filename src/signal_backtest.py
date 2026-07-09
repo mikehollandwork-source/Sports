@@ -342,6 +342,24 @@ def build() -> str:
            roi_row("+ margin & BvP & consistency (all three)",
                    [g for g in dogs if has(g, "margin", "bvp", "consistency")]), ""]
 
+    # EXHAUSTIVE on underdogs: every signal subset, betting the dog, ranked by
+    # units (dogs are sparse so the sample floor is lower, n>=5). Answers "does the
+    # dog paired with ANY signal combo return positive units?"
+    DOG_MINN = 5
+    dcombos = []
+    for k in range(0, len(SIGNALS) + 1):
+        for cmb in itertools.combinations(SIGNALS, k):
+            sub = [g for g in dogs if all(g["sig"].get(s) is True for s in cmb)]
+            if len(sub) >= DOG_MINN:
+                w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
+                dcombos.append((u, u / len(sub), w, l, len(sub),
+                                " + ".join(cmb) if cmb else "(any dog)"))
+    md += ["## Every underdog + signal combo (bet the dog, n≥5, by units)", "",
+           "| combo | record | units | ROI/bet |", "|---|---|---|---|"]
+    for u, roi, w, l, n, name in sorted(dcombos, reverse=True):
+        md.append(f"| {name} | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
+    md.append("")
+
     # EXHAUSTIVE: every non-empty subset of all 7 signals, ranked by ROI/bet. A
     # game counts for a subset when ALL its signals are present. Two pools: every
     # graded pick, and only the fade-gated ones (our stat side is the team Vegas
