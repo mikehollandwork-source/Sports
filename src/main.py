@@ -285,18 +285,31 @@ def _attach_line(game, result: dict, slate: list) -> None:
                        else fa > fo)
     pc["form_gap"] = round(fa - fo, 3) if fa is not None and fo is not None else None
     fh_hit = pc["form_edge"] is True
+    maj = (result.get("public_majority") or {}).get("team")
+    # Sharp-$ signal (tickets vs HANDLE, the book's own tell): the money sits on
+    # OUR side while the ticket majority leans the other way - casual tickets on
+    # them, real dollars on us. That divergence is how books themselves profile
+    # the action and pick the side they position on. None = no clean money read
+    # or no divergence to speak of.
+    mcc = result.get("public_check") or {}
+    money_ours = mcc.get("money_side") == adv_side
+    pc["sharp_money"] = (None if not mcc.get("money_side") or not maj
+                         else bool(money_ours and maj != adv))
+    s_hit = pc["sharp_money"] is True
+    s_label = "sharp $" + (f" ({mcc.get('money_pct')}% of $ on us)"
+                           if mcc.get("money_pct") else "")
     hits, misses = [], []
     for ok, label in ((m_hit, f"margin {margin}"),
                       (f_hit, "favorite" if ml is not None else "no price"),
                       (l_hit, "line toward"),
                       (c_hit, f"consistency {cons}/5"),
                       (b_hit, "BvP"),
-                      (fh_hit, f"hot lineup ({pc['form_gap']:+.3f})" if fh_hit else "form")):
+                      (fh_hit, f"hot lineup ({pc['form_gap']:+.3f})" if fh_hit else "form"),
+                      (s_hit, s_label if s_hit else "sharp $")):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
     opp_name = home if adv == away else away
     shift = info.get("implied_shift")
-    maj = (result.get("public_majority") or {}).get("team")
     # CORE signals carry a play; favorite + BvP are supporting only. The graded
     # record: bets with a core signal (margin>=.50 / line toward / consistency>=3)
     # went 11-4 (+3.06u), while no-core bets (favorite-only, BvP-only, favorite+BvP)
@@ -315,6 +328,13 @@ def _attach_line(game, result: dict, slate: list) -> None:
             pub_pct = round(hp if maj == home else ap)
             pc["public_pct_against"] = pub_pct
             mild_public = pub_pct < PUBLIC_HEAVY
+    # Tickets-vs-handle override (user call - the book's own playbook): the
+    # mild-public fade assumes the sharp side is the OTHER side. When the real
+    # dollars sit on US while the tickets lean away, that assumption fails -
+    # the sharp profile is ours, so the mild-public gate stands down.
+    if mild_public and s_hit:
+        mild_public = False
+        pc["mild_public_overridden"] = "money on us vs tickets on them"
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when
     # it clears both gates (core signal + not a mild-public fade). The internal
     # play value stays "pick" so frozen snapshots and grading classify the same;
@@ -323,12 +343,13 @@ def _attach_line(game, result: dict, slate: list) -> None:
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
-        pc["reason"] = f"{len(hits)}/6 signals — {', '.join(hits)}"
+        pc["reason"] = f"{len(hits)}/7 signals — {', '.join(hits)}"
         # ⭐ = the proven-hot combos from the graded record: margin + favorite +
-        # line toward (10-2), or 4+ of the FIVE PROVEN signals (8-1). Form is a
-        # cherry on top (user call): it shows in the count/reason but back-tested
-        # to no edge (39-51% by gap), so it can't push a play into the star.
-        proven = len(hits) - (1 if fh_hit else 0)
+        # line toward (10-2), or 4+ of the FIVE PROVEN signals (8-1). Form and
+        # sharp-$ are unproven extras (form back-tested to no edge; sharp-$ is
+        # brand-new): they show in the count/reason but can't push a play into
+        # the star until the audit/Vegas record proves them.
+        proven = len(hits) - (1 if fh_hit else 0) - (1 if s_hit else 0)
         star = []
         if m_hit and f_hit and l_hit:
             star.append("margin+favorite+line")
@@ -352,8 +373,12 @@ def _attach_line(game, result: dict, slate: list) -> None:
         elif not core_hit and hits:
             why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
         else:
-            why = "0/6 signals — no play"
+            why = "0/7 signals — no play"
         pc["reason"] = why
+
+    # Display-only Vegas read, frozen with the snapshot so the separate Vegas
+    # record grades exactly the bet the board showed. Never touches the decision.
+    pc["vegas"] = _book_needs(result)
 
 
 def _play(g: dict) -> str:
@@ -669,12 +694,77 @@ def _money_phrase(g: dict) -> str | None:
     return f"💰 money on {team}" + (f" {pct}%" if pct else "")
 
 
+# Display-only ballpark for the total wagered on an average regular-season MLB
+# game across US legal books (annual MLB handle / ~2430 games). A rough constant,
+# not per-game data - shown as "(est)" and never used in any decision.
+EST_GAME_HANDLE = 7_000_000
+
+
+def _book_needs(g: dict) -> dict | None:
+    """Which team the SPORTSBOOK needs to win, from the dollar split (money % -
+    falls back to avg ticket %) and both moneylines on an estimated ~$7M handle.
+    Returns {bet (full name), odds (that side's ml), basis, hold_home, hold_away}
+    or None with no clean read. Display/Vegas-record only - never a decision."""
+    pc = g.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    ml_a, ml_o = pc.get("advantage_moneyline"), pc.get("opponent_moneyline")
+    if not adv or ml_a is None or ml_o is None:
+        return None
+    away, home = g["matchup"].split(" @ ")
+    ml_home, ml_away = (ml_a, ml_o) if adv == home else (ml_o, ml_a)
+    cc = g.get("public_check") or {}
+    if cc.get("money_side") in ("home", "away") and cc.get("money_pct"):
+        hp = cc["money_pct"] if cc["money_side"] == "home" else 100 - cc["money_pct"]
+        basis = "money %"
+    else:
+        pairs = _public_pairs((g.get("public_majority") or {}).get("detail") or {})
+        if not pairs:
+            return None
+        hp = sum(p[1] for p in pairs) / len(pairs)
+        basis = "ticket %"
+    dh, da = hp / 100.0, 1.0 - hp / 100.0
+
+    def net(ml):        # winner's net payout per $1 staked
+        return 100 / abs(ml) if ml < 0 else ml / 100
+
+    hold_home = EST_GAME_HANDLE * (da - dh * net(ml_home))   # book P/L if home wins
+    hold_away = EST_GAME_HANDLE * (dh - da * net(ml_away))
+    need_home = hold_home >= hold_away
+    return {"bet": home if need_home else away,
+            "odds": int(ml_home if need_home else ml_away),
+            "basis": basis,
+            "hold_home": round(hold_home), "hold_away": round(hold_away)}
+
+
+def _book_phrase(g: dict, brief: bool = False) -> str | None:
+    """'🏦 book needs ATH · ~$7M wagered (est) · ...' - display-only book-liability
+    read. Prefers the frozen pick_criteria.vegas snapshot; `brief` = team only."""
+    bn = (g.get("pick_criteria") or {}).get("vegas") or _book_needs(g)
+    if not bn:
+        return None
+    need = _short(g, bn["bet"])
+    if brief:
+        return f"🏦 book needs {need}"
+    away, home = g["matchup"].split(" @ ")
+    aa, ha = _short(g, away), _short(g, home)
+    hh, hw = bn.get("hold_home"), bn.get("hold_away")
+    if hh is None or hw is None:
+        return f"🏦 book needs {need}"
+    def m(x):
+        return f"{'+' if x >= 0 else '-'}${abs(x) / 1e6:.1f}M"
+    who = (f"book profits either way — more on {need}"
+           if hh > 0 and hw > 0 else f"book needs {need}")
+    return (f"🏦 {who} · ~${EST_GAME_HANDLE / 1e6:.0f}M wagered (est, {bn['basis']}) · "
+            f"{ha} win {m(hh)} · {aa} win {m(hw)}")
+
+
 def _stay_line(g: dict) -> str:
     """One-liner for a NO-ACTION game (nothing the system likes; never booked)."""
     pc = g["pick_criteria"]
     mp = _money_phrase(g)
+    bk = _book_phrase(g, brief=True)
     return (f"▫️ {_state_tag(g)}{g['matchup']} — {pc.get('reason', 'no play')}"
-            + (f" · {mp}" if mp else ""))
+            + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else ""))
 
 
 def _star(pc: dict) -> list[str]:
@@ -713,6 +803,9 @@ def _game_lines(g: dict) -> list[str]:
     mp = _money_phrase(g)
     if mp:
         lines.append(f"   • {mp}")
+    bk = _book_phrase(g)
+    if bk:
+        lines.append(f"   • {bk} _(display only)_")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -765,8 +858,10 @@ def build_summary(payload: dict) -> str:
         out.append("_No upcoming or live games — full slate is final (see the record below)._")
         out.append("")
 
-    out.append("_✅ = PLAY (core signal + not a mild-public fade). ⭐ = play on a proven-hot "
-               "combo (margin+favorite+line, or 4+ proven signals). ▫️ = no play. 🔴 = live._")
+    out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
+               "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
+               "▫️ = no play. 🏦 = the side the BOOK needs (display only, own Vegas record). "
+               "🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -803,7 +898,8 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    books = [("Plays", ledger["plays"])]
+    books = [("Plays", ledger["plays"]),
+             ("🏦 Vegas (book's side · display only)", ledger.get("vegas") or {"entries": []})]
     for name, book in books:
         rec = grade.windowed_records(book, today)
         if not rec:
@@ -852,6 +948,9 @@ def telegram_text(payload: dict) -> str:
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
+        bk = _book_phrase(g)
+        if bk:
+            L.append(f"   {bk}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
@@ -889,8 +988,9 @@ def telegram_text(payload: dict) -> str:
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
             mp = _money_phrase(g)
+            bk = _book_phrase(g, brief=True)
             L.append(f"▫️ {tag}{aa} @ {ha} — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else ""))
+                     + (f" · {mp}" if mp else "") + (f" · {bk}" if bk else ""))
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
