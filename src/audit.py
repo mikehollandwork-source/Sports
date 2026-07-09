@@ -64,6 +64,11 @@ def _signals(g: dict, bet: str) -> dict | None:
         # UNPROVEN: sharp-$ (money on us vs tickets on them). Measured here until
         # the record says whether it earns core/star status.
         "sharp": pc.get("sharp_money"),
+        # WATCH: book's informed stance is AGAINST this bet (>=1 tell). Tracked to
+        # see whether 'betting into the house' ever justifies a hard veto - the
+        # record so far says these are winners, so it only gates the star.
+        "stance_against": bool((pc.get("book_stance") or {}).get("against_us")
+                               and (pc.get("book_stance") or {}).get("tells")),
         "_margin_val": margin,
     }
 
@@ -142,10 +147,12 @@ def build() -> tuple[dict, str]:
         md.append("")
         md.append("| signal present | with it | without it |")
         md.append("|---|---|---|")
-        for k in ("margin", "favorite", "line", "consistency", "bvp", "form", "sharp"):
+        for k in ("margin", "favorite", "line", "consistency", "bvp", "form",
+                  "sharp", "stance_against"):
             yes = [r for r in rows if r["signals"].get(k) is True]
             no = [r for r in rows if r["signals"].get(k) is False]
-            tag = " (cherry)" if k == "form" else " (unproven)" if k == "sharp" else ""
+            tag = (" (cherry)" if k == "form" else " (unproven)" if k == "sharp"
+                   else " (book fading us)" if k == "stance_against" else "")
             md.append(f"| {k}{tag} | {_wr(yes)} | {_wr(no)} |")
         md.append("")
         W = [r for r in rows if r["won"]]
