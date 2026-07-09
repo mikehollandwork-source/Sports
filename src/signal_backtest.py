@@ -37,6 +37,33 @@ def _adv_side(g: dict) -> str | None:
     return "home" if adv == home else "away" if adv == away else None
 
 
+def _implied(ml) -> float:
+    ml = int(ml)
+    return 100 / (ml + 100) if ml > 0 else -ml / (-ml + 100)
+
+
+def shading_gap(g: dict) -> float | None:
+    """Line-shading fingerprint: public ticket % on the majority side MINUS what
+    that side's moneyline actually implies. Big positive = the crowd is paying a
+    shaded/held price (the honeypot). None when the inputs aren't recorded."""
+    from .main import _public_pairs
+    pc = g.get("pick_criteria") or {}
+    maj = (g.get("public_majority") or {}).get("team")
+    adv = pc.get("advantage_team")
+    ml_a = pc.get("advantage_moneyline")
+    if not maj or ml_a is None:
+        return None
+    pairs = _public_pairs((g.get("public_majority") or {}).get("detail") or {})
+    if not pairs:
+        return None
+    away, home = g["matchup"].split(" @ ")
+    mp = (sum(p[1] for p in pairs) if maj == home else sum(p[0] for p in pairs)) / len(pairs)
+    ml_maj = ml_a if maj == adv else pc.get("opponent_moneyline")
+    if ml_maj is None:
+        return None
+    return round(mp - _implied(ml_maj) * 100, 1)
+
+
 def signals(g: dict) -> dict | None:
     """The 7 signals for the advantage team, recomputed from the frozen snapshot.
     None when an input wasn't recorded (older board) - excluded from that signal's
@@ -108,7 +135,8 @@ def build() -> str:
             graded += 1
             adv = sig["_adv"]
             rec = {"won": res["winner"] == adv, "odds": sig["_ml"], "sig": sig,
-                   "stance_against": bool((_book_stance(g) or {}).get("against_us"))}
+                   "stance_against": bool((_book_stance(g) or {}).get("against_us")),
+                   "shade": shading_gap(g)}
             bn = _book_needs(g)
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
@@ -277,6 +305,18 @@ def build() -> str:
     for thr in (3, 4, 5):
         sub = [g for g in agree if (g["sig"].get("_cons") or -9) >= thr]
         md.append(_row(f"{thr}/5", [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]))
+    md.append("")
+
+    # Does the SHADING gap (line-manipulation fingerprint) improve our picks? Split
+    # our board picks by how shaded the public price was. If heavier shade -> better,
+    # it's a pick booster; if not, it's display-only.
+    shaded = [g for g in games if g.get("shade") is not None]
+    md += ["## Does line-shading improve our picks? (our picks by shading gap)", "",
+           "| shading gap (tickets − implied) | record | units |", "|---|---|---|"]
+    for lo, hi, lab in ((-999, 5, "< 5 (not shaded)"), (5, 15, "5–15 (mild)"),
+                        (15, 999, "≥ 15 (heavy shade)")):
+        sub = [{"won": g["won"], "odds": g["odds"]} for g in shaded if lo <= g["shade"] < hi]
+        md.append(_row(lab, sub))
     md.append("")
 
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
