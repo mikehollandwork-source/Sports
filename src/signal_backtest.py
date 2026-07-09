@@ -187,6 +187,35 @@ def build() -> str:
                        [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]))
     md.append("")
 
+    # Does STACKING more than one signal on the fade raise ROI? Count buckets over
+    # the six core signals, then the best 2- and 3-signal combos on the fade.
+    def ncore(g):
+        return sum(1 for s in core if g["sig"].get(s) is True)
+    md += ["## Fade Vegas (stat side agrees) by NUMBER of signals stacked", "",
+           "| signals stacked | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, lab in ((1, "≥1"), (2, "≥2"), (3, "≥3"), (4, "≥4")):
+        sub = [g for g in agree if ncore(g) >= lo]
+        rows = [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]
+        if rows:
+            w, l, u = _units(rows)
+            roi = u / len(rows)
+            md.append(f"| {lab} signals (n={len(rows)}) | {w}-{l} ({w/len(rows):.0%}) "
+                      f"| {u:+.2f}u | {roi:+.1%} |")
+    md.append("")
+    md += ["## Best MULTI-signal fade combos (stat side agrees, n≥10)", "",
+           "| combo | record | units |", "|---|---|---|"]
+    fcombos = []
+    for k in (2, 3):
+        for cmb in itertools.combinations(core, k):
+            sub = [g for g in agree if all(g["sig"].get(s) is True for s in cmb)]
+            if len(sub) >= 10:
+                rows = [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]
+                w, _, u = _units(rows)
+                fcombos.append((u / len(rows), u, " + ".join(cmb), rows))
+    for roi, u, name, rows in sorted(fcombos, reverse=True)[:10]:
+        md.append(_row(name, rows))
+    md.append("")
+
     ag = [{"won": g["won"], "odds": g["odds"]} for g in games if g["stance_against"]]
     md += ["## Our pick when the book's informed money was AGAINST us (⚠️ bucket)", "",
            "| slice | record | units |", "|---|---|---|",
