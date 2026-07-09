@@ -20,12 +20,55 @@ import itertools
 import json
 from pathlib import Path
 
+import statistics as st
+
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
 from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form")
+
+
+def profile(g: dict) -> dict | None:
+    """Numeric profile of the advantage side vs its opponent (positive = our edge),
+    for winners-vs-losers analysis. Pulls the frozen team-score / index / neutral
+    rate stats. None when the pieces aren't recorded."""
+    pc = g.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    side = _adv_side(g)
+    if not adv or side is None:
+        return None
+    opp = "away" if side == "home" else "home"
+    sa = g.get("statistical_advantage") or {}
+    a, o = sa.get(side) or {}, sa.get(opp) or {}
+    ao, oo = a.get("offense") or {}, o.get("offense") or {}
+
+    def gap(d1, d2, k):
+        x, y = d1.get(k), d2.get(k)
+        return round(x - y, 3) if isinstance(x, (int, float)) and isinstance(y, (int, float)) else None
+
+    b = g.get("bvp") or {}
+    bvp_gap = None
+    if b.get("gap") is not None and b.get("edge_team"):
+        bvp_gap = round(b["gap"] * (1 if b["edge_team"] == adv else -1), 3)
+    fip_gap = None  # opponent FIP minus ours -> positive = our arms are better
+    af, of_ = a.get("combined_fip_sos_adj"), o.get("combined_fip_sos_adj")
+    if isinstance(af, (int, float)) and isinstance(of_, (int, float)):
+        fip_gap = round(of_ - af, 3)
+    return {
+        "team_score_gap": gap(a, o, "score"),
+        "offense_index_gap": gap(a, o, "offense_index"),
+        "pitching_index_gap": gap(a, o, "pitching_index"),
+        "margin": pc.get("components", {}).get("stat_edge", {}).get("margin"),
+        "fip_gap": fip_gap,
+        "woba_neutral_gap": gap(ao, oo, "woba_neutral"),
+        "iso_neutral_gap": gap(ao, oo, "iso_neutral"),
+        "k_pct_gap": gap(ao, oo, "k_pct"),
+        "bvp_gap": bvp_gap,
+        "form_gap": pc.get("form_gap"),
+        "dog_price": pc.get("advantage_moneyline"),
+    }
 
 
 def _adv_side(g: dict) -> str | None:
@@ -136,7 +179,7 @@ def build() -> str:
             adv = sig["_adv"]
             rec = {"won": res["winner"] == adv, "odds": sig["_ml"], "sig": sig,
                    "stance_against": bool((_book_stance(g) or {}).get("against_us")),
-                   "shade": shading_gap(g)}
+                   "shade": shading_gap(g), "prof": profile(g)}
             bn = _book_needs(g)
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
@@ -354,6 +397,27 @@ def build() -> str:
                 w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
                 dcombos.append((u, u / len(sub), w, l, len(sub),
                                 " + ".join(cmb) if cmb else "(any dog)"))
+    # What do the WINNING dogs have in common? Median of each frozen stat for dogs
+    # that WON vs dogs that LOST - a stat where winners clearly separate is a lead.
+    dw = [g["prof"] for g in dogs if g["won"] and g.get("prof")]
+    dl = [g["prof"] for g in dogs if not g["won"] and g.get("prof")]
+    PROF_KEYS = [
+        ("team_score_gap", "team-score edge"), ("margin", "edge margin"),
+        ("offense_index_gap", "offense-index edge"), ("pitching_index_gap", "pitching-index edge"),
+        ("fip_gap", "FIP edge (opp−ours)"), ("woba_neutral_gap", "wOBA edge (park-neutral)"),
+        ("iso_neutral_gap", "ISO edge (park-neutral)"), ("k_pct_gap", "K% gap"),
+        ("bvp_gap", "BvP edge (signed)"), ("form_gap", "hot-lineup edge"),
+        ("dog_price", "dog price (ml)"),
+    ]
+    md += [f"## What winning underdogs have in common ({len(dw)} winners vs {len(dl)} losers)", "",
+           "| stat (advantage side edge) | winners median | losers median |", "|---|---|---|"]
+    for k, lab in PROF_KEYS:
+        wv = [p[k] for p in dw if p.get(k) is not None]
+        lv = [p[k] for p in dl if p.get(k) is not None]
+        if wv and lv:
+            md.append(f"| {lab} | {st.median(wv):+.3f} | {st.median(lv):+.3f} |")
+    md.append("")
+
     md += ["## Every underdog + signal combo (bet the dog, n≥5, by units)", "",
            "| combo | record | units | ROI/bet |", "|---|---|---|---|"]
     for u, roi, w, l, n, name in sorted(dcombos, reverse=True):
