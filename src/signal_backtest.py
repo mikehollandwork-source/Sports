@@ -113,6 +113,15 @@ def build() -> str:
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
                            veg_basis=bn["basis"])
+                # the ANTI-Vegas side = the team the book is EXPOSED to (opposite of
+                # book_needs) and its frozen price; whether our stat side agrees.
+                away, home = g["matchup"].split(" @ ")
+                pc = g.get("pick_criteria") or {}
+                mls = {adv: pc.get("advantage_moneyline"),
+                       (home if adv == away else away): pc.get("opponent_moneyline")}
+                anti = home if bn["bet"] == away else away
+                rec.update(anti_team=anti, anti_won=res["winner"] == anti,
+                           anti_odds=mls.get(anti), anti_is_adv=(anti == adv))
             games.append(rec)
 
     md = [f"# Signal backtest — {graded} graded of {total} game snapshots", ""]
@@ -158,6 +167,24 @@ def build() -> str:
         md.append(_row(f"  ...{basis} (n={len(sub)})", sub))
     md.append(_row("(vs our advantage side, same games)",
                    [{"won": g["won"], "odds": g["odds"]} for g in veg]))
+    md.append("")
+
+    # FADE Vegas: bet the OPPOSITE side of what the book needs (the team it's
+    # exposed to), then pour in one of our signals. A signal only counts when our
+    # stat side IS that anti-Vegas team (anti_is_adv) - otherwise our signal points
+    # the other way and can't "confirm" the fade.
+    anti = [g for g in veg if g.get("anti_odds") is not None]
+    md += ["## Fading Vegas (bet the OPPOSITE of book_needs) + one of our signals", "",
+           "| slice | record | units |", "|---|---|---|",
+           _row(f"fade Vegas, all games (n={len(anti)})",
+                [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in anti])]
+    agree = [g for g in anti if g["anti_is_adv"]]
+    md.append(_row(f"  + our stat side agrees (n={len(agree)})",
+                   [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in agree]))
+    for s in SIGNALS:
+        sub = [g for g in agree if g["sig"].get(s) is True]
+        md.append(_row(f"  + agrees & {s} (n={len(sub)})",
+                       [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]))
     md.append("")
 
     ag = [{"won": g["won"], "odds": g["odds"]} for g in games if g["stance_against"]]
