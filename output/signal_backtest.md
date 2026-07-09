@@ -1,4 +1,4 @@
-# Signal backtest — 202 graded of 218 game snapshots
+# Signal backtest — 202 graded of 231 game snapshots
 
 ## Each signal alone (bet the advantage team when it fires)
 
@@ -138,5 +138,13 @@
 | 3/5 | 27-13 (68%) | +7.36u |
 | 4/5 | 7-5 (58%) | +0.39u |
 | 5/5 | 4-1 (80%) | +1.99u |
+
+## Does line-shading improve our picks? (our picks by shading gap)
+
+| shading gap (tickets − implied) | record | units |
+|---|---|---|
+| < 5 (not shaded) | 51-42 (55%) | -1.11u |
+| 5–15 (mild) | 38-29 (57%) | +1.44u |
+| ≥ 15 (heavy shade) | 15-16 (48%) | -1.89u |
 
 _Point-in-time: signals recomputed from the frozen pre-game snapshot; winners from the MLB Stats API; $1/bet at the frozen moneyline. A signal with no recorded input on an older board is excluded from that row only (see n=)._
