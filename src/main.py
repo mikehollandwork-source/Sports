@@ -35,6 +35,11 @@ log = logging.getLogger("main")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
+# Freeze a game's pick + line this long BEFORE first pitch (not just after), so a
+# board firing in the final minutes can't flip a pick to no-action. Covers the
+# common case where boards don't land exactly at game time.
+LOCK_LEAD = dt.timedelta(minutes=15)
+
 
 def today_eastern() -> str:
     return dt.datetime.now(EASTERN).date().isoformat()
@@ -156,10 +161,17 @@ def _parse_iso(s: str | None) -> dt.datetime | None:
 
 def _lock_started_games(date: str, results: list) -> list:
     """Freeze any game whose first pitch has passed: replace the fresh computation
-    with the previously committed snapshot so a started pick stays a pick (and is
+    with the previously committed snapshot so a started PICK stays a pick (and is
     graded as one) and its captured line is the closing price, not a live one.
-    Games not yet underway keep the fresh computation. First-ever capture of an
-    already-started game has no snapshot to fall back to, so it stays fresh."""
+
+    Hardened so a started pick can never flip to no-action on a later board:
+      - the start time comes from the fresh result OR (fallback) the frozen snapshot,
+        so a missing fresh datetime can't skip the lock;
+      - once a game is underway we ALWAYS restore its snapshot; and
+      - a snapshot that was a PICK is sticky — even the rare case where the fresh
+        recompute would down-grade it is overridden back to the pick.
+    A game that first appears already-started with no snapshot keeps its fresh
+    computation (nothing to fall back to)."""
     prev_path = OUTPUT_DIR / f"picks_{date}.json"
     if not prev_path.exists():
         return results
@@ -171,15 +183,21 @@ def _lock_started_games(date: str, results: list) -> list:
     now = dt.datetime.now(dt.timezone.utc)
     out, locked = [], 0
     for r in results:
-        start = _parse_iso(r.get("game_datetime"))
         snap = prev.get(r.get("game_pk"))
-        if snap is not None and start is not None and now >= start:
-            out.append(snap)   # underway -> keep the frozen pre-game snapshot
+        # start from the fresh result, falling back to the frozen snapshot so a
+        # missing/empty fresh datetime never bypasses the lock.
+        start = _parse_iso(r.get("game_datetime"))
+        if start is None and snap is not None:
+            start = _parse_iso(snap.get("game_datetime"))
+        # lock from LOCK_LEAD before first pitch onward (not just after start)
+        locked_window = start is not None and now >= start - LOCK_LEAD
+        if snap is not None and locked_window:
+            out.append(snap)   # in the lock window -> keep the frozen snapshot
             locked += 1
         else:
             out.append(r)
     if locked:
-        log.info("locked %d already-started game(s) to their pre-game snapshot", locked)
+        log.info("locked %d game(s) at/near first pitch to their pre-game snapshot", locked)
     return out
 
 
