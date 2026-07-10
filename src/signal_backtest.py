@@ -24,10 +24,10 @@ import statistics as st
 
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
-from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY
+from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY, PDOG_FIP_MIN
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
-SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form")
+SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "pitching_dog")
 
 
 def profile(g: dict) -> dict | None:
@@ -129,6 +129,12 @@ def signals(g: dict) -> dict | None:
     fm = g.get("form") or {}
     fa = (fm.get(side) or {}).get("delta")
     fo = (fm.get("away" if side == "home" else "home") or {}).get("delta")
+    sa = g.get("statistical_advantage") or {}
+    a_sfs = (sa.get(side) or {}).get("starter_fip_season")
+    o_sfs = (sa.get("away" if side == "home" else "home") or {}).get("starter_fip_season")
+    sp_dog_edge = (o_sfs - a_sfs) if isinstance(a_sfs, (int, float)) and isinstance(o_sfs, (int, float)) else None
+    pdog = (None if ml is None or sp_dog_edge is None
+            else ml > 0 and sp_dog_edge >= PDOG_FIP_MIN)
     return {
         "margin": None if margin is None else margin >= LEAN_STRONG_MARGIN,
         "favorite": None if ml is None else ml < 0,
@@ -139,6 +145,7 @@ def signals(g: dict) -> dict | None:
         "sharp": (None if not cc.get("money_side") or not maj
                   else cc.get("money_side") == side and maj != adv),
         "form": (None if fa is None or fo is None or abs(fa - fo) < 0.015 else fa > fo),
+        "pitching_dog": pdog,
         "_ml": ml, "_adv": adv, "_margin": margin, "_cons": cons,
     }
 
