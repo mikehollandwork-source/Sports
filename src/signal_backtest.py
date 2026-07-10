@@ -24,11 +24,10 @@ import statistics as st
 
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
-from .analysis import (LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY,
-                       LIVE_DOG_FIP_MIN, LIVE_DOG_FORM_MIN)
+from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
-SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "live_dog")
+SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form")
 
 
 def profile(g: dict) -> dict | None:
@@ -130,13 +129,6 @@ def signals(g: dict) -> dict | None:
     fm = g.get("form") or {}
     fa = (fm.get(side) or {}).get("delta")
     fo = (fm.get("away" if side == "home" else "home") or {}).get("delta")
-    form_gap = (fa - fo) if fa is not None and fo is not None else None
-    sa = g.get("statistical_advantage") or {}
-    af = (sa.get(side) or {}).get("combined_fip_sos_adj")
-    of_ = (sa.get("away" if side == "home" else "home") or {}).get("combined_fip_sos_adj")
-    fip_edge = (of_ - af) if isinstance(af, (int, float)) and isinstance(of_, (int, float)) else None
-    live_dog = (None if ml is None or fip_edge is None or form_gap is None
-                else ml > 0 and fip_edge >= LIVE_DOG_FIP_MIN and form_gap >= LIVE_DOG_FORM_MIN)
     return {
         "margin": None if margin is None else margin >= LEAN_STRONG_MARGIN,
         "favorite": None if ml is None else ml < 0,
@@ -147,7 +139,6 @@ def signals(g: dict) -> dict | None:
         "sharp": (None if not cc.get("money_side") or not maj
                   else cc.get("money_side") == side and maj != adv),
         "form": (None if fa is None or fo is None or abs(fa - fo) < 0.015 else fa > fo),
-        "live_dog": live_dog,
         "_ml": ml, "_adv": adv, "_margin": margin, "_cons": cons,
     }
 
@@ -383,22 +374,20 @@ def build() -> str:
     dogs = [g for g in games if (g["sig"].get("_ml") or 0) > 0]
     def has(g, *ss):
         return all(g["sig"].get(s) is True for s in ss)
-    # LIVE-DOG components tested at scale. Full signal = dog + FIP edge + form, but
-    # form is on few old boards, so we also test the FIP-edge half (full coverage)
-    # and the full signal where form exists.
+    # FIP-edge slice (full snapshot coverage) - a dog with a pitching edge. Kept as
+    # a general read after the live-dog signal was pulled (tested breakeven at scale).
     def fipedge(g):
         return (g.get("prof") or {}).get("fip_gap")
-    dogs_fip = [g for g in dogs if fipedge(g) is not None and fipedge(g) >= LIVE_DOG_FIP_MIN]
-    dogs_live = [g for g in dogs if g["sig"].get("live_dog") is True]
-    n_form = sum(1 for g in dogs if g["sig"].get("live_dog") is not None)
+    dogs_fip = [g for g in dogs if fipedge(g) is not None and fipedge(g) >= 0.15]
     md += ["## Underdog study — our stat side priced as a DOG (ml > 0)", "",
            "| slice | record | units | ROI/bet |", "|---|---|---|---|",
            roi_row("all underdogs", dogs),
            roi_row("+ edge margin ≥.50", [g for g in dogs if has(g, "margin")]),
            roi_row("+ BvP edge", [g for g in dogs if has(g, "bvp")]),
            roi_row("+ consistency ≥3", [g for g in dogs if has(g, "consistency")]),
-           roi_row(f"+ FIP edge ≥{LIVE_DOG_FIP_MIN} (live-dog half, full coverage)", dogs_fip),
-           roi_row(f"+ LIVE DOG (FIP & form; only {n_form} dogs have form data)", dogs_live), ""]
+           roi_row("+ FIP edge ≥.15 (pitching-edge dogs)", dogs_fip),
+           roi_row("+ margin & BvP", [g for g in dogs if has(g, "margin", "bvp")]),
+           roi_row("+ consistency & BvP", [g for g in dogs if has(g, "consistency", "bvp")]), ""]
 
     # EXHAUSTIVE on underdogs: every signal subset, betting the dog, ranked by
     # units (dogs are sparse so the sample floor is lower, n>=5). Answers "does the
