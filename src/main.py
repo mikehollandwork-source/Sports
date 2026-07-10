@@ -470,8 +470,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
         if mild_public:
             why = f"public mildly on {maj} ({pub_pct}% < {PUBLIC_HEAVY}) — sharp fade, no play"
         elif book and is_tail and core_hit:
-            why = (f"on the side Vegas needs ({_short(result, book['bet'])}) — "
-                   f"tailing the book lost even with signals, no play")
+            why = "core signal but not a fade setup — no play"
         elif not core_hit and hits:
             why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
         else:
