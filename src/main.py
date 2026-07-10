@@ -402,7 +402,8 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # shows our 'book-informed-side-against-us' plays are our BEST bucket (27-16),
     # so a hard fade would cut winners. It DOES gate the star: a play where the
     # book's INFORMED money (>=1 tell) is against us can't be a ⭐ (we're the side
-    # the house is quietly fading), and it earns a ⚠️ on the board.
+    # the house is quietly fading). Backend-only now: it gates the star but is not
+    # shown on the board (stored in pc["book_stance"]/["stance_warning"]).
     stance = _book_stance(result)
     pc["book_stance"] = stance
     stance_against = bool(stance and stance.get("against_us") and stance.get("tells"))
@@ -939,34 +940,14 @@ def _book_stance(g: dict) -> dict | None:
             "fooled": bool(maj and maj != side)}
 
 
-def _stance_phrase(g: dict, brief: bool = False) -> str | None:
-    """'🕵️ book stance: ON ATH — public being fooled (money vs tickets, RLM)' when
-    the book has left informed tells; a plain liability lean (0 tells) says nothing
-    and returns None. Adds '⚠️ vs OUR pick' when the informed side isn't ours.
-    `brief` = a compact tag for no-play one-liners."""
-    st = (g.get("pick_criteria") or {}).get("book_stance") or _book_stance(g)
-    if not st or not st.get("tells"):
-        return None
-    who = _short(g, st["side"])
-    if brief:
-        return (f"🚨 public fooled → book on {who}" if st["fooled"]
-                else f"🕵️ book on {who}")
-    tail = f" — 🚨 public being fooled ({', '.join(st['tells'])})" if st["fooled"] \
-        else f" ({', '.join(st['tells'])})"
-    warn = " · ⚠️ vs OUR pick" if st.get("against_us") else ""
-    return f"🕵️ book stance: ON {who}{tail}{warn}"
-
-
 def _stay_line(g: dict) -> str:
     """One-liner for a NO-ACTION game (nothing the system likes; never booked)."""
     pc = g["pick_criteria"]
     mp = _money_phrase(g)
-    stc = _stance_phrase(g, brief=True)
     tm = _start_time(g)
     head = f"▫️ {_state_tag(g)}{g['matchup']}" + (f" ({tm})" if tm else "")
     return (f"{head} — {pc.get('reason', 'no play')}"
-            + (f" · {mp}" if mp else "")
-            + (f" · {stc}" if stc else ""))
+            + (f" · {mp}" if mp else ""))
 
 
 def _star(pc: dict) -> list[str]:
@@ -994,15 +975,13 @@ def _game_lines(g: dict) -> list[str]:
     tag = _state_tag(g)
     star = _star(pc)
     kind = "PLAY"
-    warn = pc.get("stance_warning")
-    mark = "⚠️" if warn else "⭐" if star else "✅"
+    mark = "⭐" if star else "✅"
     wphr = _win_phrase(g)
     lines = [
         f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
         + (f" · {_start_time(g)}" if _start_time(g) else "")
         + (f" · {wphr}" if wphr else "")
-        + (f" · ⭐ {', '.join(star)}" if star else "")
-        + (f" · ⚠️ {warn}" if warn else ""),
+        + (f" · ⭐ {', '.join(star)}" if star else ""),
         f"   • stat edge: {edge}",
         f"   • public: {pub}",
         f"   • consistency: {cons}",
@@ -1010,9 +989,6 @@ def _game_lines(g: dict) -> list[str]:
     mp = _money_phrase(g)
     if mp:
         lines.append(f"   • {mp}")
-    stp = _stance_phrase(g)
-    if stp:
-        lines.append(f"   • {stp}")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -1070,8 +1046,7 @@ def build_summary(payload: dict) -> str:
 
     out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
                "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
-               "⚠️ = a PLAY the book's informed money is fading (never a ⭐). ▫️ = no play. "
-               "🕵️/🚨 = the book's informed stance / public being fooled. 🔴 = live._")
+               "▫️ = no play. 🔴 = live._")
 
     out.append("")
     out.append(grade.records_block())
@@ -1147,13 +1122,11 @@ def telegram_text(payload: dict) -> str:
         frozen = " [frozen]" if g.get("state") == "live" else ""
         star = _star(pc)
         kind = "PLAY"
-        warn = pc.get("stance_warning")
-        mark = "⚠️" if warn else "⭐" if star else "✅"
+        mark = "⭐" if star else "✅"
         st = _start_time(g)
         wphr = _win_phrase(g)
         L.extend(["",
-                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}"
-                  + (f"  ⚠️ {warn}" if warn else ""),
+                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
                   f"   {aa} @ {ha}" + (f" · {st}" if st else ""),
                   f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}"]
                  + ([f"   {wphr}"] if wphr else [])
@@ -1162,9 +1135,6 @@ def telegram_text(payload: dict) -> str:
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
-        stp = _stance_phrase(g)
-        if stp:
-            L.append(f"   {stp}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
@@ -1205,12 +1175,10 @@ def telegram_text(payload: dict) -> str:
             pc = g["pick_criteria"]
             tag = "🔴 " if g.get("state") == "live" else ""
             mp = _money_phrase(g)
-            stc = _stance_phrase(g, brief=True)
             tm = _start_time(g)
             L.append(f"▫️ {tag}{aa} @ {ha}" + (f" ({tm})" if tm else "")
                      + f" — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else "")
-                     + (f" · {stc}" if stc else ""))
+                     + (f" · {mp}" if mp else ""))
     if not board:
         L += ["", "No upcoming or live games — slate is final (see record)."]
 
