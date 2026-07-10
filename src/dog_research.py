@@ -256,6 +256,36 @@ def analyze(rows: list[dict]) -> str:
         md.append(_line(name, sub))
     md.append("")
 
+    # REFINED: the two plausible signals - pitching-edge dog + steam - stability-
+    # swept and crossed. A real edge should be stable across nearby thresholds and
+    # hold sample when combined.
+    def has_fip(r, thr):
+        return r.get("sp_fip_gap") is not None and r["sp_fip_gap"] >= thr
+    def steamed(r, thr=0.0):
+        return r.get("line_move") is not None and r["line_move"] >= thr
+    md += ["## REFINED — pitching-edge dog (starter FIP edge) stability sweep", "",
+           "| dog starter FIP edge ≥ | record | units | ROI |", "|---|---|---|---|"]
+    for thr in (0.30, 0.45, 0.60, 0.64, 0.75, 0.90, 1.10):
+        md.append(_line(f"{thr:+.2f}", [r for r in rows if has_fip(r, thr)]))
+    md += ["", "## REFINED — steam (dog line move) stability sweep", "",
+           "| dog implied prob rose ≥ | record | units | ROI |", "|---|---|---|---|"]
+    for thr in (0.0, 0.005, 0.01, 0.02, 0.03):
+        md.append(_line(f"{thr:+.3f}", [r for r in rows if steamed(r, thr)]))
+    md += ["", "## REFINED — crossing the two signals + road/price", "",
+           "| recipe | record | units | ROI |", "|---|---|---|---|"]
+    for fthr in (0.45, 0.60):
+        base = [r for r in rows if has_fip(r, fthr)]
+        md.append(_line(f"FIP edge ≥{fthr:+.2f} (alone)", base))
+        md.append(_line(f"FIP edge ≥{fthr:+.2f} & steamed (move ≥0)",
+                        [r for r in base if steamed(r)]))
+        md.append(_line(f"FIP edge ≥{fthr:+.2f} & ROAD dog",
+                        [r for r in base if not r["dog_home"]]))
+        md.append(_line(f"FIP edge ≥{fthr:+.2f} & ROAD & steamed",
+                        [r for r in base if not r["dog_home"] and steamed(r)]))
+    md.append(_line("steamed & ROAD dog",
+                    [r for r in rows if steamed(r) and not r["dog_home"]]))
+    md.append("")
+
     md.append("_Point-in-time features (no lookahead); market underdog by ESPN closing "
               "moneyline; $1/dog at the closing price. Season scan via the MLB Stats API._")
     return "\n".join(md)

@@ -157,6 +157,14 @@ UMP_TILT_CAP = 0.06
 # audit measures its with/without spread, same path every signal walked.
 FORM_DIFF_FLOOR = 0.015  # form-delta gap below this = no read (noise)
 
+# PITCHING-DOG signal (season-scan finding): an underdog whose probable starter
+# out-FIPs the favorite's starter by >= this much (SEASON-to-date FIP) has been a
+# real edge - 979-dog full-season scan, closing prices: dogs at >=0.60 went 51%
+# (+11% ROI, n=186), STABLE at +10-11% ROI across every threshold from 0.60 to
+# 1.10 (the plateau of a real signal, not an overfit spike). Uses season starter
+# FIP (stable), unlike the retired live-dog which leaned on noisy last-5+form.
+PDOG_FIP_MIN = 0.60   # dog starter's season FIP edge over the favorite's starter
+
 # Public-margin gate (106-game backtest of avg public % vs outcomes): a MILD
 # public lean (50-70%) is the sharp side - it wins 56-60% and picks made INTO it
 # went 3-5 (38%) / all stat sides into it 12-19 (-7.52u). A HEAVY lean
@@ -1066,6 +1074,7 @@ def _team_stats(team: Team) -> dict:
         "offense": offense_line(team.offense),
         "platoon_factor": team.platoon_factor,
         "starter_fip_last5": team.starter_fip_last5,
+        "starter_fip_season": team.starter_fip_season,   # season-to-date (pitching-dog signal)
         "starter_ip_last5": team.starter_ip_last5,
         "bullpen_fip_last5": team.bullpen_fip_last5,
         "bullpen_ip_last5": team.bullpen_ip_last5,
