@@ -23,7 +23,8 @@ from pathlib import Path
 
 from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
-                       LINE_CONFIRM_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA,
+                       LINE_CONFIRM_MIN, LIVE_DOG_FIP_MIN, LIVE_DOG_FORM_MIN,
+                       PICK_MIN_SIGNALS, PUBLIC_HEAVY, UMP_K_EXTRA,
                        UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
@@ -318,6 +319,21 @@ def _attach_line(game, result: dict, slate: list) -> None:
     s_hit = pc["sharp_money"] is True
     s_label = "sharp $" + (f" ({mcc.get('money_pct')}% of $ on us)"
                            if mcc.get("money_pct") else "")
+    # LIVE-DOG signal (user call): an underdog fitting the winning-dog profile - a
+    # real pitching edge (FIP) AND a hot lineup (form). It's on the side Vegas needs
+    # (a tail), so it's an explicit exception to the fade gate below. FIP edge comes
+    # from the frozen statistical_advantage (opponent's combined FIP minus ours).
+    sa = result.get("statistical_advantage") or {}
+    a_fip = ((sa.get(adv_side) or {}).get("combined_fip_sos_adj"))
+    o_fip = ((sa.get("away" if adv_side == "home" else "home") or {}).get("combined_fip_sos_adj"))
+    fip_edge = (o_fip - a_fip) if isinstance(a_fip, (int, float)) and isinstance(o_fip, (int, float)) else None
+    pc["fip_edge"] = round(fip_edge, 3) if fip_edge is not None else None
+    ld_hit = (ml is not None and ml > 0                       # underdog price
+              and fip_edge is not None and fip_edge >= LIVE_DOG_FIP_MIN
+              and pc.get("form_gap") is not None and pc["form_gap"] >= LIVE_DOG_FORM_MIN)
+    pc["live_dog"] = ld_hit    # frozen for the audit + record
+    ld_label = (f"live dog (FIP +{fip_edge:.2f}, form +{pc.get('form_gap', 0):.2f})"
+                if ld_hit else "live dog")
     hits, misses = [], []
     for ok, label in ((m_hit, f"margin {margin}"),
                       (f_hit, "favorite" if ml is not None else "no price"),
@@ -325,7 +341,8 @@ def _attach_line(game, result: dict, slate: list) -> None:
                       (c_hit, f"consistency {cons}/5"),
                       (b_hit, "BvP"),
                       (fh_hit, f"hot lineup ({pc['form_gap']:+.3f})" if fh_hit else "form"),
-                      (s_hit, s_label if s_hit else "sharp $")):
+                      (s_hit, s_label if s_hit else "sharp $"),
+                      (ld_hit, ld_label)):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
     opp_name = home if adv == away else away
@@ -376,24 +393,24 @@ def _attach_line(game, result: dict, slate: list) -> None:
     pc["vegas"] = book   # frozen book_needs read: drives the fade gate (behind the scenes)
     if book:
         is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
-        qualifies = core_hit and not is_tail  # fade + core signal only
+        qualifies = (core_hit and not is_tail) or ld_hit  # fade+core, OR a live dog
     else:
         is_tail = False
-        qualifies = core_hit                  # no book read -> old behavior
+        qualifies = core_hit or ld_hit        # no book read -> core, or a live dog
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when it
-    # clears the fade gate + core signal and isn't a mild-public fade. The internal
-    # play value stays "pick" so frozen snapshots and grading classify the same.
-    playable = qualifies and not mild_public
+    # clears the fade gate + core signal and isn't a mild-public fade. A LIVE DOG
+    # (the winning-dog profile) also bypasses the mild-public gate - it's its own
+    # high-conviction path. The internal play value stays "pick".
+    playable = qualifies and (not mild_public or ld_hit)
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
-        pc["reason"] = f"{len(hits)}/7 signals — {', '.join(hits)}"
+        pc["reason"] = f"{len(hits)}/8 signals — {', '.join(hits)}"
         # ⭐ = the proven-hot combos from the graded record: margin + favorite +
-        # line toward (10-2), or 4+ of the FIVE PROVEN signals (8-1). Form and
-        # sharp-$ are unproven extras (form back-tested to no edge; sharp-$ is
-        # brand-new): they show in the count/reason but can't push a play into
-        # the star until the audit/Vegas record proves them.
-        proven = len(hits) - (1 if fh_hit else 0) - (1 if s_hit else 0)
+        # line toward (10-2), or 4+ of the FIVE PROVEN signals (8-1). Form, sharp-$
+        # and live-dog are UNPROVEN extras (small/no sample): they show in the count
+        # and can carry a play (live dog) but can't push one into the star yet.
+        proven = len(hits) - (1 if fh_hit else 0) - (1 if s_hit else 0) - (1 if ld_hit else 0)
         star = []
         if m_hit and f_hit and l_hit:
             star.append("margin+favorite+line")
@@ -423,7 +440,7 @@ def _attach_line(game, result: dict, slate: list) -> None:
         elif not core_hit and hits:
             why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
         else:
-            why = "0/7 signals — no play"
+            why = "0/8 signals — no play"
         pc["reason"] = why
 
 

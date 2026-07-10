@@ -157,6 +157,16 @@ UMP_TILT_CAP = 0.06
 # audit measures its with/without spread, same path every signal walked.
 FORM_DIFF_FLOOR = 0.015  # form-delta gap below this = no read (noise)
 
+# LIVE-DOG signal (user call - take the risk): an underdog (advantage team priced
+# ml>0) that fits the profile that separated WINNING dogs from losing dogs in the
+# 60-game study - a real pitching edge (FIP) AND a hot lineup (form). Winning dogs
+# had a median FIP edge +0.158 and form edge +0.088; losers +0.010 / +0.008. These
+# bars sit between the two so the signal fires on the winner-like profile. Unlike
+# every other pick, a live dog is on the side VEGAS NEEDS (a tail), so it's an
+# explicit EXCEPTION to the fade-only gate.
+LIVE_DOG_FIP_MIN = 0.15    # opponent FIP minus ours (positive = our arms better)
+LIVE_DOG_FORM_MIN = 0.05   # hot-lineup edge toward us (moderate+; winners ~+0.088)
+
 # Public-margin gate (106-game backtest of avg public % vs outcomes): a MILD
 # public lean (50-70%) is the sharp side - it wins 56-60% and picks made INTO it
 # went 3-5 (38%) / all stat sides into it 12-19 (-7.52u). A HEAVY lean
