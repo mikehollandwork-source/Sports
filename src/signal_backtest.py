@@ -85,6 +85,13 @@ def _implied(ml) -> float:
     return 100 / (ml + 100) if ml > 0 else -ml / (-ml + 100)
 
 
+def _money_split(g: dict) -> bool:
+    """True when the board raised the 'money sources disagree' flag — the dollar
+    sources pointed to different sides, so there's no clean money read."""
+    flags = (g.get("public_check") or {}).get("flags") or []
+    return any("money sources disagree" in f for f in flags)
+
+
 def shading_gap(g: dict) -> float | None:
     """Line-shading fingerprint: public ticket % on the majority side MINUS what
     that side's moneyline actually implies. Big positive = the crowd is paying a
@@ -186,6 +193,7 @@ def build() -> str:
             adv = sig["_adv"]
             rec = {"won": res["winner"] == adv, "odds": sig["_ml"], "sig": sig,
                    "stance_against": bool((_book_stance(g) or {}).get("against_us")),
+                   "money_split": _money_split(g),
                    "shade": shading_gap(g), "prof": profile(g)}
             bn = _book_needs(g)
             if bn:
@@ -395,6 +403,44 @@ def build() -> str:
            roi_row("+ FIP edge ≥.15 (pitching-edge dogs)", dogs_fip),
            roi_row("+ margin & BvP", [g for g in dogs if has(g, "margin", "bvp")]),
            roi_row("+ consistency & BvP", [g for g in dogs if has(g, "consistency", "bvp")]), ""]
+
+    # MONEY SOURCES DISAGREE — games the board flagged '⚠️ money sources disagree'
+    # (the dollar sources split, so no clean money read). Does our stat side, alone
+    # or paired with a signal, cash +units inside this murky-money subset? Small
+    # sample by nature (the flag is rare) - read the n= before trusting a row.
+    msd = [g for g in games if g.get("money_split")]
+    def nsig(g):
+        return sum(1 for s in SIGNALS if g["sig"].get(s) is True)
+    md += [f"## When money sources disagree — bet our stat side (n={len(msd)})", "",
+           "_The '⚠️ money sources disagree' flag fires rarely; every slice here is "
+           "small — treat as exploratory, not a proven edge._", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|",
+           roi_row("advantage side (flag on)", msd)]
+    for s in SIGNALS:
+        md.append(roi_row(f"+ {s}", [g for g in msd if g["sig"].get(s) is True]))
+    for lo, lab in ((1, "≥1"), (2, "≥2"), (3, "≥3")):
+        md.append(roi_row(f"+ {lab} signals stacked", [g for g in msd if nsig(g) >= lo]))
+    # the FADE side (team the book is exposed to) within the flagged subset
+    msd_anti = [g for g in msd if g.get("anti_odds") is not None]
+    anti_rows = [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in msd_anti]
+    if anti_rows:
+        w, l, u = _units(anti_rows)
+        md.append(f"| fade side (opp. of book_needs), flag on (n={len(anti_rows)}) "
+                  f"| {w}-{l} ({w/len(anti_rows):.0%}) | {u:+.2f}u | {u/len(anti_rows):+.0%} |")
+    # every signal subset inside the flagged subset, n>=3 (sample is tiny), by units
+    mcombos = []
+    for k in range(1, len(SIGNALS) + 1):
+        for cmb in itertools.combinations(SIGNALS, k):
+            sub = [g for g in msd if all(g["sig"].get(s) is True for s in cmb)]
+            if len(sub) >= 3:
+                w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
+                mcombos.append((u, u / len(sub), w, l, len(sub), " + ".join(cmb)))
+    if mcombos:
+        md += ["", "_Signal combos inside the flag (bet our side, n≥3, by units):_", "",
+               "| combo | record | units | ROI/bet |", "|---|---|---|---|"]
+        for u, roi, w, l, n, name in sorted(mcombos, reverse=True):
+            md.append(f"| {name} (n={n}) | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
+    md.append("")
 
     # EXHAUSTIVE on underdogs: every signal subset, betting the dog, ranked by
     # units (dogs are sparse so the sample floor is lower, n>=5). Answers "does the
