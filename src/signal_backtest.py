@@ -383,16 +383,22 @@ def build() -> str:
     dogs = [g for g in games if (g["sig"].get("_ml") or 0) > 0]
     def has(g, *ss):
         return all(g["sig"].get(s) is True for s in ss)
+    # LIVE-DOG components tested at scale. Full signal = dog + FIP edge + form, but
+    # form is on few old boards, so we also test the FIP-edge half (full coverage)
+    # and the full signal where form exists.
+    def fipedge(g):
+        return (g.get("prof") or {}).get("fip_gap")
+    dogs_fip = [g for g in dogs if fipedge(g) is not None and fipedge(g) >= LIVE_DOG_FIP_MIN]
+    dogs_live = [g for g in dogs if g["sig"].get("live_dog") is True]
+    n_form = sum(1 for g in dogs if g["sig"].get("live_dog") is not None)
     md += ["## Underdog study — our stat side priced as a DOG (ml > 0)", "",
            "| slice | record | units | ROI/bet |", "|---|---|---|---|",
            roi_row("all underdogs", dogs),
            roi_row("+ edge margin ≥.50", [g for g in dogs if has(g, "margin")]),
            roi_row("+ BvP edge", [g for g in dogs if has(g, "bvp")]),
            roi_row("+ consistency ≥3", [g for g in dogs if has(g, "consistency")]),
-           roi_row("+ margin & BvP", [g for g in dogs if has(g, "margin", "bvp")]),
-           roi_row("+ consistency & BvP", [g for g in dogs if has(g, "consistency", "bvp")]),
-           roi_row("+ margin & BvP & consistency (all three)",
-                   [g for g in dogs if has(g, "margin", "bvp", "consistency")]), ""]
+           roi_row(f"+ FIP edge ≥{LIVE_DOG_FIP_MIN} (live-dog half, full coverage)", dogs_fip),
+           roi_row(f"+ LIVE DOG (FIP & form; only {n_form} dogs have form data)", dogs_live), ""]
 
     # EXHAUSTIVE on underdogs: every signal subset, betting the dog, ranked by
     # units (dogs are sparse so the sample floor is lower, n>=5). Answers "does the
