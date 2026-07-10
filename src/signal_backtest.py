@@ -24,10 +24,11 @@ import statistics as st
 
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
-from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY
+from .analysis import (LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY,
+                       LIVE_DOG_FIP_MIN, LIVE_DOG_FORM_MIN)
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
-SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form")
+SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "live_dog")
 
 
 def profile(g: dict) -> dict | None:
@@ -129,6 +130,13 @@ def signals(g: dict) -> dict | None:
     fm = g.get("form") or {}
     fa = (fm.get(side) or {}).get("delta")
     fo = (fm.get("away" if side == "home" else "home") or {}).get("delta")
+    form_gap = (fa - fo) if fa is not None and fo is not None else None
+    sa = g.get("statistical_advantage") or {}
+    af = (sa.get(side) or {}).get("combined_fip_sos_adj")
+    of_ = (sa.get("away" if side == "home" else "home") or {}).get("combined_fip_sos_adj")
+    fip_edge = (of_ - af) if isinstance(af, (int, float)) and isinstance(of_, (int, float)) else None
+    live_dog = (None if ml is None or fip_edge is None or form_gap is None
+                else ml > 0 and fip_edge >= LIVE_DOG_FIP_MIN and form_gap >= LIVE_DOG_FORM_MIN)
     return {
         "margin": None if margin is None else margin >= LEAN_STRONG_MARGIN,
         "favorite": None if ml is None else ml < 0,
@@ -139,6 +147,7 @@ def signals(g: dict) -> dict | None:
         "sharp": (None if not cc.get("money_side") or not maj
                   else cc.get("money_side") == side and maj != adv),
         "form": (None if fa is None or fo is None or abs(fa - fo) < 0.015 else fa > fo),
+        "live_dog": live_dog,
         "_ml": ml, "_adv": adv, "_margin": margin, "_cons": cons,
     }
 
