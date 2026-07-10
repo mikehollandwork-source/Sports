@@ -221,6 +221,33 @@ def _attach_situational(g, r: dict, date: str) -> None:
     }
 
 
+# Historical WIN RATES per signal / proven pair, from the fade-gated full-slate
+# exhaustive backtest. Used to rank picks by the highest mathematical chance of a
+# win, so core (consistency/margin) leads and the pitching-dog (~51%) never tops it.
+_SIGNAL_WIN = {"margin": 76, "consistency": 68, "line": 68, "bvp": 62,
+               "favorite": 61, "sharp": 60, "form": 57, "pitching_dog": 51}
+_PAIR_WIN = {frozenset(("favorite", "consistency", "bvp")): 76,
+             frozenset(("consistency", "bvp")): 75,
+             frozenset(("margin", "bvp")): 75,
+             frozenset(("favorite", "consistency")): 68}
+
+
+def _win_prob(hits: dict) -> tuple[int, str]:
+    """Best mathematical win chance for a pick from the signals it has: the highest
+    backtested win rate among its single signals and proven pairs. Returns
+    (win_pct, driver_label). A pitching-dog-only pick lands at ~51%, so it always
+    sorts below any core (consistency/margin/line) pick."""
+    present = [s for s, ok in hits.items() if ok]
+    best, driver = 50, "no signal"
+    for s in present:
+        if _SIGNAL_WIN.get(s, 0) > best:
+            best, driver = _SIGNAL_WIN[s], s
+    for combo, wr in _PAIR_WIN.items():
+        if combo <= set(present) and wr > best:
+            best, driver = wr, " + ".join(sorted(combo))
+    return best, driver
+
+
 def _merge_slates(primary: list, secondary: list) -> list:
     """ESPN (primary) preferred; append covers (secondary) rows for any game-pair
     the primary doesn't already cover, matched on canonical abbreviations."""
@@ -418,6 +445,16 @@ def _attach_line(game, result: dict, slate: list) -> None:
         pc["starred"] = [] if stance_against else star
         if stance_against:
             pc["stance_warning"] = f"book's informed money is on {stance['side']}"
+        # WIN PROBABILITY (user call): the reason we pick a game is the highest
+        # mathematical chance of a WIN among its signals - the board is ranked by
+        # this, so high-win-rate CORE picks (consistency/margin) always lead and the
+        # low-win-rate pitching-dog (~51%, profits on the plus price) never takes
+        # priority over core. Rates are the fade-gated backtest win %s.
+        wp, driver = _win_prob({"margin": m_hit, "favorite": f_hit, "line": l_hit,
+                                "consistency": c_hit, "bvp": b_hit, "sharp": s_hit,
+                                "form": fh_hit, "pitching_dog": pd_hit})
+        pc["win_prob"] = wp
+        pc["win_driver"] = driver
     else:
         # (Coin flips RETIRED per user call - "it's either a pick or not". The
         # old lock profile bet the opponent on a line move toward them, but it
@@ -476,6 +513,23 @@ def _board_games(games: list) -> list:
     shown = [g for g in games if g.get("state") != "final"]
     return sorted(shown, key=lambda g: (0 if g.get("state") == "live" else 1,
                                         g.get("game_datetime") or ""))
+
+
+def _by_win(games: list) -> list:
+    """Order picks by the highest mathematical chance of a win (live pinned on top),
+    so core consistency/margin picks lead and the low-win pitching-dog trails."""
+    return sorted(games, key=lambda g: (0 if g.get("state") == "live" else 1,
+                                        -((g.get("pick_criteria") or {}).get("win_prob") or 0)))
+
+
+def _win_phrase(g: dict) -> str | None:
+    """'🎯 ~76% win (margin)' - the pick's best mathematical win chance + what drives
+    it. None on older snapshots without the field."""
+    pc = g.get("pick_criteria") or {}
+    wp = pc.get("win_prob")
+    if not wp:
+        return None
+    return f"🎯 ~{wp}% win ({pc.get('win_driver', 'signal')})"
 
 
 def _finals(games: list) -> list:
@@ -943,9 +997,11 @@ def _game_lines(g: dict) -> list[str]:
     kind = "PLAY"
     warn = pc.get("stance_warning")
     mark = "⚠️" if warn else "⭐" if star else "✅"
+    wphr = _win_phrase(g)
     lines = [
         f"{mark} **{kind} {adv}**{_ml_str(pc)} — {tag}{g['matchup']}"
         + (f" · {_start_time(g)}" if _start_time(g) else "")
+        + (f" · {wphr}" if wphr else "")
         + (f" · ⭐ {', '.join(star)}" if star else "")
         + (f" · ⚠️ {warn}" if warn else ""),
         f"   • stat edge: {edge}",
@@ -1006,7 +1062,7 @@ def build_summary(payload: dict) -> str:
     out.append("")
 
     if board:
-        for g in board:
+        for g in _by_win(picks) + no_action:   # picks ranked by win chance, then no-plays
             out.extend(_game_lines(g))
             out.append("")
     else:
@@ -1095,13 +1151,15 @@ def telegram_text(payload: dict) -> str:
         warn = pc.get("stance_warning")
         mark = "⚠️" if warn else "⭐" if star else "✅"
         st = _start_time(g)
+        wphr = _win_phrase(g)
         L.extend(["",
                   f"{mark} {tag}{kind} {adv}{_ml_str(pc)}"
                   + (f"  ⚠️ {warn}" if warn else ""),
                   f"   {aa} @ {ha}" + (f" · {st}" if st else ""),
-                  f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}",
-                  f"   👥 public {_public_evidence(g)}",
-                  f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
+                  f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}"]
+                 + ([f"   {wphr}"] if wphr else [])
+                 + [f"   👥 public {_public_evidence(g)}",
+                    f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
@@ -1135,7 +1193,7 @@ def telegram_text(payload: dict) -> str:
         L.append(f"   ✅ {pc['reason']}"
                  + (f" · ⭐ {', '.join(star)}" if star else ""))
 
-    for g in picks:
+    for g in _by_win(picks):   # ranked by win chance: core leads, pitching-dog trails
         block(g)
     if not picks:
         L += ["", "No plays on the slate."]
