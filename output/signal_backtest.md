@@ -11,7 +11,7 @@
 | bvp (n=94) | 53-41 (56%) | +0.40u |
 | sharp (n=3) | 1-2 (33%) | -1.23u |
 | form (n=19) | 12-7 (63%) | +3.19u |
-| live_dog (n=1) | 0-1 (0%) | -1.00u |
+| pitching_dog (n=0) | 0 | — |
 
 ## By number of signals hit
 
@@ -19,8 +19,8 @@
 |---|---|---|
 | 5/7 | 5-1 (83%) | +2.01u |
 | 4/7 | 13-6 (68%) | +2.90u |
-| 3/7 | 19-12 (61%) | +2.20u |
-| 2/7 | 36-29 (55%) | +0.08u |
+| 3/7 | 19-11 (63%) | +3.20u |
+| 2/7 | 36-30 (55%) | -0.92u |
 | 1/7 | 32-36 (47%) | -8.32u |
 | 0/7 | 10-16 (38%) | -4.12u |
 
@@ -63,7 +63,7 @@
 |   + agrees & bvp (n=27) | 10-17 (37%) | -8.48u |
 |   + agrees & sharp (n=1) | 0-1 (0%) | -1.00u |
 |   + agrees & form (n=6) | 2-4 (33%) | -1.90u |
-|   + agrees & live_dog (n=1) | 0-1 (0%) | -1.00u |
+|   + agrees & pitching_dog (n=0) | 0 | — |
 
 ## Tail Vegas (stat side agrees) by NUMBER of signals stacked
 
@@ -87,7 +87,7 @@
 |   + agrees & bvp (n=67) | 43-24 (64%) | +8.88u |
 |   + agrees & sharp (n=2) | 1-1 (50%) | -0.23u |
 |   + agrees & form (n=13) | 10-3 (77%) | +5.09u |
-|   + agrees & live_dog (n=0) | 0 | — |
+|   + agrees & pitching_dog (n=0) | 0 | — |
 
 ## Fade Vegas (stat side agrees) by NUMBER of signals stacked
 
@@ -158,8 +158,52 @@
 | + edge margin ≥.50 (n=5) | 4-1 (80%) | +3.36u | +67% |
 | + BvP edge (n=26) | 10-16 (38%) | -4.62u | -18% |
 | + consistency ≥3 (n=14) | 6-8 (43%) | -1.55u | -11% |
-| + FIP edge ≥0.15 (live-dog half, full coverage) (n=28) | 13-15 (46%) | -0.08u | -0% |
-| + LIVE DOG (FIP & form; only 9 dogs have form data) (n=1) | 0-1 (0%) | -1.00u | -100% |
+| + FIP edge ≥.15 (pitching-edge dogs) (n=28) | 13-15 (46%) | -0.08u | -0% |
+| + margin & BvP (n=2) | 2-0 (100%) | +2.15u | +108% |
+| + consistency & BvP (n=7) | 2-5 (29%) | -2.86u | -41% |
+
+## When money sources disagree — bet our stat side (n=16)
+
+_The '⚠️ money sources disagree' flag fires rarely; every slice here is small — treat as exploratory, not a proven edge._
+
+| slice | record | units | ROI/bet |
+|---|---|---|---|
+| advantage side (flag on) (n=16) | 14-2 (88%) | +10.26u | +64% |
+| + margin (n=3) | 3-0 (100%) | +2.59u | +86% |
+| + favorite (n=12) | 10-2 (83%) | +5.94u | +50% |
+| + line (n=3) | 3-0 (100%) | +2.56u | +85% |
+| + consistency (n=8) | 7-1 (88%) | +5.02u | +63% |
+| + bvp (n=11) | 10-1 (91%) | +7.57u | +69% |
+| + sharp | 0 | — | — |
+| + form (n=4) | 4-0 (100%) | +3.67u | +92% |
+| + pitching_dog | 0 | — | — |
+| + ≥1 signals stacked (n=15) | 13-2 (87%) | +9.13u | +61% |
+| + ≥2 signals stacked (n=14) | 12-2 (86%) | +8.36u | +60% |
+| + ≥3 signals stacked (n=7) | 7-0 (100%) | +5.84u | +83% |
+| fade side (opp. of book_needs), flag on (n=16) | 12-4 (75%) | +6.50u | +41% |
+
+_Signal combos inside the flag (bet our side, n≥3, by units):_
+
+| combo | record | units | ROI/bet |
+|---|---|---|---|
+| bvp (n=11) | 10-1 (91%) | +7.57u | +69% |
+| favorite (n=12) | 10-2 (83%) | +5.94u | +50% |
+| consistency (n=8) | 7-1 (88%) | +5.02u | +63% |
+| favorite + bvp (n=8) | 7-1 (88%) | +4.38u | +55% |
+| consistency + bvp (n=5) | 5-0 (100%) | +4.23u | +85% |
+| form (n=4) | 4-0 (100%) | +3.67u | +92% |
+| favorite + consistency (n=6) | 5-1 (83%) | +2.88u | +48% |
+| bvp + form (n=3) | 3-0 (100%) | +2.70u | +90% |
+| favorite + form (n=3) | 3-0 (100%) | +2.62u | +87% |
+| favorite + consistency + form (n=3) | 3-0 (100%) | +2.62u | +87% |
+| consistency + form (n=3) | 3-0 (100%) | +2.62u | +87% |
+| margin + favorite + bvp (n=3) | 3-0 (100%) | +2.59u | +86% |
+| margin + favorite (n=3) | 3-0 (100%) | +2.59u | +86% |
+| margin + bvp (n=3) | 3-0 (100%) | +2.59u | +86% |
+| margin (n=3) | 3-0 (100%) | +2.59u | +86% |
+| line + consistency (n=3) | 3-0 (100%) | +2.56u | +85% |
+| line (n=3) | 3-0 (100%) | +2.56u | +85% |
+| favorite + consistency + bvp (n=3) | 3-0 (100%) | +2.09u | +70% |
 
 ## What winning underdogs have in common (26 winners vs 36 losers)
 
