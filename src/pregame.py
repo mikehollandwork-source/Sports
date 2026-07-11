@@ -42,6 +42,14 @@ def run(force_telegram: bool = False) -> bool:
     picks_main.write_outputs(payload, date)
     grade.update_ledger(date)               # move any now-final games into the record
 
+    # once the LAST game of a slate is final, send a one-time end-of-day recap.
+    # check today and the prior day (late games finish after midnight ET, so the
+    # slate that just wrapped may be dated yesterday by the time it's all final).
+    import datetime as _dt
+    prev = (_dt.date.fromisoformat(date) - _dt.timedelta(days=1)).isoformat()
+    for d in (date, prev):
+        grade.send_day_recap_if_complete(d, notify.send_telegram)
+
     changed = (payload.get("picks"), payload.get("coin_flips")) != old_picks
     if force_telegram or changed:
         notify.send_telegram(picks_main.telegram_text(payload))

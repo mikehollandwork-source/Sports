@@ -37,6 +37,7 @@ log = logging.getLogger("grade")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 LEDGER_PATH = OUTPUT_DIR / "ledger.json"
 VOIDS_PATH = OUTPUT_DIR / "voids.json"
+RECAPS_PATH = OUTPUT_DIR / "recaps_sent.json"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 STAKE = 1.0
@@ -204,34 +205,88 @@ def _play(g: dict) -> str:
     return "stay_away"
 
 
-def grade_date(date: str) -> list[dict]:
-    """Settle every final game into play entries (bet the advantage team).
-    No-action games are never booked; unpriced bets are never booked."""
+def settle_day(date: str) -> tuple[list[dict], int]:
+    """Settle a date's PLAYS. Returns (entries, pending): `entries` are the final,
+    priced, non-voided plays (bet the advantage team); `pending` counts plays that
+    would be booked but aren't final yet. pending == 0 with entries -> the slate is
+    complete. No-action / unpriced / voided games are never booked."""
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         log.warning("no picks file for %s", date)
-        return []
+        return [], 0
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
     voids = load_voids()
 
-    play_entries: list[dict] = []
+    entries: list[dict] = []
+    pending = 0
     for g in payload.get("games", []):
         pc = g.get("pick_criteria", {})
         adv = pc.get("advantage_team")
-        res = results.get(g.get("game_pk"))
-        if not adv or not res or not res["final"] or not res["winner"]:
-            continue
+        if not adv or _play(g) != "pick":
+            continue        # no-action / legacy lock snapshots: never booked
         if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
-            log.info("skip voided game: %s %s", date, g.get("matchup"))
             continue
-        play = _play(g)
-        if play == "pick":
-            odds = _price(g, "advantage_moneyline")
-            if odds is not None:
-                play_entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
-        # everything else (incl. legacy lock snapshots) is no-action: never booked.
-    return play_entries
+        odds = _price(g, "advantage_moneyline")
+        if odds is None:
+            continue        # unpriced: never booked at fake even money
+        res = results.get(g.get("game_pk"))
+        if not res or not res["final"] or not res["winner"]:
+            pending += 1     # a play still to be decided -> slate not done
+            continue
+        entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
+    return entries, pending
+
+
+def grade_date(date: str) -> list[dict]:
+    """Final, priced, non-voided play entries for a date (bet the advantage team)."""
+    return settle_day(date)[0]
+
+
+# --- end-of-day recap (fires once the last game of the slate is final) ---------
+def day_recap_text(date: str, entries: list[dict]) -> str:
+    """Telegram recap of a completed slate: each play W/L with the final score and
+    its +/- units, then the day's record and total units up/down."""
+    w = sum(1 for e in entries if e["result"] == "W")
+    u = round(sum(e.get("profit", 0.0) for e in entries), 2)
+    lines = [f"🏁 RECAP — {date} (final)", ""]
+    for e in entries:
+        od = e["odds"]
+        ods = f"+{od}" if od > 0 else str(od)
+        mark = "✅ WON " if e["result"] == "W" else "❌ LOST"
+        lines.append(f"{mark}  {e['bet']} ({ods})   {e['profit']:+.2f}u")
+        lines.append(f"        {e['score']}")
+    arrow = "▲" if u >= 0 else "▼"
+    lines += ["", f"Day: {w}-{len(entries) - w}  ·  {u:+.2f}u {arrow}"]
+    return "\n".join(lines)
+
+
+def _recaps_sent() -> set[str]:
+    try:
+        return set(json.loads(RECAPS_PATH.read_text()))
+    except (OSError, ValueError):
+        return set()
+
+
+def _mark_recap_sent(date: str) -> None:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    RECAPS_PATH.write_text(json.dumps(sorted(_recaps_sent() | {date})))
+
+
+def send_day_recap_if_complete(date: str, send) -> bool:
+    """Send the day's recap via `send(text)` exactly once, and only after EVERY
+    play on the slate is final (the last game of the day is over). No-op if the
+    slate isn't done, has no plays, or the recap already went out."""
+    if date in _recaps_sent():
+        return False
+    entries, pending = settle_day(date)
+    if pending or not entries:      # a play still live, or nothing booked -> wait
+        return False
+    send(day_recap_text(date, entries))
+    _mark_recap_sent(date)
+    log.info("sent end-of-day recap for %s (%d plays, %+.2fu)",
+             date, len(entries), sum(e.get("profit", 0.0) for e in entries))
+    return True
 
 
 def _add(book: dict, entries: list[dict]) -> int:
