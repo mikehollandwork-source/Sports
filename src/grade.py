@@ -276,11 +276,19 @@ def _mark_recap_sent(date: str) -> None:
 def send_day_recap_if_complete(date: str, send) -> bool:
     """Send the day's recap via `send(text)` exactly once, and only after EVERY
     play on the slate is final (the last game of the day is over). No-op if the
-    slate isn't done, has no plays, or the recap already went out."""
+    slate isn't done, has no booked plays, or the recap already went out.
+
+    The recap is built from the LEDGER (the authoritative running record) — the
+    same source as the Yesterday/Week/Month record — NOT from a re-derivation of
+    the end-of-day board, whose play set / sides / odds can drift through the day
+    and would otherwise disagree with the record."""
     if date in _recaps_sent():
         return False
-    entries, pending = settle_day(date)
-    if pending or not entries:      # a play still live, or nothing booked -> wait
+    _, pending = settle_day(date)   # board completion signal: any play still live?
+    if pending:
+        return False
+    entries = [e for e in load_ledger()["plays"]["entries"] if e["date"] == date]
+    if not entries:                 # nothing booked for the day -> nothing to recap
         return False
     send(day_recap_text(date, entries))
     _mark_recap_sent(date)
