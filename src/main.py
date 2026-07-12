@@ -1033,7 +1033,9 @@ def build_summary(payload: dict) -> str:
                + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
                   if picks else ""))
     if finals:
-        out.append(f"\n_{len(finals)} game(s) final — moved into the record below._")
+        final_plays = sum(1 for g in finals if _play(g) == "pick")
+        out.append(f"\n_{len(finals)} game(s) final — {final_plays} was/were plays booked "
+                   f"to the record below; the rest were no-plays (never bet)._")
     out.append("")
 
     if board:
@@ -1110,7 +1112,9 @@ def telegram_text(payload: dict) -> str:
     L = [f"⚾ MLB BOARD — {date}",
          f"{len(picks)} play(s) · {len(no_action)} no-play"]
     if finals:
-        L.append(f"({len(finals)} final → moved to the record)")
+        final_plays = sum(1 for g in finals if _play(g) == "pick")
+        L.append(f"({len(finals)} final → {final_plays} play(s) booked to the record; "
+                 f"rest were no-plays)")
 
     def block(g):
         pc = g["pick_criteria"]
