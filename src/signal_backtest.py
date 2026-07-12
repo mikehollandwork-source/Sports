@@ -194,6 +194,8 @@ def build() -> str:
             rec = {"won": res["winner"] == adv, "odds": sig["_ml"], "sig": sig,
                    "stance_against": bool((_book_stance(g) or {}).get("against_us")),
                    "money_split": _money_split(g),
+                   "line_timing": ((g.get("pick_criteria") or {}).get("line_check")
+                                   or {}).get("timing"),
                    "shade": shading_gap(g), "prof": profile(g)}
             bn = _book_needs(g)
             if bn:
@@ -375,6 +377,21 @@ def build() -> str:
                         (15, 999, "≥ 15 (heavy shade)")):
         sub = [{"won": g["won"], "odds": g["odds"]} for g in shaded if lo <= g["shade"] < hi]
         md.append(_row(lab, sub))
+    md.append("")
+
+    # LINE-MOVE TIMING: the 6am early_lines snapshot splits each pick's move into
+    # the overnight/sharp window (open->6am) and the daytime/public window
+    # (6am->close). Which window's move toward us actually wins? Rows only start
+    # accumulating from the day the early-lines cron went live.
+    timed = [g for g in games if g.get("line_timing")]
+    md += [f"## Line-move timing — sharp window vs public window (n={len(timed)})", "",
+           "_open→6am = overnight (sharp money); 6am→close = daytime (public). "
+           "Needs the 6am snapshot, so n grows from the day that cron started._", "",
+           "| move toward us happened | record | units |", "|---|---|---|"]
+    for key, lab in (("early", "overnight only (sharp)"),
+                     ("late", "daytime only (public)"),
+                     ("both", "both windows")):
+        md.append(_row(lab, [g for g in games if g.get("line_timing") == key]))
     md.append("")
 
     # Underdog study: our stat side priced as a DOG (ml > 0). Dog wins pay >1u, so

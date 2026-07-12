@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -118,8 +118,10 @@ def run(date: str) -> dict:
         except Exception as exc:
             log.warning("espn debug dump failed: %s", exc)
 
+    early = early_lines.load(date)   # 6am snapshot (absent until that cron has run)
+
     for g, r in zip(games, results):
-        _attach_line(g, r, slate)
+        _attach_line(g, r, slate, early)
         _attach_situational(g, r, date)
 
     # Lock games that have already started: a started game keeps the pick/lean
@@ -261,7 +263,20 @@ def _merge_slates(primary: list, secondary: list) -> list:
     return merged
 
 
-def _attach_line(game, result: dict, slate: list) -> None:
+def _line_windows(o, m, c) -> dict:
+    """Split an open->current move into the overnight/sharp window (open->6am)
+    and the daytime/public window (6am->current), as implied-probability shifts.
+    `timing` = which window(s) carried a real move toward us (>= LINE_CONFIRM_MIN).
+    Empty dict when any price is missing."""
+    if o is None or m is None or c is None:
+        return {}
+    es, ls = round(_implied(m) - _implied(o), 3), round(_implied(c) - _implied(m), 3)
+    eh, lh = es >= LINE_CONFIRM_MIN, ls >= LINE_CONFIRM_MIN
+    timing = "early" if eh and not lh else "late" if lh and not eh else "both" if eh and lh else None
+    return {"morning": m, "early_shift": es, "late_shift": ls, "timing": timing}
+
+
+def _attach_line(game, result: dict, slate: list, early: dict | None = None) -> None:
     """Capture the advantage team's current pre-game moneyline (for the tracker,
     picks AND leans) and the open->current line movement toward our side, straight
     from ESPN's open/current. Also applies the sharp-money pick filter."""
@@ -284,6 +299,20 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # line movement toward our side (the advantage team) for EVERY game
     _, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
     pc["line_check"] = info
+
+    # With the 6am snapshot (early_lines), split that move into the overnight
+    # sharp window (open->6am) and the daytime public window (6am->now), plus the
+    # sharp-book (Pinnacle) morning price for our side. Recording + display only -
+    # the confirms status above stays the pure open->current signal.
+    em = find_slate_line(game, (early or {}).get("espn") or [])
+    info.update(_line_windows((e or {}).get(f"{side}_open"),
+                              (em or {}).get(f"{side}_current"),
+                              (e or {}).get(f"{side}_current")))
+    for p in (early or {}).get("pinnacle") or []:
+        if (p.get("away_name", "").casefold() == game.away.name.casefold()
+                and p.get("home_name", "").casefold() == game.home.name.casefold()):
+            info["pinny_morning"] = p.get(f"{side}_ml")
+            break
 
     # Cross-check the public read against the money: did the line move WITH the
     # stated public side (public money real) or AGAINST it (reverse line move — the
@@ -656,7 +685,10 @@ def _line_phrase(lc: dict | None) -> str:
     if status == "caution":            # big move our way -> usually a pitcher change/news
         return f"⚠️ TOO MUCH ({arrow}) — likely news, verify"
     if status == "confirms":           # a real move toward our side
-        return f"IN OUR FAVOR ✓ ({arrow})"
+        tag = {"early": " · moved overnight (sharp window)",
+               "late": " · moved today (public window)",
+               "both": " · moved in both windows"}.get(lc.get("timing"), "")
+        return f"IN OUR FAVOR ✓ ({arrow}){tag}"
     if status == "contradicts":        # moved toward the other side
         return f"AGAINST us ✗ ({arrow})"
     return f"no real movement ({arrow})"   # flat, or a sub-signal wiggle (soft)

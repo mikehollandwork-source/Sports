@@ -1,0 +1,47 @@
+name: Early lines snapshot
+
+# Freezes the slate's prices at ~6am ET - BEFORE the noon board loop - so each
+# day's open->close line movement can be split into the overnight/sharp window
+# (open->6am) and the daytime/public window (6am->close). Also records Pinnacle's
+# (sharp-origin book) morning moneylines as a reference. One small JSON per day;
+# recording only, no pick logic.
+# (Cron is UTC and fixed; 10:00 UTC = 6am ET during EDT, 5am under EST - harmless.)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 10 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Capture early lines
+        run: python -m src.early_lines
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Early lines snapshot ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
