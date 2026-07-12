@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -118,8 +118,12 @@ def run(date: str) -> dict:
         except Exception as exc:
             log.warning("espn debug dump failed: %s", exc)
 
+    # off-hours snapshots (absent until those crons have run for this date)
+    early = early_lines.load(date)              # 6am ET reading
+    evening = early_lines.load(date, "evening")  # 11pm-ET-the-night-before reading
+
     for g, r in zip(games, results):
-        _attach_line(g, r, slate)
+        _attach_line(g, r, slate, early, evening)
         _attach_situational(g, r, date)
 
     # Lock games that have already started: a started game keeps the pick/lean
@@ -261,7 +265,32 @@ def _merge_slates(primary: list, secondary: list) -> list:
     return merged
 
 
-def _attach_line(game, result: dict, slate: list) -> None:
+def _line_windows(o, evening, morning, c) -> dict:
+    """Split an open->current move by WHEN it happened, from the snapshot files:
+    strike (open->11pm the night before), overnight (11pm->6am), early (open->6am,
+    the whole sharp window) and late (6am->current, the public window) - all as
+    implied-probability shifts toward our side. `timing` = which side of the 6am
+    cut carried a real move (>= LINE_CONFIRM_MIN). Only windows whose snapshot
+    exists are emitted; empty dict when open/current are missing."""
+    if o is None or c is None:
+        return {}
+    out: dict = {}
+    if morning is not None:
+        es, ls = round(_implied(morning) - _implied(o), 3), round(_implied(c) - _implied(morning), 3)
+        eh, lh = es >= LINE_CONFIRM_MIN, ls >= LINE_CONFIRM_MIN
+        out.update(morning=morning, early_shift=es, late_shift=ls,
+                   timing="early" if eh and not lh else "late" if lh and not eh
+                          else "both" if eh and lh else None)
+    if evening is not None:
+        out["evening"] = evening
+        out["strike_shift"] = round(_implied(evening) - _implied(o), 3)
+        if morning is not None:
+            out["overnight_shift"] = round(_implied(morning) - _implied(evening), 3)
+    return out
+
+
+def _attach_line(game, result: dict, slate: list, early: dict | None = None,
+                 evening: dict | None = None) -> None:
     """Capture the advantage team's current pre-game moneyline (for the tracker,
     picks AND leans) and the open->current line movement toward our side, straight
     from ESPN's open/current. Also applies the sharp-money pick filter."""
@@ -284,6 +313,22 @@ def _attach_line(game, result: dict, slate: list) -> None:
     # line movement toward our side (the advantage team) for EVERY game
     _, info = line_confirms(side, e)  # e has {away/home}_open/_current from ESPN
     pc["line_check"] = info
+
+    # With the off-hours snapshots (early_lines), split that move by WHEN it
+    # happened - 11pm strike / overnight / daytime windows - plus the sharp-book
+    # (Pinnacle) morning price for our side. Recording + display only - the
+    # confirms status above stays the pure open->current signal.
+    em = find_slate_line(game, (early or {}).get("espn") or [])
+    ev = find_slate_line(game, (evening or {}).get("espn") or [])
+    info.update(_line_windows((e or {}).get(f"{side}_open"),
+                              (ev or {}).get(f"{side}_current"),
+                              (em or {}).get(f"{side}_current"),
+                              (e or {}).get(f"{side}_current")))
+    for p in (early or {}).get("pinnacle") or []:
+        if (p.get("away_name", "").casefold() == game.away.name.casefold()
+                and p.get("home_name", "").casefold() == game.home.name.casefold()):
+            info["pinny_morning"] = p.get(f"{side}_ml")
+            break
 
     # Cross-check the public read against the money: did the line move WITH the
     # stated public side (public money real) or AGAINST it (reverse line move — the
@@ -656,7 +701,12 @@ def _line_phrase(lc: dict | None) -> str:
     if status == "caution":            # big move our way -> usually a pitcher change/news
         return f"⚠️ TOO MUCH ({arrow}) — likely news, verify"
     if status == "confirms":           # a real move toward our side
-        return f"IN OUR FAVOR ✓ ({arrow})"
+        tag = {"early": " · moved overnight (sharp window)",
+               "late": " · moved today (public window)",
+               "both": " · moved in both windows"}.get(lc.get("timing"), "")
+        if (lc.get("strike_shift") or 0) >= LINE_CONFIRM_MIN and lc.get("timing") in ("early", "both"):
+            tag = " · sharps struck the fresh opener"   # moved within hours of posting
+        return f"IN OUR FAVOR ✓ ({arrow}){tag}"
     if status == "contradicts":        # moved toward the other side
         return f"AGAINST us ✗ ({arrow})"
     return f"no real movement ({arrow})"   # flat, or a sub-signal wiggle (soft)

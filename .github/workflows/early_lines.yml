@@ -1,0 +1,58 @@
+name: Early lines snapshot
+
+# Freezes the slate's prices off-hours - BEFORE the noon board loop - so each
+# day's open->close line movement can be split by WHEN it happened:
+#   ~11pm ET (tomorrow's fresh openers) -> open->11pm = the instant sharp strike
+#   ~6am ET  (today's slate)            -> open->6am = the full overnight window,
+#                                          6am->close = the daytime/public window
+# Also records Pinnacle's (sharp-origin book) moneylines as a reference. Two
+# small JSONs per day; recording only, no pick logic.
+# (Cron is UTC and fixed; 03:00/10:00 UTC = 11pm/6am ET during EDT - shifts an
+# hour under EST, harmless.)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"    # evening reading (11pm ET, tomorrow's openers)
+    - cron: "0 10 * * *"   # morning reading (6am ET, today's slate)
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Capture lines snapshot
+        run: |
+          # before ~6 UTC it's the 11pm-ET evening reading (tomorrow's fresh
+          # openers); otherwise the 6am-ET morning reading for today's slate
+          if [ "$(date -u +%H)" -lt 6 ]; then
+            python -m src.early_lines --evening
+          else
+            python -m src.early_lines
+          fi
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Early lines snapshot ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
