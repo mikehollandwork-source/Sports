@@ -24,7 +24,8 @@ import statistics as st
 
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
-from .analysis import LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY, PDOG_FIP_MIN
+from .analysis import (LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY, LINE_CONFIRM_MIN,
+                       PDOG_FIP_MIN)
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "pitching_dog")
@@ -191,11 +192,13 @@ def build() -> str:
                 continue
             graded += 1
             adv = sig["_adv"]
+            lc = (g.get("pick_criteria") or {}).get("line_check") or {}
             rec = {"won": res["winner"] == adv, "odds": sig["_ml"], "sig": sig,
                    "stance_against": bool((_book_stance(g) or {}).get("against_us")),
                    "money_split": _money_split(g),
-                   "line_timing": ((g.get("pick_criteria") or {}).get("line_check")
-                                   or {}).get("timing"),
+                   "line_timing": lc.get("timing"),
+                   "strike": (lc.get("strike_shift") or -9) >= LINE_CONFIRM_MIN,
+                   "overnight": (lc.get("overnight_shift") or -9) >= LINE_CONFIRM_MIN,
                    "shade": shading_gap(g), "prof": profile(g)}
             bn = _book_needs(g)
             if bn:
@@ -385,13 +388,18 @@ def build() -> str:
     # accumulating from the day the early-lines cron went live.
     timed = [g for g in games if g.get("line_timing")]
     md += [f"## Line-move timing — sharp window vs public window (n={len(timed)})", "",
-           "_open→6am = overnight (sharp money); 6am→close = daytime (public). "
-           "Needs the 6am snapshot, so n grows from the day that cron started._", "",
+           "_open→11pm = instant strike on the fresh opener; open→6am = the full "
+           "overnight/sharp window; 6am→close = daytime (public). Needs the "
+           "off-hours snapshots, so n grows from the day those crons started._", "",
            "| move toward us happened | record | units |", "|---|---|---|"]
     for key, lab in (("early", "overnight only (sharp)"),
                      ("late", "daytime only (public)"),
                      ("both", "both windows")):
         md.append(_row(lab, [g for g in games if g.get("line_timing") == key]))
+    md.append(_row("instant strike on the opener (open→11pm)",
+                   [g for g in games if g.get("strike")]))
+    md.append(_row("overnight drift after the strike window (11pm→6am)",
+                   [g for g in games if g.get("overnight")]))
     md.append("")
 
     # Underdog study: our stat side priced as a DOG (ml > 0). Dog wins pay >1u, so

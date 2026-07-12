@@ -1,15 +1,19 @@
 name: Early lines snapshot
 
-# Freezes the slate's prices at ~6am ET - BEFORE the noon board loop - so each
-# day's open->close line movement can be split into the overnight/sharp window
-# (open->6am) and the daytime/public window (6am->close). Also records Pinnacle's
-# (sharp-origin book) morning moneylines as a reference. One small JSON per day;
-# recording only, no pick logic.
-# (Cron is UTC and fixed; 10:00 UTC = 6am ET during EDT, 5am under EST - harmless.)
+# Freezes the slate's prices off-hours - BEFORE the noon board loop - so each
+# day's open->close line movement can be split by WHEN it happened:
+#   ~11pm ET (tomorrow's fresh openers) -> open->11pm = the instant sharp strike
+#   ~6am ET  (today's slate)            -> open->6am = the full overnight window,
+#                                          6am->close = the daytime/public window
+# Also records Pinnacle's (sharp-origin book) moneylines as a reference. Two
+# small JSONs per day; recording only, no pick logic.
+# (Cron is UTC and fixed; 03:00/10:00 UTC = 11pm/6am ET during EDT - shifts an
+# hour under EST, harmless.)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "0 3 * * *"    # evening reading (11pm ET, tomorrow's openers)
+    - cron: "0 10 * * *"   # morning reading (6am ET, today's slate)
 
 permissions:
   contents: write
@@ -27,8 +31,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Capture early lines
-        run: python -m src.early_lines
+      - name: Capture lines snapshot
+        run: |
+          # before ~6 UTC it's the 11pm-ET evening reading (tomorrow's fresh
+          # openers); otherwise the 6am-ET morning reading for today's slate
+          if [ "$(date -u +%H)" -lt 6 ]; then
+            python -m src.early_lines --evening
+          else
+            python -m src.early_lines
+          fi
 
       - name: Commit snapshot
         run: |

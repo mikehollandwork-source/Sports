@@ -1,23 +1,30 @@
 """
-Morning line snapshot - the record of the 'sharp window'.
+Off-hours line snapshots - the record of the sharp windows.
 
 ESPN exposes exactly two prices per game (open + current) with no timestamps, and
 our board loop doesn't start until ~noon ET - so open->close movement can't be
-split into the overnight/sharp window vs the afternoon/public pile-in. This
-runner fires early (6am ET cron, before the noon loop) and freezes the slate's
-prices at that moment into output/lines_early_<date>.json:
+split by WHEN it happened. Two small crons freeze the slate's prices off-hours:
 
-  espn:     [{away_abbr, home_abbr, *_open, *_current}]  (*_current = the 6am price)
-  pinnacle: [{away_name, home_name, away_ml, home_ml}]   (sharp-book reference)
+  evening (~11pm ET, for TOMORROW's slate) -> lines_evening_<date>.json
+      the fresh openers a few hours after they post: open->11pm isolates the
+      "instant strike" sharps put on a new low-limit test line
+  morning (~6am ET, for today's slate)     -> lines_early_<date>.json
+      the 6am price: open->6am = the full overnight/sharp window,
+      6am->close = the daytime/public window
 
-main.py then splits each pick's line move into early (open->6am) and late
-(6am->now) shifts inside line_check, and signal_backtest grades which window's
-move actually predicts winners once enough days accumulate. Recording only -
-the live line signal (open->current) is unchanged.
+Each file: {date, captured_utc,
+            espn:     [{away_abbr, home_abbr, *_open, *_current}],   (*_current = price at capture)
+            pinnacle: [{away_name, home_name, away_ml, home_ml}]}    (sharp-book reference)
+
+main.py threads the checkpoints into each pick's line_check (strike_shift /
+overnight_shift / early_shift / late_shift / timing) and signal_backtest grades
+which window's move actually predicts winners once days accumulate. Recording
+only - the live line signal (open->current) is unchanged.
 """
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import logging
@@ -32,42 +39,50 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 
-def path_for(date: str) -> Path:
-    return OUTPUT_DIR / f"lines_early_{date}.json"
+def path_for(date: str, reading: str = "early") -> Path:
+    return OUTPUT_DIR / f"lines_{reading}_{date}.json"
 
 
-def load(date: str) -> dict | None:
-    """The day's morning snapshot, or None if the 6am run hasn't produced one."""
+def load(date: str, reading: str = "early") -> dict | None:
+    """A day's snapshot ('early' = 6am, 'evening' = 11pm the night before), or
+    None if that cron hasn't produced one."""
     try:
-        return json.loads(path_for(date).read_text())
+        return json.loads(path_for(date, reading).read_text())
     except (OSError, ValueError):
         return None
 
 
-def capture(date: str | None = None) -> dict:
-    date = date or dt.datetime.now(EASTERN).date().isoformat()
+def capture(date: str | None = None, reading: str = "early") -> dict:
+    if date is None:
+        today = dt.datetime.now(EASTERN).date()
+        # the evening run happens the NIGHT BEFORE the slate it snapshots
+        date = (today + dt.timedelta(days=1)).isoformat() if reading == "evening" \
+            else today.isoformat()
     try:
         esp = espn.lines(date)
     except Exception as exc:
-        log.warning("espn early snapshot failed: %s", exc)
+        log.warning("espn %s snapshot failed: %s", reading, exc)
         esp = []
     try:
         pin = pinnacle.lines()
     except Exception as exc:
-        log.warning("pinnacle early snapshot failed: %s", exc)
+        log.warning("pinnacle %s snapshot failed: %s", reading, exc)
         pin = []
-    snap = {"date": date,
+    snap = {"date": date, "reading": reading,
             "captured_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "espn": esp, "pinnacle": pin}
     OUTPUT_DIR.mkdir(exist_ok=True)
-    path_for(date).write_text(json.dumps(snap, indent=2))
-    log.info("early lines: %d espn / %d pinnacle row(s) -> %s",
-             len(esp), len(pin), path_for(date).name)
+    path_for(date, reading).write_text(json.dumps(snap, indent=2))
+    log.info("%s lines: %d espn / %d pinnacle row(s) -> %s",
+             reading, len(esp), len(pin), path_for(date, reading).name)
     return snap
 
 
 def main() -> None:
-    capture()
+    ap = argparse.ArgumentParser(description="Freeze the slate's current prices to a snapshot file")
+    ap.add_argument("--evening", action="store_true",
+                    help="the ~11pm ET reading of TOMORROW's fresh openers (default: 6am for today)")
+    capture(reading="evening" if ap.parse_args().evening else "early")
 
 
 if __name__ == "__main__":
