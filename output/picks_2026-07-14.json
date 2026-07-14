@@ -1,6 +1,6 @@
 {
   "date": "2026-07-14",
-  "generated_at": "2026-07-14T05:02:17.833616+00:00",
+  "generated_at": "2026-07-14T06:02:17.150726+00:00",
   "games": [
     {
       "game_pk": 823443,
@@ -101,18 +101,18 @@
         }
       },
       "public_majority": {
-        "team": null,
+        "team": "National League All-Stars",
         "detail": {
           "consensus": null,
           "forum": {
             "pick": "National League All-Stars",
-            "home": 2,
+            "home": 3,
             "away": 2
           },
           "agree": null,
-          "forum_lean": 0.0,
+          "forum_lean": 0.2,
           "consensus_lean": null,
-          "blended_lean": null,
+          "blended_lean": 0.2,
           "reddit": null,
           "reddit_lean": null,
           "wiki": null,
@@ -121,15 +121,21 @@
         }
       },
       "public_check": {
-        "sources": [],
-        "majority_side": null,
-        "agree": 0,
+        "sources": [
+          {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          }
+        ],
+        "majority_side": "home",
+        "agree": 1,
         "dissent": 0,
         "trusted": true,
-        "verdict": "no public read",
-        "note": "no public lean to check",
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
         "flags": [],
-        "line": "unknown",
+        "line": "flat",
         "money": "unknown",
         "money_side": null
       },
@@ -210,12 +216,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "only hot lineup (+0.072) \u2014 no core signal (margin/line/consistency), no play",
+        "reason": "public mildly on National League All-Stars (60% < 70) \u2014 sharp fade, no play",
         "advantage_team": "American League All-Stars",
-        "public_edge": false,
+        "public_edge": true,
         "public_trusted": true,
         "edge_strong": true,
-        "confidence": 0.55,
+        "confidence": 0.64,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -224,8 +230,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": null,
-            "strength": 0.0,
+            "blended_lean": 0.2,
+            "strength": 0.2,
             "weight": 0.45
           },
           "consistency": {
@@ -249,6 +255,7 @@
         "sp_dog_edge": 0.514,
         "pitching_dog": false,
         "signals_hit": 1,
+        "public_pct_against": 60,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -257,11 +264,11 @@
           "fooled": false
         },
         "vegas": {
-          "bet": "National League All-Stars",
-          "odds": -135,
+          "bet": "American League All-Stars",
+          "odds": 110,
           "basis": "ticket %",
-          "hold_home": 907407,
-          "hold_away": -350000
+          "hold_home": -311111,
+          "hold_away": 1120000
         },
         "play": "stay_away",
         "stay_bet": null,
