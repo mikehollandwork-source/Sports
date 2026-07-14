@@ -1,0 +1,32 @@
+name: Channel announcement
+
+# Manual one-off: send a message to the Telegram channel through the same
+# notify pipeline the board uses. Never touches picks files or the ledger -
+# nothing sent here is graded. For specials, welcome notes, announcements.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "The text to post to the channel"
+        required: true
+        type: string
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send announcement
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANNOUNCE_TEXT: ${{ inputs.message }}
+        run: python -m src.announce
