@@ -110,7 +110,10 @@ def _et_date(iso: str) -> str | None:
 
 
 def price_history(token_id: str, start_ts: int, end_ts: int) -> list[tuple[int, float]]:
-    data = _get(HISTORY, market=token_id, startTs=start_ts, endTs=end_ts, fidelity=10)
+    # fidelity=1 (minute bars): at 10 almost no pre-game prints survived the
+    # lock-window gate - MLB markets trade mostly in-game, so use the finest
+    # grain the endpoint offers to catch what little pre-game printing exists.
+    data = _get(HISTORY, market=token_id, startTs=start_ts, endTs=end_ts, fidelity=1)
     out = []
     for h in (data or {}).get("history") or []:
         try:
