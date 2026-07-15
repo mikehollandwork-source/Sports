@@ -1,0 +1,43 @@
+name: PM trade-out backtest
+
+# Manual research run: simulate entering every graded pick on Polymarket at
+# lock time and locking profit at +X cents vs holding to settlement, from PM's
+# public historical price series. Writes + commits output/pm_tradeout.{md,json}.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run trade-out backtest
+        run: python -m src.pm_tradeout
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/pm_tradeout.md output/pm_tradeout.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "PM trade-out backtest ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
