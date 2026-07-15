@@ -1,0 +1,53 @@
+name: PM order-book poller
+
+# Stage 2 of the Polymarket plan: during game hours, record the REAL order book
+# (best bid/ask + size) of every board side's PM token every ~10 minutes, from
+# pre-lock through the games. Builds the fill-quality + trade-out dataset with
+# actual quotes - no wallet, no orders. Same hourly-kick + in-job loop pattern
+# as the board refresh (high-frequency crons get throttled; hourly ones fire).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 16-23 * * *"   # noon ET -> 7pm ET kicks
+    - cron: "0 0-5 * * *"     # 8pm ET -> 1am ET kicks
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pm-books
+  cancel-in-progress: true
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Poll order books every ~10 min
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          END=$(( $(date +%s) + 285*60 ))
+          while [ "$(date +%s)" -lt "$END" ]; do
+            git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
+            python -m src.pm_books || echo "poll errored this tick, continuing"
+            git add output/pm_books_*.json 2>/dev/null || true
+            if ! git diff --staged --quiet; then
+              git commit -m "PM book readings ($(date -u +%Y-%m-%dT%H:%MZ))"
+              for i in 1 2 3 4; do
+                git pull --rebase -X theirs origin "${{ github.ref_name }}" \
+                  && git push origin "HEAD:${{ github.ref_name }}" && break
+                echo "push retry $i"; sleep 5
+              done
+            fi
+            sleep 600
+          done
