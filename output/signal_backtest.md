@@ -1,285 +1,339 @@
-# Signal backtest — 215 graded of 246 game snapshots
+# Signal backtest — 261 graded of 278 game snapshots
 
 ## Each signal alone (bet the advantage team when it fires)
 
 | signal | record | units |
 |---|---|---|
-| margin (n=37) | 26-11 (70%) | +8.05u |
-| favorite (n=153) | 89-64 (58%) | +1.01u |
-| line (n=29) | 20-9 (69%) | +5.34u |
-| consistency (n=61) | 37-24 (61%) | +4.35u |
-| bvp (n=94) | 53-41 (56%) | +0.40u |
-| sharp (n=3) | 1-2 (33%) | -1.23u |
-| form (n=19) | 12-7 (63%) | +3.19u |
+| margin (n=41) | 28-13 (68%) | +7.34u |
+| favorite (n=188) | 105-83 (56%) | -5.75u |
+| line (n=41) | 26-15 (63%) | +3.59u |
+| consistency (n=88) | 47-41 (53%) | -4.34u |
+| bvp (n=124) | 64-60 (52%) | -9.69u |
+| sharp (n=4) | 1-3 (25%) | -2.23u |
+| form (n=47) | 24-23 (51%) | -1.74u |
 | pitching_dog (n=0) | 0 | — |
 
 ## By number of signals hit
 
 | signals hit | record | units |
 |---|---|---|
-| 5/7 | 5-1 (83%) | +2.01u |
-| 4/7 | 13-6 (68%) | +2.90u |
-| 3/7 | 19-11 (63%) | +3.20u |
-| 2/7 | 36-30 (55%) | -0.92u |
-| 1/7 | 32-36 (47%) | -8.32u |
+| 5/7 | 6-3 (67%) | +0.69u |
+| 4/7 | 18-14 (56%) | -1.62u |
+| 3/7 | 25-20 (56%) | -0.94u |
+| 2/7 | 41-35 (54%) | -1.31u |
+| 1/7 | 36-37 (49%) | -4.32u |
 | 0/7 | 10-16 (38%) | -4.12u |
 
 ## Best signal combos (all present together, n≥10, by win%)
 
 | combo | record | units |
 |---|---|---|
-| margin + consistency + bvp | 9-2 (82%) | +3.47u |
-| line + consistency | 10-3 (77%) | +4.26u |
-| margin + bvp | 16-5 (76%) | +6.04u |
-| margin + consistency | 12-4 (75%) | +3.82u |
-| margin + favorite + bvp | 14-5 (74%) | +3.89u |
+| margin + line | 9-1 (90%) | +4.13u |
+| margin + favorite + line | 9-1 (90%) | +4.13u |
+| margin + consistency + bvp | 9-3 (75%) | +2.47u |
 | margin + favorite + consistency | 11-4 (73%) | +2.78u |
-| favorite + line + consistency | 8-3 (73%) | +2.07u |
-| favorite + consistency + bvp | 22-9 (71%) | +6.10u |
-| line + bvp | 9-4 (69%) | +1.46u |
-| margin + favorite | 22-10 (69%) | +4.69u |
-| favorite + line + bvp | 8-4 (67%) | +0.32u |
-| favorite + consistency | 31-16 (66%) | +5.90u |
+| margin + consistency | 12-5 (71%) | +2.82u |
+| margin + favorite + bvp | 14-6 (70%) | +2.89u |
+| margin + bvp | 16-7 (70%) | +4.04u |
+| margin + favorite | 24-11 (69%) | +4.98u |
+| favorite + consistency + bvp | 29-18 (62%) | +2.30u |
+| line + consistency + bvp | 8-5 (62%) | +0.21u |
+| line + bvp | 11-7 (61%) | -0.08u |
+| favorite + line | 23-15 (61%) | +0.40u |
 
 ## Tailing the side VEGAS needed (book_needs) vs outcome
 
 | slice | record | units |
 |---|---|---|
-| all games with a book read (n=199) | 86-113 (43%) | -27.27u |
-|   ...money % (n=22) | 6-16 (27%) | -9.26u |
-|   ...ticket % (n=177) | 80-97 (45%) | -18.01u |
-| (vs our advantage side, same games) | 112-87 (56%) | +4.89u |
+| all games with a book read (n=245) | 106-139 (43%) | -30.36u |
+|   ...money % (n=61) | 24-37 (39%) | -9.37u |
+|   ...ticket % (n=184) | 82-102 (45%) | -20.99u |
+| (vs our advantage side, same games) | 133-112 (54%) | -1.48u |
 
 ## Tailing Vegas (bet the side book_needs) + one of our signals
 
 | slice | record | units |
 |---|---|---|
-| tail Vegas, all games (n=199) | 86-113 (43%) | -27.27u |
-|   + our stat side agrees (n=69) | 34-35 (49%) | -4.78u |
-|   + agrees & margin (n=8) | 5-3 (62%) | +0.87u |
-|   + agrees & favorite (n=40) | 22-18 (55%) | -1.88u |
-|   + agrees & line (n=7) | 5-2 (71%) | +1.74u |
-|   + agrees & consistency (n=18) | 7-11 (39%) | -5.45u |
-|   + agrees & bvp (n=27) | 10-17 (37%) | -8.48u |
+| tail Vegas, all games (n=245) | 106-139 (43%) | -30.36u |
+|   + our stat side agrees (n=90) | 42-48 (47%) | -9.50u |
+|   + agrees & margin (n=10) | 5-5 (50%) | -1.13u |
+|   + agrees & favorite (n=52) | 27-25 (52%) | -4.70u |
+|   + agrees & line (n=11) | 7-4 (64%) | +1.20u |
+|   + agrees & consistency (n=30) | 11-19 (37%) | -10.01u |
+|   + agrees & bvp (n=41) | 15-26 (37%) | -13.30u |
 |   + agrees & sharp (n=1) | 0-1 (0%) | -1.00u |
-|   + agrees & form (n=6) | 2-4 (33%) | -1.90u |
+|   + agrees & form (n=21) | 7-14 (33%) | -6.29u |
 |   + agrees & pitching_dog (n=0) | 0 | — |
 
 ## Tail Vegas (stat side agrees) by NUMBER of signals stacked
 
 | signals stacked | record | units | ROI/bet |
 |---|---|---|---|
-| ≥1 signals (n=58) | 28-30 (48%) | -6.99u | -12.1% |
-| ≥2 signals (n=27) | 12-15 (44%) | -5.67u | -21.0% |
-| ≥3 signals (n=11) | 5-6 (45%) | -2.60u | -23.6% |
-| ≥4 signals (n=4) | 3-1 (75%) | +0.69u | +17.2% |
+| ≥1 signals (n=77) | 34-43 (44%) | -14.77u | -19.2% |
+| ≥2 signals (n=42) | 17-25 (40%) | -11.49u | -27.4% |
+| ≥3 signals (n=19) | 9-10 (47%) | -3.41u | -17.9% |
+| ≥4 signals (n=6) | 4-2 (67%) | +0.36u | +6.0% |
 
 ## Fading Vegas (bet the OPPOSITE of book_needs) + one of our signals
 
 | slice | record | units |
 |---|---|---|
-| fade Vegas, all games (n=199) | 113-86 (57%) | +7.15u |
-|   + our stat side agrees (n=130) | 78-52 (60%) | +9.67u |
-|   + agrees & margin (n=26) | 20-6 (77%) | +8.35u |
-|   + agrees & favorite (n=103) | 65-38 (63%) | +9.08u |
-|   + agrees & line (n=22) | 15-7 (68%) | +3.61u |
-|   + agrees & consistency (n=43) | 30-13 (70%) | +9.81u |
-|   + agrees & bvp (n=67) | 43-24 (64%) | +8.88u |
-|   + agrees & sharp (n=2) | 1-1 (50%) | -0.23u |
-|   + agrees & form (n=13) | 10-3 (77%) | +5.09u |
+| fade Vegas, all games (n=245) | 139-106 (57%) | +9.81u |
+|   + our stat side agrees (n=155) | 91-64 (59%) | +8.02u |
+|   + agrees & margin (n=28) | 22-6 (79%) | +9.64u |
+|   + agrees & favorite (n=126) | 76-50 (60%) | +5.14u |
+|   + agrees & line (n=30) | 19-11 (63%) | +2.39u |
+|   + agrees & consistency (n=58) | 36-22 (62%) | +5.67u |
+|   + agrees & bvp (n=83) | 49-34 (59%) | +3.61u |
+|   + agrees & sharp (n=3) | 1-2 (33%) | -1.23u |
+|   + agrees & form (n=26) | 17-9 (65%) | +4.55u |
 |   + agrees & pitching_dog (n=0) | 0 | — |
 
 ## Fade Vegas (stat side agrees) by NUMBER of signals stacked
 
 | signals stacked | record | units | ROI/bet |
 |---|---|---|---|
-| ≥1 signals (n=120) | 75-45 (62%) | +13.05u | +10.9% |
-| ≥2 signals (n=86) | 57-29 (66%) | +13.21u | +15.4% |
-| ≥3 signals (n=39) | 29-10 (74%) | +10.20u | +26.2% |
-| ≥4 signals (n=16) | 11-5 (69%) | +2.04u | +12.8% |
+| ≥1 signals (n=144) | 87-57 (60%) | +10.30u | +7.2% |
+| ≥2 signals (n=109) | 68-41 (62%) | +9.61u | +8.8% |
+| ≥3 signals (n=54) | 35-19 (65%) | +5.29u | +9.8% |
+| ≥4 signals (n=19) | 11-8 (58%) | -0.96u | -5.1% |
 
 ## Best MULTI-signal fade combos (stat side agrees, n≥10)
 
 | combo | record | units |
 |---|---|---|
-| consistency + bvp | 21-6 (78%) | +9.24u |
-| favorite + consistency + bvp | 19-5 (79%) | +8.10u |
 | margin + bvp | 13-4 (76%) | +5.27u |
 | margin + consistency + bvp | 8-2 (80%) | +3.10u |
+| margin + favorite | 19-6 (76%) | +6.45u |
 | margin + consistency | 11-4 (73%) | +3.45u |
-| margin + favorite | 17-6 (74%) | +5.16u |
 | margin + favorite + bvp | 11-4 (73%) | +3.12u |
-| favorite + consistency | 26-11 (70%) | +7.46u |
 | margin + favorite + consistency | 10-4 (71%) | +2.41u |
-| favorite + line | 14-7 (67%) | +2.47u |
+| consistency + bvp | 26-13 (67%) | +6.22u |
+| favorite + consistency + bvp | 23-12 (66%) | +3.89u |
+| favorite + line | 18-11 (62%) | +1.25u |
+| favorite + consistency | 31-20 (61%) | +2.13u |
 
 ## Our pick when the book's informed money was AGAINST us (⚠️ bucket)
 
 | slice | record | units |
 |---|---|---|
-| stance-against plays (n=50) | 26-24 (52%) | -3.40u |
+| stance-against plays (n=63) | 32-31 (51%) | -5.71u |
 
 ## NEW BOARD GATE — fade + core signal (what makes the board now)
 
 | slice | record | units |
 |---|---|---|
-| BOARD: fade + core signal (n=64) | 45-19 (70%) | +15.01u |
-| DROPPED: tail + core signal (was played, now cut) (n=27) | 12-15 (44%) | -4.95u |
+| BOARD: fade + core signal (n=83) | 55-28 (66%) | +13.65u |
+| DROPPED: tail + core signal (was played, now cut) (n=42) | 17-25 (40%) | -10.71u |
 
 ## Threshold sweeps on the fade side (does a tighter bar help?)
 
 | margin ≥ | record | units |
 |---|---|---|
-| 0.30 | 34-22 (61%) | +3.17u |
-| 0.40 | 29-13 (69%) | +8.34u |
-| 0.50 | 20-6 (77%) | +8.35u |
-| 0.60 | 7-2 (78%) | +2.79u |
+| 0.30 | 39-27 (59%) | +1.97u |
+| 0.40 | 34-16 (68%) | +9.14u |
+| 0.50 | 22-6 (79%) | +9.64u |
+| 0.60 | 9-2 (82%) | +4.08u |
 | 0.70 | 2-1 (67%) | +0.11u |
 
 | consistency (out-hit) ≥ | record | units |
 |---|---|---|
-| 3/5 | 30-13 (70%) | +9.81u |
-| 4/5 | 8-5 (62%) | +1.34u |
-| 5/5 | 5-1 (83%) | +2.94u |
+| 3/5 | 36-22 (62%) | +5.67u |
+| 4/5 | 10-9 (53%) | -0.57u |
+| 5/5 | 5-2 (71%) | +1.94u |
 
 ## Does line-shading improve our picks? (our picks by shading gap)
 
 | shading gap (tickets − implied) | record | units |
 |---|---|---|
-| < 5 (not shaded) | 54-42 (56%) | +1.66u |
-| 5–15 (mild) | 41-35 (54%) | -2.31u |
-| ≥ 15 (heavy shade) | 16-16 (50%) | -1.16u |
+| < 5 (not shaded) | 61-51 (54%) | -0.16u |
+| 5–15 (mild) | 52-49 (51%) | -7.61u |
+| ≥ 15 (heavy shade) | 18-18 (50%) | -1.51u |
+
+## Line-move timing — sharp window vs public window (n=6)
+
+_open→11pm = instant strike on the fresh opener; open→6am = the full overnight/sharp window; 6am→close = daytime (public). Needs the off-hours snapshots, so n grows from the day those crons started._
+
+| move toward us happened | record | units |
+|---|---|---|
+| overnight only (sharp) | 3-0 (100%) | +2.33u |
+| daytime only (public) | 1-1 (50%) | -0.33u |
+| both windows | 0-1 (0%) | -1.00u |
+| instant strike on the opener (open→11pm) | 0 | — |
+| overnight drift after the strike window (11pm→6am) | 0 | — |
+
+## Polymarket vs the book — same picks, PM's frozen price (n=134)
+
+_PM price is the gamma-API quote frozen in the snapshot: a mid/last price with no fee or slippage modeling, so treat PM units as a best-case. Unopened 50/50 placeholder markets excluded._
+
+| venue (same picks, same outcomes) | record | units | ROI/bet |
+|---|---|---|---|
+| book (real prices) | 69-65 (51%) | -9.74u | -7.3% |
+| Polymarket (frozen quote) | 69-65 (same games) | -3.33u | -2.5% |
+
+_Avg price gap: PM sells our side +2.8 prob. points vs the book (positive = PM cheaper). PM was >=1pt cheaper on 121 of 134 picks._
+
+_On those 121 PM-cheaper picks: book 64-57 -7.03u vs PM -0.73u._
+
+_ARBITRAGE windows (PM one side + book the other, combined implied < 100%): 11 of 134 games; margins avg 7.3%, best 22.1%._
 
 ## Underdog study — our stat side priced as a DOG (ml > 0)
 
 | slice | record | units | ROI/bet |
 |---|---|---|---|
-| all underdogs (n=62) | 26-36 (42%) | -6.26u | -10% |
-| + edge margin ≥.50 (n=5) | 4-1 (80%) | +3.36u | +67% |
-| + BvP edge (n=26) | 10-16 (38%) | -4.62u | -18% |
-| + consistency ≥3 (n=14) | 6-8 (43%) | -1.55u | -11% |
-| + FIP edge ≥.15 (pitching-edge dogs) (n=28) | 13-15 (46%) | -0.08u | -0% |
-| + margin & BvP (n=2) | 2-0 (100%) | +2.15u | +108% |
-| + consistency & BvP (n=7) | 2-5 (29%) | -2.86u | -41% |
+| all underdogs (n=73) | 31-42 (42%) | -5.87u | -8% |
+| + edge margin ≥.50 (n=6) | 4-2 (67%) | +2.36u | +39% |
+| + BvP edge (n=32) | 11-21 (34%) | -8.43u | -26% |
+| + consistency ≥3 (n=21) | 8-13 (38%) | -4.32u | -21% |
+| + FIP edge ≥.15 (pitching-edge dogs) (n=33) | 17-16 (52%) | +4.27u | +13% |
+| + margin & BvP (n=3) | 2-1 (67%) | +1.15u | +38% |
+| + consistency & BvP (n=12) | 3-9 (25%) | -5.67u | -47% |
 
-## When money sources disagree — bet our stat side (n=16)
+## When money sources disagree — bet our stat side (n=22)
 
 _The '⚠️ money sources disagree' flag fires rarely; every slice here is small — treat as exploratory, not a proven edge._
 
 | slice | record | units | ROI/bet |
 |---|---|---|---|
-| advantage side (flag on) (n=16) | 14-2 (88%) | +10.26u | +64% |
+| advantage side (flag on) (n=22) | 17-5 (77%) | +9.97u | +45% |
 | + margin (n=3) | 3-0 (100%) | +2.59u | +86% |
-| + favorite (n=12) | 10-2 (83%) | +5.94u | +50% |
-| + line (n=3) | 3-0 (100%) | +2.56u | +85% |
-| + consistency (n=8) | 7-1 (88%) | +5.02u | +63% |
-| + bvp (n=11) | 10-1 (91%) | +7.57u | +69% |
+| + favorite (n=17) | 13-4 (76%) | +6.65u | +39% |
+| + line (n=5) | 4-1 (80%) | +2.41u | +48% |
+| + consistency (n=12) | 8-4 (67%) | +2.90u | +24% |
+| + bvp (n=14) | 11-3 (79%) | +6.55u | +47% |
 | + sharp | 0 | — | — |
-| + form (n=4) | 4-0 (100%) | +3.67u | +92% |
+| + form (n=7) | 6-1 (86%) | +4.40u | +63% |
 | + pitching_dog | 0 | — | — |
-| + ≥1 signals stacked (n=15) | 13-2 (87%) | +9.13u | +61% |
-| + ≥2 signals stacked (n=14) | 12-2 (86%) | +8.36u | +60% |
-| + ≥3 signals stacked (n=7) | 7-0 (100%) | +5.84u | +83% |
-| fade side (opp. of book_needs), flag on (n=16) | 12-4 (75%) | +6.50u | +41% |
+| + ≥1 signals stacked (n=21) | 16-5 (76%) | +8.84u | +42% |
+| + ≥2 signals stacked (n=20) | 15-5 (75%) | +8.08u | +40% |
+| + ≥3 signals stacked (n=11) | 9-2 (82%) | +5.57u | +51% |
+| fade side (opp. of book_needs), flag on (n=22) | 16-6 (73%) | +7.94u | +36% |
 
 _Signal combos inside the flag (bet our side, n≥3, by units):_
 
 | combo | record | units | ROI/bet |
 |---|---|---|---|
-| bvp (n=11) | 10-1 (91%) | +7.57u | +69% |
-| favorite (n=12) | 10-2 (83%) | +5.94u | +50% |
-| consistency (n=8) | 7-1 (88%) | +5.02u | +63% |
-| favorite + bvp (n=8) | 7-1 (88%) | +4.38u | +55% |
-| consistency + bvp (n=5) | 5-0 (100%) | +4.23u | +85% |
-| form (n=4) | 4-0 (100%) | +3.67u | +92% |
-| favorite + consistency (n=6) | 5-1 (83%) | +2.88u | +48% |
-| bvp + form (n=3) | 3-0 (100%) | +2.70u | +90% |
-| favorite + form (n=3) | 3-0 (100%) | +2.62u | +87% |
-| favorite + consistency + form (n=3) | 3-0 (100%) | +2.62u | +87% |
-| consistency + form (n=3) | 3-0 (100%) | +2.62u | +87% |
+| favorite (n=17) | 13-4 (76%) | +6.65u | +39% |
+| bvp (n=14) | 11-3 (79%) | +6.55u | +47% |
+| form (n=7) | 6-1 (86%) | +4.40u | +63% |
+| favorite + bvp (n=10) | 8-2 (80%) | +4.36u | +44% |
+| favorite + form (n=5) | 5-0 (100%) | +4.35u | +87% |
+| favorite + consistency + form (n=4) | 4-0 (100%) | +3.49u | +87% |
+| consistency (n=12) | 8-4 (67%) | +2.90u | +24% |
 | margin + favorite + bvp (n=3) | 3-0 (100%) | +2.59u | +86% |
 | margin + favorite (n=3) | 3-0 (100%) | +2.59u | +86% |
 | margin + bvp (n=3) | 3-0 (100%) | +2.59u | +86% |
 | margin (n=3) | 3-0 (100%) | +2.59u | +86% |
-| line + consistency (n=3) | 3-0 (100%) | +2.56u | +85% |
-| line (n=3) | 3-0 (100%) | +2.56u | +85% |
-| favorite + consistency + bvp (n=3) | 3-0 (100%) | +2.09u | +70% |
+| consistency + form (n=5) | 4-1 (80%) | +2.49u | +50% |
+| line (n=5) | 4-1 (80%) | +2.41u | +48% |
+| consistency + bvp (n=7) | 5-2 (71%) | +2.23u | +32% |
+| favorite + consistency (n=9) | 6-3 (67%) | +1.76u | +20% |
+| bvp + form (n=4) | 3-1 (75%) | +1.70u | +42% |
+| line + consistency (n=4) | 3-1 (75%) | +1.56u | +39% |
+| favorite + line (n=4) | 3-1 (75%) | +1.27u | +32% |
+| favorite + consistency + bvp (n=4) | 3-1 (75%) | +1.09u | +27% |
+| consistency + bvp + form (n=3) | 2-1 (67%) | +0.65u | +22% |
+| line + consistency + bvp (n=3) | 2-1 (67%) | +0.58u | +19% |
+| line + bvp (n=3) | 2-1 (67%) | +0.58u | +19% |
+| favorite + line + consistency (n=3) | 2-1 (67%) | +0.42u | +14% |
 
-## What winning underdogs have in common (26 winners vs 36 losers)
+## What winning underdogs have in common (31 winners vs 42 losers)
 
 | stat (advantage side edge) | winners median | losers median |
 |---|---|---|
-| team-score edge | +0.164 | +0.157 |
-| edge margin | +0.192 | +0.177 |
-| offense-index edge | +0.207 | +0.166 |
-| pitching-index edge | +0.034 | -0.012 |
-| FIP edge (opp−ours) | +0.138 | -0.051 |
-| wOBA edge (park-neutral) | +0.048 | +0.037 |
-| ISO edge (park-neutral) | +0.070 | +0.048 |
-| K% gap | -0.028 | -0.002 |
-| BvP edge (signed) | -0.004 | -0.012 |
-| hot-lineup edge | +0.127 | +0.025 |
-| dog price (ml) | +113.500 | +118.500 |
+| team-score edge | +0.156 | +0.157 |
+| edge margin | +0.187 | +0.201 |
+| offense-index edge | +0.190 | +0.183 |
+| pitching-index edge | +0.044 | -0.017 |
+| FIP edge (opp−ours) | +0.180 | -0.071 |
+| wOBA edge (park-neutral) | +0.038 | +0.043 |
+| ISO edge (park-neutral) | +0.068 | +0.050 |
+| K% gap | -0.024 | -0.002 |
+| BvP edge (signed) | -0.025 | -0.012 |
+| hot-lineup edge | +0.049 | +0.076 |
+| dog price (ml) | +114.000 | +121.000 |
 
 ## Every underdog + signal combo (bet the dog, n≥5, by units)
 
 | combo | record | units | ROI/bet |
 |---|---|---|---|
-| margin | 4-1 (80%) | +3.36u | +67% |
-| form | 3-3 (50%) | +0.15u | +2% |
-| consistency | 6-8 (43%) | -1.55u | -11% |
-| consistency + bvp | 2-5 (29%) | -2.86u | -41% |
-| bvp | 10-16 (38%) | -4.62u | -18% |
-| (any dog) | 26-36 (42%) | -6.26u | -10% |
+| margin | 4-2 (67%) | +2.36u | +39% |
+| form | 7-9 (44%) | -0.65u | -4% |
+| consistency + form | 3-5 (38%) | -1.86u | -23% |
+| consistency | 8-13 (38%) | -4.32u | -21% |
+| consistency + bvp | 3-9 (25%) | -5.67u | -47% |
+| (any dog) | 31-42 (42%) | -5.87u | -8% |
+| bvp + form | 1-8 (11%) | -6.95u | -77% |
+| bvp | 11-21 (34%) | -8.43u | -26% |
 
 ## ALL signal combinations — every graded pick (every signal subset, n≥10, by ROI/bet)
 
 | combo | record | units | ROI/bet |
 |---|---|---|---|
-| line + consistency | 10-3 (77%) | +4.26u | +33% |
+| margin + line | 9-1 (90%) | +4.13u | +41% |
+| margin + favorite + line | 9-1 (90%) | +4.13u | +41% |
 | margin + favorite + consistency + bvp | 9-2 (82%) | +3.47u | +32% |
-| margin + consistency + bvp | 9-2 (82%) | +3.47u | +32% |
-| margin + bvp | 16-5 (76%) | +6.04u | +29% |
-| margin + consistency | 12-4 (75%) | +3.82u | +24% |
-| favorite + form | 9-4 (69%) | +3.04u | +23% |
-| margin | 26-11 (70%) | +8.05u | +22% |
-| margin + favorite + bvp | 14-5 (74%) | +3.89u | +20% |
-| favorite + consistency + bvp | 22-9 (71%) | +6.10u | +20% |
-| favorite + line + consistency | 8-3 (73%) | +2.07u | +19% |
+| margin + consistency + bvp | 9-3 (75%) | +2.47u | +21% |
 | margin + favorite + consistency | 11-4 (73%) | +2.78u | +19% |
-| line | 20-9 (69%) | +5.34u | +18% |
-| form | 12-7 (63%) | +3.19u | +17% |
-| margin + favorite | 22-10 (69%) | +4.69u | +15% |
-| favorite + consistency | 31-16 (66%) | +5.90u | +13% |
-| line + bvp | 9-4 (69%) | +1.46u | +11% |
-| consistency + bvp | 24-14 (63%) | +3.24u | +9% |
-| favorite + line | 17-9 (65%) | +2.15u | +8% |
-| favorite + bvp | 43-25 (63%) | +5.02u | +7% |
-| consistency | 37-24 (61%) | +4.35u | +7% |
+| margin | 28-13 (68%) | +7.34u | +18% |
+| margin + bvp | 16-7 (70%) | +4.04u | +18% |
+| margin + consistency | 12-5 (71%) | +2.82u | +17% |
+| margin + favorite + bvp | 14-6 (70%) | +2.89u | +14% |
+| margin + favorite | 24-11 (69%) | +4.98u | +14% |
+| line | 26-15 (63%) | +3.59u | +9% |
+| favorite + consistency + bvp | 29-18 (62%) | +2.30u | +5% |
+| line + consistency + bvp | 8-5 (62%) | +0.21u | +2% |
+| favorite + line | 23-15 (61%) | +0.40u | +1% |
+| favorite + consistency | 39-28 (58%) | -0.02u | -0% |
+| favorite + consistency + bvp + form | 8-6 (57%) | -0.04u | -0% |
+| line + consistency | 11-8 (58%) | -0.07u | -0% |
+| line + bvp | 11-7 (61%) | -0.08u | -0% |
+| favorite + consistency + form | 10-8 (56%) | -0.19u | -1% |
+| favorite + bvp | 53-39 (58%) | -1.26u | -1% |
+
+_worst 6:_
+| combo | record | units | ROI/bet |
+|---|---|---|---|
+| line + form | 6-6 (50%) | -1.16u | -10% |
+| favorite + bvp + form | 10-10 (50%) | -2.58u | -13% |
+| favorite + line + consistency | 9-8 (53%) | -2.26u | -13% |
+| favorite + line + form | 5-6 (45%) | -2.21u | -20% |
+| consistency + bvp + form | 8-10 (44%) | -4.04u | -22% |
+| bvp + form | 11-18 (38%) | -9.53u | -33% |
 
 ## ALL signal combinations — FADE-GATED picks (live board condition) (every signal subset, n≥10, by ROI/bet)
 
 | combo | record | units | ROI/bet |
 |---|---|---|---|
-| form | 10-3 (77%) | +5.09u | +39% |
-| consistency + bvp | 21-6 (78%) | +9.24u | +34% |
-| favorite + consistency + bvp | 19-5 (79%) | +8.10u | +34% |
-| favorite + form | 9-3 (75%) | +4.04u | +34% |
-| margin | 20-6 (77%) | +8.35u | +32% |
+| margin | 22-6 (79%) | +9.64u | +34% |
 | margin + bvp | 13-4 (76%) | +5.27u | +31% |
 | margin + favorite + consistency + bvp | 8-2 (80%) | +3.10u | +31% |
 | margin + consistency + bvp | 8-2 (80%) | +3.10u | +31% |
+| margin + favorite | 19-6 (76%) | +6.45u | +26% |
 | margin + consistency | 11-4 (73%) | +3.45u | +23% |
-| consistency | 30-13 (70%) | +9.81u | +23% |
-| margin + favorite | 17-6 (74%) | +5.16u | +22% |
 | margin + favorite + bvp | 11-4 (73%) | +3.12u | +21% |
-| favorite + consistency | 26-11 (70%) | +7.46u | +20% |
+| form | 17-9 (65%) | +4.55u | +18% |
 | margin + favorite + consistency | 10-4 (71%) | +2.41u | +17% |
-| line | 15-7 (68%) | +3.61u | +16% |
-| bvp | 43-24 (64%) | +8.88u | +13% |
-| favorite + line | 14-7 (67%) | +2.47u | +12% |
-| favorite + bvp | 35-18 (66%) | +6.12u | +12% |
-| favorite | 65-38 (63%) | +9.08u | +9% |
-| line + bvp | 6-4 (60%) | -0.23u | -2% |
+| consistency + bvp | 26-13 (67%) | +6.22u | +16% |
+| favorite + consistency + bvp | 23-12 (66%) | +3.89u | +11% |
+| favorite + form | 15-9 (62%) | +2.40u | +10% |
+| consistency | 36-22 (62%) | +5.67u | +10% |
+| line | 19-11 (63%) | +2.39u | +8% |
+| bvp | 49-34 (59%) | +3.61u | +4% |
+| favorite + line | 18-11 (62%) | +1.25u | +4% |
+| favorite + consistency | 31-20 (61%) | +2.13u | +4% |
+| favorite | 76-50 (60%) | +5.14u | +4% |
+| favorite + consistency + form | 8-6 (57%) | +0.29u | +2% |
+| consistency + form | 8-6 (57%) | +0.29u | +2% |
+
+_worst 6:_
+| combo | record | units | ROI/bet |
+|---|---|---|---|
+| consistency + bvp + form | 6-5 (55%) | -0.55u | -5% |
+| favorite + bvp + form | 8-7 (53%) | -1.09u | -7% |
+| line + consistency | 7-6 (54%) | -0.96u | -7% |
+| favorite + line + consistency | 6-6 (50%) | -2.10u | -18% |
+| line + bvp | 6-6 (50%) | -2.23u | -19% |
+| favorite + line + bvp | 5-6 (45%) | -3.37u | -31% |
 
 _Point-in-time: signals recomputed from the frozen pre-game snapshot; winners from the MLB Stats API; $1/bet at the frozen moneyline. A signal with no recorded input on an older board is excluded from that row only (see n=)._
