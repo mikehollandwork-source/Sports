@@ -122,9 +122,12 @@ def price_history(token_id: str, start_ts: int, end_ts: int) -> list[tuple[int, 
 
 def simulate(points: list[tuple[int, float]], entry_ts: int, won: bool) -> dict | None:
     """Enter at the first print at/after entry_ts; record entry, the max price
-    seen afterward (the best exit that existed), and the settle outcome."""
+    seen afterward (the best exit that existed), and the settle outcome. The
+    entry print must land within 30 minutes of lock - a sparse series whose
+    first point is already mid-game would otherwise enter at an in-game price
+    (audit: 4c 'entries' on 50/50 games paying 24x poisoned the totals)."""
     after = [(t, p) for t, p in points if t >= entry_ts]
-    if not after:
+    if not after or after[0][0] - entry_ts > 1800:
         return None
     entry = after[0][1]
     if not 0.02 <= entry <= 0.98:
@@ -203,9 +206,10 @@ def collect() -> list[dict]:
                 if abs(sim_flip["entry"] - ref) + 0.03 < abs(sim_name["entry"] - ref):
                     sim = sim_flip     # the "wrong" token matches the lock price
             elif sim_name is None:
-                sim = sim_flip if (sim_flip and ref is not None
-                                   and abs(sim_flip["entry"] - ref) <= 0.10) else None
-            if not sim:
+                sim = sim_flip
+            # final gate: without a book reference, or with an entry that doesn't
+            # remotely match it, the row is unusable data - drop, don't guess.
+            if not sim or ref is None or abs(sim["entry"] - ref) > 0.12:
                 continue
             seen.add((date, pk))
             rows.append({"date": date, "matchup": g["matchup"], "ref": ref,
