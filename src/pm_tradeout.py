@@ -95,6 +95,11 @@ def closed_mlb_markets(date_min: str, date_max: str) -> dict:
     return index
 
 
+def _implied_prob(ml) -> float:
+    ml = int(ml)
+    return 100.0 / (ml + 100) if ml > 0 else -ml / (-ml + 100.0)
+
+
 def _et_date(iso: str) -> str | None:
     try:
         t = dt.datetime.fromisoformat(iso.replace("Z", "+00:00"))
@@ -170,7 +175,8 @@ def collect() -> list[dict]:
             a_ab, h_ab = _name_abbr(away), _name_abbr(home)
             tok = index.get((a_ab, h_ab, date)) if a_ab and h_ab else None
             adv_ab = h_ab if adv == home else a_ab
-            if not tok or adv_ab not in tok:
+            opp_ab = a_ab if adv == home else h_ab
+            if not tok or adv_ab not in tok or opp_ab not in tok:
                 continue
             try:
                 start = dt.datetime.fromisoformat(
@@ -178,13 +184,32 @@ def collect() -> list[dict]:
             except Exception:
                 continue
             entry_ts = int(start.timestamp()) - 15 * 60
-            pts = price_history(tok[adv_ab], entry_ts - 3600, entry_ts + 8 * 3600)
+            won = res["winner"] == adv
+            # Fetch BOTH sides' histories and pick our side by PRICE, validated
+            # against the book moneyline frozen at the same lock moment - the
+            # first pass trusted gamma's outcome->token pairing by name and a
+            # chunk of games came back side-inverted (audit: cheap entries won
+            # 56-100%, dear entries 33-36% - a mirror around 50c).
+            pts_name = price_history(tok[adv_ab], entry_ts - 3600, entry_ts + 8 * 3600)
             time.sleep(0.25)
-            sim = simulate(pts, entry_ts, res["winner"] == adv)
+            pts_flip = price_history(tok[opp_ab], entry_ts - 3600, entry_ts + 8 * 3600)
+            time.sleep(0.25)
+            sim_name = simulate(pts_name, entry_ts, won)
+            sim_flip = simulate(pts_flip, entry_ts, won)
+            ml = pc.get("advantage_moneyline")
+            ref = _implied_prob(ml) if ml is not None else None
+            sim = sim_name
+            if ref is not None and sim_name and sim_flip:
+                if abs(sim_flip["entry"] - ref) + 0.03 < abs(sim_name["entry"] - ref):
+                    sim = sim_flip     # the "wrong" token matches the lock price
+            elif sim_name is None:
+                sim = sim_flip if (sim_flip and ref is not None
+                                   and abs(sim_flip["entry"] - ref) <= 0.10) else None
             if not sim:
                 continue
             seen.add((date, pk))
-            rows.append({"date": date, "matchup": g["matchup"],
+            rows.append({"date": date, "matchup": g["matchup"], "ref": ref,
+                         "flipped": sim is sim_flip,
                          "play": grade._play(g) == "pick", **sim})
     log.info("collected %d simulated positions (%d plays)",
              len(rows), sum(1 for r in rows if r["play"]))
@@ -199,6 +224,12 @@ def report(rows: list[dict]) -> str:
           "guaranteed regardless of the final score); otherwise the bet settles "
           "normally. $1 staked per position. Prices are ~10-min prints with no "
           "fee/spread/depth modeling - a stated best case._", ""]
+    refd = [r for r in rows if r.get("ref") is not None]
+    if refd:
+        gaps = [abs(r["entry"] - r["ref"]) for r in refd]
+        md += [f"_Side-mapping audit: {sum(1 for r in rows if r.get('flipped'))} of "
+               f"{len(rows)} tokens flipped after price-validation vs the lock-time "
+               f"book price; median |entry - book| now {st.median(gaps) * 100:.1f} pts._", ""]
     for label, pool in (("ALL stat-advantage sides", rows),
                         ("BOARD PLAYS only", [r for r in rows if r["play"]])):
         md += [f"## {label} (n={len(pool)})", ""]
