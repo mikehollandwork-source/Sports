@@ -919,24 +919,6 @@ def _lock_bet(g: dict) -> tuple[str | None, int | None]:
     return bet, odds
 
 
-def _pm_phrase(g: dict) -> str | None:
-    """'🟣 Polymarket: 58¢ (≈ -138) — BETTER than the book by 3.5 pts' for a pick's
-    side, when a PM market matched. Read-only stage-1 of the auto-bet plan."""
-    q = (g.get("pick_criteria") or {}).get("pm_quote")
-    if not q:
-        return None
-    am = q["pm_american"]
-    base = f"🟣 Polymarket: {q['pm_pct']}¢ (≈ {am:+d})"
-    vb = q.get("vs_book")
-    if vb == "better":
-        return f"{base} — BETTER than the book by {q['edge_pts']:.1f} pts"
-    if vb == "worse":
-        return f"{base} — worse than the book by {abs(q['edge_pts']):.1f} pts"
-    if vb == "same":
-        return f"{base} — ≈ same price as the book"
-    return base
-
-
 def _money_phrase(g: dict) -> str | None:
     """'💰 money on ATL 62%' - which side the sportsbook money sits on (avg of
     the *_money sources) for a no-play game. None when there's no clean read."""
@@ -1091,9 +1073,6 @@ def _game_lines(g: dict) -> list[str]:
     mp = _money_phrase(g)
     if mp:
         lines.append(f"   • {mp}")
-    pmq = _pm_phrase(g)
-    if pmq:
-        lines.append(f"   • {pmq}")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -1244,9 +1223,6 @@ def telegram_text(payload: dict) -> str:
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
-        pmq = _pm_phrase(g)
-        if pmq:
-            L.append(f"   {pmq}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
