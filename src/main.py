@@ -124,6 +124,7 @@ def run(date: str) -> dict:
 
     for g, r in zip(games, results):
         _attach_line(g, r, slate, early, evening)
+        _attach_pm_quote(g, r, extra_public.get("polymarket_bets") or [])
         _attach_situational(g, r, date)
 
     # Lock games that have already started: a started game keeps the pick/lean
@@ -287,6 +288,39 @@ def _line_windows(o, evening, morning, c) -> dict:
         if morning is not None:
             out["overnight_shift"] = round(_implied(morning) - _implied(evening), 3)
     return out
+
+
+def _prob_to_american(p: float) -> int:
+    """Implied win probability -> the equivalent American moneyline."""
+    return -int(round(100 * p / (1 - p))) if p >= 0.5 else int(round(100 * (1 - p) / p))
+
+
+def _attach_pm_quote(game, result: dict, pm_rows: list) -> None:
+    """Polymarket quote for the advantage side (STAGE 1 of auto-betting: read-only).
+    A Polymarket price in cents IS the breakeven win probability, so comparing it
+    to the book moneyline's implied probability says which venue sells our side
+    cheaper. Recorded in the snapshot (pick_criteria.pm_quote) so PM's value vs
+    the book can be graded over time before any real order is ever placed."""
+    pc = result.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    if not adv or not pm_rows:
+        return
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    row = next((x for x in pm_rows if _canon_abbr(x["away_abbr"]) == a
+                and _canon_abbr(x["home_abbr"]) == h), None)
+    if not row:
+        return
+    side = "home" if adv == game.home.name else "away"
+    pct = row.get(f"{side}_pct")
+    if not isinstance(pct, (int, float)) or not 1 <= pct <= 99:
+        return
+    q = {"pm_pct": int(pct), "pm_american": _prob_to_american(pct / 100)}
+    ml = pc.get("advantage_moneyline")
+    if ml is not None:
+        diff = round((_implied(int(ml)) - pct / 100) * 100, 1)  # +ve = PM cheaper
+        q["edge_pts"] = diff
+        q["vs_book"] = "better" if diff >= 1 else "worse" if diff <= -1 else "same"
+    pc["pm_quote"] = q
 
 
 def _attach_line(game, result: dict, slate: list, early: dict | None = None,
@@ -885,6 +919,24 @@ def _lock_bet(g: dict) -> tuple[str | None, int | None]:
     return bet, odds
 
 
+def _pm_phrase(g: dict) -> str | None:
+    """'🟣 Polymarket: 58¢ (≈ -138) — BETTER than the book by 3.5 pts' for a pick's
+    side, when a PM market matched. Read-only stage-1 of the auto-bet plan."""
+    q = (g.get("pick_criteria") or {}).get("pm_quote")
+    if not q:
+        return None
+    am = q["pm_american"]
+    base = f"🟣 Polymarket: {q['pm_pct']}¢ (≈ {am:+d})"
+    vb = q.get("vs_book")
+    if vb == "better":
+        return f"{base} — BETTER than the book by {q['edge_pts']:.1f} pts"
+    if vb == "worse":
+        return f"{base} — worse than the book by {abs(q['edge_pts']):.1f} pts"
+    if vb == "same":
+        return f"{base} — ≈ same price as the book"
+    return base
+
+
 def _money_phrase(g: dict) -> str | None:
     """'💰 money on ATL 62%' - which side the sportsbook money sits on (avg of
     the *_money sources) for a no-play game. None when there's no clean read."""
@@ -1039,6 +1091,9 @@ def _game_lines(g: dict) -> list[str]:
     mp = _money_phrase(g)
     if mp:
         lines.append(f"   • {mp}")
+    pmq = _pm_phrase(g)
+    if pmq:
+        lines.append(f"   • {pmq}")
     pcheck = _public_check_phrase(g)
     if pcheck:
         lines.append(f"   • public check: {pcheck}")
@@ -1189,6 +1244,9 @@ def telegram_text(payload: dict) -> str:
         mp = _money_phrase(g)
         if mp:
             L.append(f"   {mp}")
+        pmq = _pm_phrase(g)
+        if pmq:
+            L.append(f"   {pmq}")
         pcheck = _public_check_phrase(g)
         if pcheck:
             L.append(f"   🔍 check: {pcheck}")
