@@ -200,6 +200,18 @@ def build() -> str:
                    "strike": (lc.get("strike_shift") or -9) >= LINE_CONFIRM_MIN,
                    "overnight": (lc.get("overnight_shift") or -9) >= LINE_CONFIRM_MIN,
                    "shade": shading_gap(g), "prof": profile(g)}
+            # Polymarket's frozen price for both sides (recorded in the public
+            # detail since the PM source was added). An exact 50/50 pair is an
+            # unopened/placeholder market, not a real price - excluded.
+            side = _adv_side(g)
+            pmrow = (((g.get("public_majority") or {}).get("detail") or {})
+                     .get("books") or {}).get("polymarket_bets") or {}
+            pm_p = pmrow.get(side)
+            pm_o = pmrow.get("away" if side == "home" else "home")
+            if pm_p == 50 and pm_o == 50:
+                pm_p = pm_o = None
+            rec["pm_pct"], rec["pm_opp_pct"] = pm_p, pm_o
+            rec["opp_odds"] = (g.get("pick_criteria") or {}).get("opponent_moneyline")
             bn = _book_needs(g)
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
@@ -400,6 +412,53 @@ def build() -> str:
                    [g for g in games if g.get("strike")]))
     md.append(_row("overnight drift after the strike window (11pm→6am)",
                    [g for g in games if g.get("overnight")]))
+    md.append("")
+
+    # POLYMARKET vs THE BOOK: settle the SAME graded picks twice - once at the
+    # book moneyline (the real record) and once at Polymarket's frozen price for
+    # our side (PM cents = breakeven probability; a $1 win pays 100/pct - 1).
+    # Also count historical ARBITRAGE windows: our side's PM price + the OTHER
+    # side's book price implying under 100% combined = a riskless spread existed
+    # at snapshot time. Caveats stated in the table notes.
+    pmg = [g for g in games if isinstance(g.get("pm_pct"), (int, float))
+           and 1 <= g["pm_pct"] <= 99]
+    md += [f"## Polymarket vs the book — same picks, PM's frozen price (n={len(pmg)})", "",
+           "_PM price is the gamma-API quote frozen in the snapshot: a mid/last "
+           "price with no fee or slippage modeling, so treat PM units as a "
+           "best-case. Unopened 50/50 placeholder markets excluded._", ""]
+    if pmg:
+        w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in pmg])
+        pm_u = round(sum((100.0 / g["pm_pct"] - 1) if g["won"] else -1 for g in pmg), 2)
+        gaps = [(_implied(g["odds"]) - g["pm_pct"] / 100.0) * 100 for g in pmg]
+        avg_gap = sum(gaps) / len(gaps)
+        better = [g for g in pmg if (_implied(g["odds"]) - g["pm_pct"] / 100.0) * 100 >= 1]
+        md += ["| venue (same picks, same outcomes) | record | units | ROI/bet |",
+               "|---|---|---|---|",
+               f"| book (real prices) | {w}-{l} ({w / len(pmg):.0%}) | {u:+.2f}u | {u / len(pmg):+.1%} |",
+               f"| Polymarket (frozen quote) | {w}-{l} (same games) | {pm_u:+.2f}u | {pm_u / len(pmg):+.1%} |",
+               "",
+               f"_Avg price gap: PM sells our side {avg_gap:+.1f} prob. points vs the book "
+               f"(positive = PM cheaper). PM was >=1pt cheaper on {len(better)} of {len(pmg)} picks._"]
+        if better:
+            bw, bl, bu = _units([{"won": g["won"], "odds": g["odds"]} for g in better])
+            bpm = round(sum((100.0 / g["pm_pct"] - 1) if g["won"] else -1 for g in better), 2)
+            md += ["", f"_On those {len(better)} PM-cheaper picks: book {bw}-{bl} {bu:+.2f}u "
+                       f"vs PM {bpm:+.2f}u._"]
+        # arbitrage windows: back our side at PM + the other side at the book
+        # (or the mirror) with combined implied probability under 100%.
+        arbs = []
+        for g in pmg:
+            if g.get("opp_odds") is None or not isinstance(g.get("pm_opp_pct"), (int, float)):
+                continue
+            m1 = 1 - (g["pm_pct"] / 100.0 + _implied(g["opp_odds"]))   # PM us + book opp
+            m2 = 1 - (_implied(g["odds"]) + g["pm_opp_pct"] / 100.0)   # book us + PM opp
+            m = max(m1, m2)
+            if m > 0:
+                arbs.append(m)
+        md += ["", f"_ARBITRAGE windows (PM one side + book the other, combined implied < 100%): "
+                   f"{len(arbs)} of {len(pmg)} games"
+                   + (f"; margins avg {100 * sum(arbs) / len(arbs):.1f}%, "
+                      f"best {100 * max(arbs):.1f}%." if arbs else ".") + "_"]
     md.append("")
 
     # Underdog study: our stat side priced as a DOG (ml > 0). Dog wins pay >1u, so
