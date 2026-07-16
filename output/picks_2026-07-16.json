@@ -1,6 +1,6 @@
 {
   "date": "2026-07-16",
-  "generated_at": "2026-07-16T08:02:23.385907+00:00",
+  "generated_at": "2026-07-16T09:02:13.885402+00:00",
   "games": [
     {
       "game_pk": 823440,
@@ -12,7 +12,7 @@
       "statistical_advantage": {
         "team": "New York Mets",
         "home_score": -0.0058,
-        "away_score": 0.07447088888888884,
+        "away_score": 0.07159088888888884,
         "home": {
           "name": "Philadelphia Phillies",
           "probable_pitcher": "Aaron Nola",
@@ -101,7 +101,7 @@
         }
       },
       "public_majority": {
-        "team": "New York Mets",
+        "team": "Philadelphia Phillies",
         "detail": {
           "consensus": {
             "pick": "Phi",
@@ -112,13 +112,13 @@
           },
           "forum": {
             "pick": "New York Mets",
-            "home": 0,
-            "away": 1
+            "home": 1,
+            "away": 2
           },
           "agree": false,
-          "forum_lean": -1.0,
+          "forum_lean": -0.333,
           "consensus_lean": 0.28,
-          "blended_lean": -0.075,
+          "blended_lean": 0.157,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -150,40 +150,40 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "vsin_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           }
         ],
-        "majority_side": "away",
-        "agree": 1,
-        "dissent": 4,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (covers, scoresodds_bets, vsin_bets, polymarket_bets differ)",
+        "majority_side": "home",
+        "agree": 4,
+        "dissent": 1,
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "4/5 sources agree (forum differ)",
         "flags": [
-          "money is on the other side from the public tickets"
+          "reverse line move \u2014 money went against the public %"
         ],
-        "line": "with public",
-        "money": "against public",
+        "line": "against public",
+        "money": "with public",
         "money_side": "home",
         "money_pct": 71
       },
@@ -263,14 +263,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "New York Mets",
-          "consensus_pct": 36.0,
-          "moneyline": "+110"
-        },
-        "non_majority": {
           "team": "Philadelphia Phillies",
           "consensus_pct": 64.0,
-          "moneyline": "-130"
+          "moneyline": "-133"
+        },
+        "non_majority": {
+          "team": "New York Mets",
+          "consensus_pct": 36.0,
+          "moneyline": "+108"
         }
       },
       "consistency": {
@@ -421,22 +421,22 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "core signal but not a fade setup \u2014 no play",
+        "reason": "public mildly on Philadelphia Phillies (63% < 70) \u2014 sharp fade, no play",
         "advantage_team": "New York Mets",
-        "public_edge": false,
-        "public_trusted": false,
+        "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.11,
+        "confidence": 0.163,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.08,
-            "strength": 0.201,
+            "margin": 0.077,
+            "strength": 0.193,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.075,
-            "strength": 0.0,
+            "blended_lean": 0.157,
+            "strength": 0.126,
             "weight": 0.45
           },
           "consistency": {
@@ -461,11 +461,12 @@
         "sp_dog_edge": 0.567,
         "pitching_dog": false,
         "signals_hit": 4,
+        "public_pct_against": 63,
         "book_stance": {
-          "side": "Philadelphia Phillies",
-          "against_us": true,
+          "side": "New York Mets",
+          "against_us": false,
           "tells": [
-            "money vs tickets"
+            "reverse line move"
           ],
           "strength": 1,
           "fooled": true
@@ -492,9 +493,9 @@
       "game_datetime": "2026-07-16T23:10:00Z",
       "weather": {
         "temp_f": 97,
-        "wind_mph": 13,
-        "wind_dir": "WNW",
-        "precip_pct": 2,
+        "wind_mph": 12,
+        "wind_dir": "W",
+        "precip_pct": 4,
         "roof": "open"
       },
       "umpire_hp": null,
