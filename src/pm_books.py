@@ -35,7 +35,7 @@ from pathlib import Path
 
 import requests
 
-from . import grade
+from . import grade, kalshi
 from .public_sources import _name_abbr
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -173,48 +173,84 @@ def run(date: str | None = None) -> int:
     except (OSError, ValueError):
         day = {"date": date, "games": {}}
 
-    index = None   # fetched lazily, only if some game still needs registration
+    index = None    # PM markets, fetched lazily if some game needs registration
+    kindex = None   # Kalshi markets, same
     now = int(time.time())
     polled = 0
     for g in targets:
         pk = str(g.get("game_pk"))
         pc = g["pick_criteria"]
+        if " @ " not in g.get("matchup", ""):
+            continue
+        away, home = g["matchup"].split(" @ ")
+        a_ab, h_ab = _name_abbr(away), _name_abbr(home)
+        adv = pc["advantage_team"]
+        adv_ab = h_ab if adv == home else a_ab
+        opp_ab = a_ab if adv == home else h_ab
+        ml = pc.get("advantage_moneyline")
+        ref = _implied(ml) if ml is not None else None
+        start = str(g.get("game_datetime", ""))
+        pregame = True
+        try:
+            st = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
+            pregame = now < int(st.timestamp())
+        except Exception:
+            pass
+
         entry = day["games"].get(pk)
+        book = None
         if entry is None or not entry.get("token"):
             if index is None:
                 index = open_market_index()
-            if " @ " not in g.get("matchup", ""):
-                continue
-            away, home = g["matchup"].split(" @ ")
-            a_ab, h_ab = _name_abbr(away), _name_abbr(home)
             tok = index.get((a_ab, h_ab)) if a_ab and h_ab else None
-            adv = pc["advantage_team"]
-            adv_ab = h_ab if adv == home else a_ab
-            opp_ab = a_ab if adv == home else h_ab
-            if not tok or adv_ab not in tok:
-                continue
-            ml = pc.get("advantage_moneyline")
-            ref = _implied(ml) if ml is not None else None
-            start = str(g.get("game_datetime", ""))
-            pregame = True
-            try:
-                st = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
-                pregame = now < int(st.timestamp())
-            except Exception:
-                pass
-            token, book = _pick_token(tok, adv_ab, opp_ab, ref, pregame)
-            if not token:
-                continue
-            entry = {"matchup": g["matchup"], "side": adv, "token": token,
-                     "play": grade._play(g) == "pick", "ref": ref,
-                     "game_datetime": start, "readings": []}
-            day["games"][pk] = entry
+            if tok and adv_ab in tok:
+                token, book = _pick_token(tok, adv_ab, opp_ab, ref, pregame)
+                if token:
+                    entry = entry or {"matchup": g["matchup"], "side": adv,
+                                      "play": grade._play(g) == "pick", "ref": ref,
+                                      "game_datetime": start, "readings": []}
+                    entry["token"] = token
+                    day["games"][pk] = entry
         else:
             book = best_of_book(entry["token"])
-        if book is None:
-            continue
-        entry["readings"].append({"t": now, **book})
-        polled += 1
+        if entry is not None and book is not None:
+            entry["readings"].append({"t": now, **book})
+            polled += 1
+        time.sleep(0.25)
+
+        # ---- Kalshi leg: same game, second venue, same cadence ----
+        if entry is None:
+            # no PM market found yet; still track Kalshi alone so the venue
+            # comparison isn't biased toward games PM happened to list.
+            entry = day["games"].get(pk)
+            if entry is None:
+                entry = {"matchup": g["matchup"], "side": adv,
+                         "play": grade._play(g) == "pick", "ref": ref,
+                         "game_datetime": start, "readings": []}
+                day["games"][pk] = entry
+        if not entry.get("k_ticker"):
+            if kindex is None:
+                kindex = kalshi.game_markets()
+            pair = kindex.get((a_ab, h_ab)) if a_ab and h_ab else None
+            kt = (pair or {}).get(adv_ab)
+            if kt:
+                kb = kalshi.top_of_book(kt)
+                m = _mid(kb) if kb and not kb.get("empty") else None
+                # pre-game the named market's mid must match the moneyline; if it
+                # doesn't but the other team's does, the name mapping was wrong.
+                if pregame and ref is not None and m is not None and abs(m - ref) > SIDE_TOL:
+                    ko = (pair or {}).get(opp_ab)
+                    kob = kalshi.top_of_book(ko) if ko else None
+                    om = _mid(kob) if kob and not kob.get("empty") else None
+                    if om is not None and abs(om - ref) <= SIDE_TOL:
+                        kt, kb = ko, kob
+                if kb is not None:
+                    entry["k_ticker"] = kt
+                    entry.setdefault("k_readings", []).append({"t": now, **kb})
+        else:
+            kb = kalshi.top_of_book(entry["k_ticker"])
+            if kb is not None:
+                entry.setdefault("k_readings", []).append({"t": now, **kb})
         time.sleep(0.25)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
