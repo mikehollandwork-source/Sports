@@ -156,6 +156,14 @@ def path_for(date: str) -> Path:
     return OUTPUT_DIR / f"pm_books_{date}.json"
 
 
+def load_day(date: str) -> dict:
+    """A day's recorded books ({} when the poller hasn't produced one yet)."""
+    try:
+        return json.loads(path_for(date).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 def run(date: str | None = None) -> int:
     date = date or dt.datetime.now(EASTERN).date().isoformat()
     picks_path = OUTPUT_DIR / f"picks_{date}.json"

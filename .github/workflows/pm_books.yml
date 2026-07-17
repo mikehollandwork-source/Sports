@@ -40,7 +40,10 @@ jobs:
           while [ "$(date +%s)" -lt "$END" ]; do
             git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
             python -m src.pm_books || echo "poll errored this tick, continuing"
-            git add output/pm_books_*.json 2>/dev/null || true
+            # dry-run executor: phantom orders at lock, fills vs the books just
+            # recorded, settles finals into the paper ledger. No real orders.
+            python -m src.pm_executor || echo "executor errored this tick, continuing"
+            git add output/pm_books_*.json output/pm_paper.json 2>/dev/null || true
             if ! git diff --staged --quiet; then
               git commit -m "PM book readings ($(date -u +%Y-%m-%dT%H:%MZ))"
               for i in 1 2 3 4; do
