@@ -33,6 +33,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Poll order books every ~10 min
+        env:
+          KALSHI_DEBUG: "1"   # temp: dump raw Kalshi JSON - series guess found 0 markets
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -43,7 +45,7 @@ jobs:
             # dry-run executor: phantom orders at lock, fills vs the books just
             # recorded, settles finals into the paper ledger. No real orders.
             python -m src.pm_executor || echo "executor errored this tick, continuing"
-            git add output/pm_books_*.json output/pm_paper.json 2>/dev/null || true
+            git add output/pm_books_*.json output/pm_paper.json output/kalshi_debug 2>/dev/null || true
             if ! git diff --staged --quiet; then
               git commit -m "PM book readings ($(date -u +%Y-%m-%dT%H:%MZ))"
               for i in 1 2 3 4; do
