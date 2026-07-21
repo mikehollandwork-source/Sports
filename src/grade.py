@@ -275,8 +275,9 @@ def _mark_recap_sent(date: str) -> None:
 
 def send_day_recap_if_complete(date: str, send) -> bool:
     """Send the day's recap via `send(text)` exactly once, and only after EVERY
-    play on the slate is final (the last game of the day is over). No-op if the
-    slate isn't done, has no booked plays, or the recap already went out.
+    play on the slate is final AND graded into the ledger (the last game of the
+    day is over and booked). No-op if the slate isn't done, has no booked plays,
+    or the recap already went out.
 
     The recap is built from the LEDGER (the authoritative running record) — the
     same source as the Yesterday/Week/Month record — NOT from a re-derivation of
@@ -284,11 +285,17 @@ def send_day_recap_if_complete(date: str, send) -> bool:
     and would otherwise disagree with the record."""
     if date in _recaps_sent():
         return False
-    _, pending = settle_day(date)   # board completion signal: any play still live?
-    if pending:
+    settled, pending = settle_day(date)   # settled = final+priced plays; pending = not-final
+    if pending or not settled:            # a play still live/undecided, or nothing to book
         return False
+    # every play is final -> GRADE this date first, so the last game (incl. any
+    # that finalized after midnight) is booked before the recap is built. Without
+    # this the prior-day recap could read a ledger the loop never re-graded and
+    # undercount a just-finalized game. Idempotent, so re-grading is a no-op.
+    update_ledger(date)
     entries = [e for e in load_ledger()["plays"]["entries"] if e["date"] == date]
-    if not entries:                 # nothing booked for the day -> nothing to recap
+    if len(entries) < len(settled):       # a final play isn't booked yet -> wait
+        log.info("recap for %s held: %d/%d plays booked", date, len(entries), len(settled))
         return False
     send(day_recap_text(date, entries))
     _mark_recap_sent(date)
