@@ -27,6 +27,7 @@ import requests
 
 from .park_factors import factor_for
 from . import strength
+from . import apitime
 
 log = logging.getLogger("mlb_api")
 
@@ -41,10 +42,12 @@ SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
 
 def _get(path: str, **params) -> dict:
-    resp = SESSION.get(f"{BASE}/{path}", params=params, timeout=TIMEOUT)
-    resp.raise_for_status()
+    with apitime.timed("mlb", path):
+        resp = SESSION.get(f"{BASE}/{path}", params=params, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
     time.sleep(POLITE_DELAY)
-    return resp.json()
+    return data
 
 
 # --- data models --------------------------------------------------------------

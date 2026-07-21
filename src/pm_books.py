@@ -35,7 +35,7 @@ from pathlib import Path
 
 import requests
 
-from . import grade, kalshi
+from . import apitime, grade, kalshi
 from .public_sources import _name_abbr
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -51,10 +51,11 @@ SIDE_TOL = 0.12   # pre-game mid must sit within this of the board's moneyline
 
 def _get(url: str, **params):
     try:
-        r = requests.get(url, params=params, timeout=TIMEOUT,
-                         headers={"User-Agent": "mlb-edge-finder (personal research)"})
-        r.raise_for_status()
-        return r.json()
+        with apitime.timed("pm", url.rsplit("/", 1)[-1]):
+            r = requests.get(url, params=params, timeout=TIMEOUT,
+                             headers={"User-Agent": "mlb-edge-finder (personal research)"})
+            r.raise_for_status()
+            return r.json()
     except Exception as exc:
         log.warning("fetch failed (%s): %s", url, exc)
         return None

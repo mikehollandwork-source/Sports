@@ -22,6 +22,8 @@ from pathlib import Path
 
 import requests
 
+from . import apitime
+
 log = logging.getLogger("espn")
 
 DEBUG = os.environ.get("ESPN_DEBUG") == "1"
@@ -34,9 +36,10 @@ EVENT_ODDS = ("https://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/"
 
 def _get(url: str) -> dict | None:
     try:
-        r = requests.get(url, headers=HEADERS, timeout=20)
-        r.raise_for_status()
-        data = r.json()
+        with apitime.timed("espn", url.rsplit("/", 2)[-1]):
+            r = requests.get(url, headers=HEADERS, timeout=20)
+            r.raise_for_status()
+            data = r.json()
     except Exception as exc:  # network/HTTP/JSON - degrade gracefully
         log.warning("espn fetch failed (%s): %s", url, exc)
         return None

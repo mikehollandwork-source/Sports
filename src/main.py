@@ -25,7 +25,8 @@ from . import covers, early_lines, espn, grade, notify, public_sources, reddit, 
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
-                       find_slate_line, line_confirms)
+                       find_slate_line, line_confirms,
+                       projected_from_margin)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
                       team_home_away_split)
 
@@ -126,6 +127,12 @@ def run(date: str) -> dict:
         _attach_line(g, r, slate, early, evening)
         _attach_pm_quote(g, r, extra_public.get("polymarket_bets") or [])
         _attach_situational(g, r, date)
+        # projected fair odds from our stats alone (no market data) - backend
+        pc = r.get("pick_criteria") or {}
+        margin = (pc.get("components") or {}).get("stat_edge", {}).get("margin")
+        proj = projected_from_margin(margin)
+        if proj:
+            pc["projected"] = proj
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls

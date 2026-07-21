@@ -23,6 +23,7 @@ from pathlib import Path
 import requests
 
 from .public_sources import _name_abbr
+from . import apitime
 
 log = logging.getLogger("kalshi")
 
@@ -35,11 +36,12 @@ DEBUG_DIR = Path("output/kalshi_debug")
 
 def _get(path: str, **params):
     try:
-        r = requests.get(f"{BASE}{path}", params=params, timeout=TIMEOUT,
-                         headers={"User-Agent": "mlb-edge-finder (personal research)",
-                                  "Accept": "application/json"})
-        r.raise_for_status()
-        data = r.json()
+        with apitime.timed("kalshi", path):
+            r = requests.get(f"{BASE}{path}", params=params, timeout=TIMEOUT,
+                             headers={"User-Agent": "mlb-edge-finder (personal research)",
+                                      "Accept": "application/json"})
+            r.raise_for_status()
+            data = r.json()
         if DEBUG:
             DEBUG_DIR.mkdir(parents=True, exist_ok=True)
             name = (path.strip("/").replace("/", "_") or "root") + ".json"

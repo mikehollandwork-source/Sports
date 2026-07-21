@@ -31,6 +31,8 @@ import time
 from pathlib import Path
 
 import requests
+
+from . import apitime
 from bs4 import BeautifulSoup
 
 log = logging.getLogger("public_sources")
@@ -87,8 +89,9 @@ def _name_abbr(text: str) -> str | None:
 
 def _fetch(url: str) -> tuple[BeautifulSoup | None, str, str]:
     try:
-        resp = SESSION.get(url, timeout=TIMEOUT)
-        resp.raise_for_status()
+        with apitime.timed("public", url.split("//", 1)[-1].split("/", 1)[0]):
+            resp = SESSION.get(url, timeout=TIMEOUT)
+            resp.raise_for_status()
         time.sleep(POLITE_DELAY)
         if DEBUG:
             _dump(url, resp.text)
@@ -226,9 +229,10 @@ def polymarket_consensus() -> list[dict]:
     when its two outcomes resolve to two MLB teams."""
     import json as _json
     try:
-        resp = SESSION.get(POLYMARKET_URL, timeout=TIMEOUT)
-        resp.raise_for_status()
-        events = resp.json()
+        with apitime.timed("polymarket", "events"):
+            resp = SESSION.get(POLYMARKET_URL, timeout=TIMEOUT)
+            resp.raise_for_status()
+            events = resp.json()
         if DEBUG:
             _dump("polymarket_events.json", _json.dumps(events)[:800000])
     except Exception as exc:
