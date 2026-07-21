@@ -37,6 +37,7 @@ import requests
 
 from . import apitime, grade, kalshi
 from .public_sources import _name_abbr
+from .analysis import _canon_abbr
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("pm_books")
@@ -240,15 +241,19 @@ def run(date: str | None = None) -> int:
         if not entry.get("k_ticker"):
             if kindex is None:
                 kindex = kalshi.game_markets()
-            pair = kindex.get((a_ab, h_ab)) if a_ab and h_ab else None
-            kt = (pair or {}).get(adv_ab)
+            # kalshi's index is keyed by CANONICAL abbrs (from the ticker); our
+            # a_ab/h_ab come from _name_abbr, so canonicalize before matching.
+            ca, ch = _canon_abbr(a_ab or ""), _canon_abbr(h_ab or "")
+            cadv, copp = _canon_abbr(adv_ab or ""), _canon_abbr(opp_ab or "")
+            pair = kindex.get((ca, ch)) if ca and ch else None
+            kt = (pair or {}).get(cadv)
             if kt:
                 kb = kalshi.top_of_book(kt)
                 m = _mid(kb) if kb and not kb.get("empty") else None
                 # pre-game the named market's mid must match the moneyline; if it
                 # doesn't but the other team's does, the name mapping was wrong.
                 if pregame and ref is not None and m is not None and abs(m - ref) > SIDE_TOL:
-                    ko = (pair or {}).get(opp_ab)
+                    ko = (pair or {}).get(copp)
                     kob = kalshi.top_of_book(ko) if ko else None
                     om = _mid(kob) if kob and not kob.get("empty") else None
                     if om is not None and abs(om - ref) <= SIDE_TOL:

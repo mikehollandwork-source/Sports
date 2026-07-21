@@ -23,6 +23,7 @@ from pathlib import Path
 import requests
 
 from .public_sources import _name_abbr
+from .analysis import _canon_abbr
 from . import apitime
 
 log = logging.getLogger("kalshi")
@@ -52,23 +53,49 @@ def _get(path: str, **params):
         return None
 
 
+def _abbr(ticker: str) -> str | None:
+    """The team this YES market resolves for, from the ticker suffix:
+    'KXMLBGAME-26JUL231840KCDET-KC' -> 'KC' (canonicalized)."""
+    tail = (ticker or "").rsplit("-", 1)[-1].upper()
+    return _canon_abbr(tail) if tail else None
+
+
+def _book(m: dict) -> dict:
+    """Top-of-book for a market row: YES bid/ask (dollars, 0-1) + sizes, straight
+    off the market object. Empty book -> {'empty': True}."""
+    bid, ask = m.get("yes_bid_dollars"), m.get("yes_ask_dollars")
+    if not bid and not ask:
+        return {"empty": True}
+    out: dict = {}
+    if bid:
+        out["bid"], out["bid_sz"] = float(bid), float(m.get("yes_bid_size_fp") or 0)
+    if ask:
+        out["ask"], out["ask_sz"] = float(ask), float(m.get("yes_ask_size_fp") or 0)
+    return out
+
+
 def game_markets() -> dict:
-    """{(abbr1, abbr2): {abbr: ticker}} for OPEN MLB game markets, keyed in both
-    orders (a game's two 'TEAM wins' markets share an event_ticker)."""
+    """{(abbr1, abbr2): {abbr: ticker}} for ACTIVE MLB game markets, keyed in both
+    orders (a game's two 'TEAM wins' markets share an event_ticker). Caches each
+    market row's inline prices for same-tick reads via top_of_book()."""
+    global _MARKET_CACHE
+    _MARKET_CACHE = {}
     events: dict = {}
     cursor = None
     for _ in range(20):                    # paginate, hard-capped
-        params = {"series_ticker": SERIES, "status": "open", "limit": 200}
+        params = {"series_ticker": SERIES, "status": "active", "limit": 200}
         if cursor:
             params["cursor"] = cursor
         data = _get("/markets", **params)
         mkts = (data or {}).get("markets") or []
         for m in mkts:
             try:
-                team = _name_abbr(str(m.get("yes_sub_title") or m.get("subtitle") or ""))
+                tk = m.get("ticker")
+                team = _abbr(tk)
                 ev = m.get("event_ticker")
-                if team and ev and m.get("ticker"):
-                    events.setdefault(ev, {})[team] = m["ticker"]
+                if team and ev and tk:
+                    events.setdefault(ev, {})[team] = tk
+                    _MARKET_CACHE[tk] = m
             except Exception:
                 continue
         cursor = (data or {}).get("cursor")
@@ -81,29 +108,22 @@ def game_markets() -> dict:
         if len(abbrs) == 2:
             index[(abbrs[0], abbrs[1])] = tick_by_team
             index[(abbrs[1], abbrs[0])] = tick_by_team
-    log.info("kalshi: %d open game market pair(s)", len(index) // 2)
+    log.info("kalshi: %d active game market pair(s)", len(index) // 2)
     return index
 
 
+_MARKET_CACHE: dict = {}
+
+
 def top_of_book(ticker: str) -> dict | None:
-    """{bid, ask, bid_sz, ask_sz} for a market's YES side, prices in 0-1.
-    YES ask = 1 - best NO bid. Empty book -> {'empty': True}; failure -> None."""
-    data = _get(f"/markets/{ticker}/orderbook")
-    ob = (data or {}).get("orderbook")
-    if ob is None:
-        return None
-    try:
-        yes = [(int(p) / 100.0, int(q)) for p, q in ob.get("yes") or []]
-        no = [(int(p) / 100.0, int(q)) for p, q in ob.get("no") or []]
-    except Exception:
-        return None
-    if not yes and not no:
-        return {"empty": True}
-    out: dict = {}
-    if yes:
-        p, q = max(yes, key=lambda x: x[0])
-        out["bid"], out["bid_sz"] = p, q
-    if no:
-        p, q = max(no, key=lambda x: x[0])
-        out["ask"], out["ask_sz"] = round(1 - p, 2), q
-    return out
+    """{bid, ask, bid_sz, ask_sz} for a market's YES side (prices 0-1). Uses the
+    cached row from the last game_markets() pass; on a miss (or for a fresh
+    reading) fetches the single market. Empty book -> {'empty': True}; None on
+    failure."""
+    m = _MARKET_CACHE.get(ticker)
+    if m is None:
+        data = _get(f"/markets/{ticker}")
+        m = (data or {}).get("market")
+        if m is None:
+            return None
+    return _book(m)
