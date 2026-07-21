@@ -25,7 +25,7 @@ import statistics as st
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
 from .analysis import (LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY, LINE_CONFIRM_MIN,
-                       PDOG_FIP_MIN)
+                       PDOG_FIP_MIN, projected_from_margin)
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "pitching_dog")
@@ -212,6 +212,18 @@ def build() -> str:
                 pm_p = pm_o = None
             rec["pm_pct"], rec["pm_opp_pct"] = pm_p, pm_o
             rec["opp_odds"] = (g.get("pick_criteria") or {}).get("opponent_moneyline")
+            # OUR projected fair win% (from the stat margin alone) minus the
+            # market's implied % - the "value" edge. Recomputed from margin so it
+            # covers every historical game, not just post-feature snapshots.
+            mg = sig.get("_margin")
+            proj = projected_from_margin(mg) if mg is not None else None
+            rec["proj_win"] = proj["win_prob"] if proj else None
+            rec["proj_edge"] = (round(proj["win_prob"] - _implied(sig["_ml"]) * 100, 1)
+                                if proj and sig.get("_ml") is not None else None)
+            # PM money vs our side: PM implied % for our side minus the market's -
+            # positive = PM's real money is MORE on our pick than the book price.
+            rec["pm_edge"] = (round(pm_p - _implied(sig["_ml"]) * 100, 1)
+                              if pm_p is not None and sig.get("_ml") is not None else None)
             bn = _book_needs(g)
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
@@ -564,6 +576,74 @@ def build() -> str:
     for u, roi, w, l, n, name in sorted(dcombos, reverse=True):
         md.append(f"| {name} | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
     md.append("")
+
+    # ============================ NEW EXPERIMENTS ============================
+    def roi3(label, rows):
+        if not rows:
+            return f"| {label} | 0 | — | — |"
+        w, l, u = _units(rows)
+        return f"| {label} (n={len(rows)}) | {w}-{l} ({w/len(rows):.0%}) | {u:+.2f}u | {u/len(rows):+.1%} |"
+
+    # (A) VALUE vs the market: our projected fair win% (stats alone) minus the
+    # market's implied %. Does betting only when WE think the price is generous
+    # beat flat betting everything? Bucketed, then a min-edge sweep.
+    valg = [g for g in games if g.get("proj_edge") is not None]
+    md += [f"## Value bet — our projected odds vs the market (n={len(valg)})", "",
+           "_proj_edge = our stat-projected win% minus the market's implied %. "
+           "Positive = we think our side is underpriced. Recomputed from margin so "
+           "it spans every graded game._", "",
+           "| our edge over the market | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, hi, lab in ((-99, 0, "market richer than us (<0)"), (0, 5, "slight (0–5 pts)"),
+                        (5, 10, "moderate (5–10)"), (10, 20, "strong (10–20)"),
+                        (20, 999, "huge (20+)")):
+        md.append(roi3(lab, [{"won": g["won"], "odds": g["odds"]} for g in valg
+                             if lo <= g["proj_edge"] < hi]))
+    md += ["", "| bet only when edge ≥ | record | units | ROI/bet |", "|---|---|---|---|"]
+    for thr in (0, 3, 5, 8, 12, 15):
+        md.append(roi3(f"{thr} pts", [{"won": g["won"], "odds": g["odds"]}
+                                      for g in valg if g["proj_edge"] >= thr]))
+    md.append("")
+
+    # (B) Polymarket money vs our pick (#2 on the roadmap): when PM's real-money
+    # implied % sits MORE on our side than the book price, does our pick win more?
+    pme = [g for g in games if g.get("pm_edge") is not None]
+    md += [f"## Polymarket money agreeing with our pick (n={len(pme)})", "",
+           "_pm_edge = PM's implied % for our side minus the market's implied %. "
+           "Positive = PM's live money leans our way harder than the sportsbook._", "",
+           "| PM lean vs the book | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, hi, lab in ((-99, -3, "PM against us (< -3)"), (-3, 3, "≈ agree (±3)"),
+                        (3, 8, "PM with us (3–8)"), (8, 999, "PM hard with us (8+)")):
+        md.append(roi3(lab, [{"won": g["won"], "odds": g["odds"]} for g in pme
+                             if lo <= g["pm_edge"] < hi]))
+    md.append("")
+
+    # (C) Line-move timing stacked on a core signal: does a SHARP-window move
+    # (overnight, before the public) plus a core signal beat the same core signal
+    # with a daytime/public move?
+    def is_core(g):
+        return any(g["sig"].get(s) is True for s in ("margin", "line", "consistency"))
+    core_pool = [g for g in games if is_core(g)]
+    md += [f"## Sharp-window line move × core signal (n={len(core_pool)} core picks)", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("core signal, any", [{"won": g["won"], "odds": g["odds"]} for g in core_pool]),
+           roi3("core + moved in the SHARP window (early)",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool
+                 if g.get("line_timing") in ("early", "both")]),
+           roi3("core + moved only in the PUBLIC window (late)",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool
+                 if g.get("line_timing") == "late"]),
+           roi3("core + sharps STRUCK the fresh opener",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool if g.get("strike")]), ""]
+
+    # (D) Value + a core signal together - the two independent edges stacked.
+    md += ["## Value edge + core signal together", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|"]
+    for thr in (5, 8, 12):
+        sub = [g for g in valg if g["proj_edge"] >= thr and is_core(g)]
+        md.append(roi3(f"proj_edge ≥{thr} AND a core signal",
+                       [{"won": g["won"], "odds": g["odds"]} for g in sub]))
+    md.append("")
+    # =========================== END NEW EXPERIMENTS =========================
 
     # EXHAUSTIVE: every non-empty subset of all 7 signals, ranked by ROI/bet. A
     # game counts for a subset when ALL its signals are present. Two pools: every
