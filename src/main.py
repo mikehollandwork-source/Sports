@@ -1109,42 +1109,16 @@ def build_summary(payload: dict) -> str:
     specific reason it's only a lean."""
     date = payload["date"]
     games = payload.get("games", [])
-    board, finals = _board_games(games), _finals(games)
+    board = _board_games(games)
     picks = [g for g in board if _play(g) == "pick"]
-    no_action = [g for g in board if _play(g) == "stay_away"]
+    # Minimal board: only the plays, one clean line each, ranked by win chance.
+    # No-plays are still recorded in the picks JSON (backend), just not shown.
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} play(s) · {len(no_action)} no-play**"
-               + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
-                  if picks else ""))
-    if finals:
-        final_plays = sum(1 for g in finals if _play(g) == "pick")
-        out.append(f"\n_{len(finals)} game(s) final — {final_plays} was/were plays booked "
-                   f"to the record below; the rest were no-plays (never bet)._")
-    out.append("")
-
-    if board:
-        for g in _by_win(picks) + no_action:   # picks ranked by win chance, then no-plays
-            out.extend(_game_lines(g))
-            out.append("")
+    if picks:
+        out += [_pick_line(g) for g in _by_win(picks)]
     else:
-        out.append("_No upcoming or live games — full slate is final (see the record below)._")
-        out.append("")
-
-    out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
-               "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
-               "▫️ = no play. 🔴 = live._")
-
-    out.append("")
-    out.append(grade.records_block())
-    rev = grade.review_line()
-    if rev:
-        out.append("")
-        out.append(rev)
-    tune_status = tune.status_line()
-    if tune_status:
-        out.append("")
-        out.append(tune_status)
-    out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
+        out.append("_No plays on the board._")
+    out += ["", grade.records_block()]
     return "\n".join(out)
 
 
@@ -1161,6 +1135,21 @@ def write_outputs(payload: dict, date: str) -> None:
 def _ml_str(pc: dict) -> str:
     ml = pc.get("advantage_moneyline")
     return f" ({ml:+d})" if isinstance(ml, int) else ""
+
+
+def _pick_line(g: dict) -> str:
+    """Minimal one-liner for the clean board: '⭐ BOS +115 vs TOR' — the pick's
+    abbreviation + moneyline, then the opponent. 🔴 prefix when live."""
+    pc = g["pick_criteria"]
+    aa, ha = _abbrs(g)
+    away, home = g["matchup"].split(" @ ")
+    adv = pc["advantage_team"]
+    adv_ab, opp_ab = (ha, aa) if adv == home else (aa, ha)
+    ml = pc.get("advantage_moneyline")
+    mls = f" {ml:+d}" if isinstance(ml, int) else ""
+    mark = "⭐" if _star(pc) else "✅"
+    live = "🔴 " if g.get("state") == "live" else ""
+    return f"{mark} {live}{adv_ab}{mls} vs {opp_ab}"
 
 
 def _telegram_records_lines() -> list[str]:
@@ -1188,92 +1177,18 @@ def telegram_text(payload: dict) -> str:
     the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
     date = payload["date"]
     games = payload.get("games", [])
-    board, finals = _board_games(games), _finals(games)
-
+    board = _board_games(games)
     picks = [g for g in board if _play(g) == "pick"]
-    no_action = [g for g in board if _play(g) == "stay_away"]
 
-    L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} play(s) · {len(no_action)} no-play"]
-    if finals:
-        final_plays = sum(1 for g in finals if _play(g) == "pick")
-        L.append(f"({len(finals)} final → {final_plays} play(s) booked to the record; "
-                 f"rest were no-plays)")
-
-    def block(g):
-        pc = g["pick_criteria"]
-        aa, ha = _abbrs(g)
-        adv = _short(g, pc["advantage_team"])
-        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
-        emargin = pc["components"]["stat_edge"]["margin"]
-        tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        frozen = " [frozen]" if g.get("state") == "live" else ""
-        star = _star(pc)
-        kind = "PLAY"
-        mark = "⭐" if star else "✅"
-        st = _start_time(g)
-        wphr = _win_phrase(g)
-        L.extend(["",
-                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
-                  f"   {aa} @ {ha}" + (f" · {st}" if st else ""),
-                  f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}"]
-                 + ([f"   {wphr}"] if wphr else [])
-                 + [f"   👥 public {_public_evidence(g)}",
-                    f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
-        mp = _money_phrase(g)
-        if mp:
-            L.append(f"   {mp}")
-        pcheck = _public_check_phrase(g)
-        if pcheck:
-            L.append(f"   🔍 check: {pcheck}")
-        bvp = _bvp_phrase(g)
-        if bvp:
-            L.append(f"   🥊 BvP {bvp}")
-        pen = _pen_bvp_phrase(g)
-        if pen:
-            L.append(f"   🧯 pen BvP {pen}")
-        pt = _pen_tax_phrase(g)
-        if pt:
-            L.append(f"   {pt}")
-        fp = _form_phrase(g)
-        if fp:
-            L.append(f"   📈 form: {fp}")
-        wx = _weather_phrase(g)
-        if wx:
-            L.append(f"   🌤 {wx}")
-        ump = _ump_phrase(g)
-        if ump:
-            L.append(f"   🧑‍⚖️ {ump}")
-        sit = _situational_phrase(g)
-        if sit:
-            L.append(f"   📅 {sit}")
-        L.append(f"   ✅ {pc['reason']}"
-                 + (f" · ⭐ {', '.join(star)}" if star else ""))
-
-    for g in _by_win(picks):   # ranked by win chance: core leads, pitching-dog trails
-        block(g)
-    if not picks:
-        L += ["", "No plays on the slate."]
-
-
-    if no_action:
-        L += ["", "— NO PLAY —"]
-        for g in no_action:
-            aa, ha = _abbrs(g)
-            pc = g["pick_criteria"]
-            tag = "🔴 " if g.get("state") == "live" else ""
-            mp = _money_phrase(g)
-            tm = _start_time(g)
-            L.append(f"▫️ {tag}{aa} @ {ha}" + (f" ({tm})" if tm else "")
-                     + f" — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else ""))
-    if not board:
-        L += ["", "No upcoming or live games — slate is final (see record)."]
+    # Minimal board: only the plays, one clean line each (ranked by win chance).
+    # No-plays stay recorded in the picks JSON (backend); they're not shown.
+    L = [f"⚾ MLB BOARD — {date}", ""]
+    if picks:
+        L += [_pick_line(g) for g in _by_win(picks)]
+    else:
+        L.append("No plays on the board.")
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
-    ts = tune.status_line().replace("**", "")
-    if ts:
-        L += ["", ts]
     return "\n".join(L)
 
 
