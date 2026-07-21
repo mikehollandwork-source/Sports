@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -147,6 +147,25 @@ def run(date: str) -> dict:
         states = {}
     for r in results:
         r["state"] = states.get(r.get("game_pk"), {}).get("state", "upcoming")
+
+    # Best 1+ hit prop for each PLAY (the picked team's most-consistent bat in its
+    # season wins). Only upcoming/live plays; fails soft so it never blocks the board.
+    gbypk = {g.game_pk: g for g in games}
+    for r in results:
+        if _play(r) != "pick" or r.get("state") == "final":
+            continue
+        gm = gbypk.get(r.get("game_pk"))
+        if gm is None:
+            continue
+        adv = r["pick_criteria"]["advantage_team"]
+        is_home = adv == gm.home.name
+        team = gm.home if is_home else gm.away
+        try:
+            prop = props.best_hit_prop(gm.game_pk, team.team_id, date, is_home)
+            if prop:
+                r["pick_criteria"]["prop"] = prop
+        except Exception as exc:
+            log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
     picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
     no_action = sum(1 for r in results if _play(r) == "stay_away")
@@ -1145,8 +1164,8 @@ def _ml_str(pc: dict) -> str:
 
 
 def _pick_line(g: dict) -> str:
-    """Minimal one-liner for the clean board: '⭐ BOS +115 vs TOR' — the pick's
-    abbreviation + moneyline, then the opponent. 🔴 prefix when live."""
+    """Minimal board line: '⭐ BOS +115 vs TOR · 7:10 PM ET · 🎯 Devers 78% H'
+    — pick abbr + moneyline, opponent, first pitch, and the best hit prop."""
     pc = g["pick_criteria"]
     aa, ha = _abbrs(g)
     away, home = g["matchup"].split(" @ ")
@@ -1156,7 +1175,15 @@ def _pick_line(g: dict) -> str:
     mls = f" {ml:+d}" if isinstance(ml, int) else ""
     mark = "⭐" if _star(pc) else "✅"
     live = "🔴 " if g.get("state") == "live" else ""
-    return f"{mark} {live}{adv_ab}{mls} vs {opp_ab}"
+    line = f"{mark} {live}{adv_ab}{mls} vs {opp_ab}"
+    st = _start_time(g)
+    if st:
+        line += f" · {st}"
+    prop = pc.get("prop")
+    if prop and prop.get("player"):
+        last = prop["player"].split()[-1]
+        line += f" · 🎯 {last} {prop['hit_rate']}% H"
+    return line
 
 
 def _telegram_records_lines() -> list[str]:
