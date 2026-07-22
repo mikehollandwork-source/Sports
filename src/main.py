@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, prop_grade, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -1148,7 +1148,8 @@ def build_summary(payload: dict) -> str:
     else:
         out.append("_No plays on the board._")
     out += ["", grade.records_block()]
-    out += ["", *prop_grade.records_lines(md=True)]
+    # props stay backend-only for now (still computed + tracked in prop_ledger.json,
+    # just not shown on the board)
     return "\n".join(out)
 
 
@@ -1168,8 +1169,9 @@ def _ml_str(pc: dict) -> str:
 
 
 def _pick_line(g: dict) -> str:
-    """Minimal board line: '⭐ BOS +115 vs TOR · 7:10 PM ET · 🎯 Devers 78% H'
-    — pick abbr + moneyline, opponent, first pitch, and the best hit prop."""
+    """Minimal board line: '⭐ BOS +115 vs TOR · 7:10 PM ET'
+    — pick abbr + moneyline, opponent, and first pitch. (The hit prop is
+    computed and tracked backend-only for now, so it's not shown here.)"""
     pc = g["pick_criteria"]
     aa, ha = _abbrs(g)
     away, home = g["matchup"].split(" @ ")
@@ -1183,10 +1185,6 @@ def _pick_line(g: dict) -> str:
     st = _start_time(g)
     if st:
         line += f" · {st}"
-    prop = pc.get("prop")
-    if prop and prop.get("player"):
-        last = prop["player"].split()[-1]
-        line += f" · 🎯 {last} {prop['hit_rate']}% H"
     return line
 
 
@@ -1227,7 +1225,7 @@ def telegram_text(payload: dict) -> str:
         L.append("No plays on the board.")
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
-    L += ["", *prop_grade.records_lines(md=False)]
+    # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)
 
 
