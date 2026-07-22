@@ -104,7 +104,8 @@ def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool) -> dict | N
         if played < MIN_WINS_PLAYED or (pa_total / played) < MIN_AVG_PA:
             continue
         rate = with_hit / played
-        cand = {"player": p.name, "hit_rate": round(rate * 100),
+        cand = {"player": p.name, "player_id": p.player_id,
+                "hit_rate": round(rate * 100),
                 "wins_played": played, "avg_pa": round(pa_total / played, 1)}
         if best is None or (rate, cand["avg_pa"]) > (best["hit_rate"] / 100, best["avg_pa"]):
             best = cand

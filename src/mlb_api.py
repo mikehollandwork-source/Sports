@@ -170,6 +170,23 @@ def hp_umpire(game_pk: int) -> str | None:
     return None
 
 
+def player_hits(game_pk: int, player_id: int) -> int | None:
+    """Hits the player recorded in a game, from the boxscore batting line. None
+    if unavailable (game not final / player absent / fetch fails)."""
+    try:
+        with apitime.timed("mlb", f"box/{game_pk}"):
+            box = SESSION.get(
+                f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore",
+                timeout=TIMEOUT).json()
+        for side in ("home", "away"):
+            p = (box.get("teams", {}).get(side, {}).get("players") or {}).get(f"ID{player_id}")
+            if p:
+                return int((p.get("stats", {}).get("batting", {}) or {}).get("hits", 0) or 0)
+    except Exception as exc:
+        log.warning("player_hits fetch failed (%s/%s): %s", game_pk, player_id, exc)
+    return None
+
+
 def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")

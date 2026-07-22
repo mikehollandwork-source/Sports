@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, prop_grade, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -1145,6 +1145,7 @@ def build_summary(payload: dict) -> str:
     else:
         out.append("_No plays on the board._")
     out += ["", grade.records_block()]
+    out += ["", *prop_grade.records_lines(md=True)]
     return "\n".join(out)
 
 
@@ -1223,6 +1224,7 @@ def telegram_text(payload: dict) -> str:
         L.append("No plays on the board.")
 
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
+    L += ["", *prop_grade.records_lines(md=False)]
     return "\n".join(L)
 
 
