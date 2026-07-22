@@ -123,8 +123,8 @@
 
 | slice | record | units |
 |---|---|---|
-| BOARD: fade + core signal (n=120) | 75-45 (62%) | +10.65u |
-| DROPPED: tail + core signal (was played, now cut) (n=57) | 26-31 (46%) | -8.57u |
+| BOARD: fade + core signal (n=96) | 62-34 (65%) | +12.89u |
+| DROPPED: tail + core signal (was played, now cut) (n=52) | 23-29 (44%) | -8.98u |
 
 ## Board leak-finder — the live board by core-signal type
 
@@ -133,8 +133,8 @@ _Which picks on the current board (fade + core) carry ROI, and which are the dra
 | board subset | record | units | ROI/bet |
 |---|---|---|---|
 | has MARGIN (with anything) (n=33) | 26-7 (79%) | +11.43u | +34.6% |
-| NO margin (core = line/consistency only) (n=87) | 49-38 (56%) | -0.77u | -0.9% |
-|   ...line-only core (no margin, no consistency) (n=24) | 13-11 (54%) | -2.24u | -9.3% |
+| NO margin (core = line/consistency only) (n=63) | 36-27 (57%) | +1.46u | +2.3% |
+|   ...line-only core (no margin, no consistency) | 0 | — | — |
 |   ...consistency-only core (no margin, no line) (n=50) | 30-20 (60%) | +4.06u | +8.1% |
 |   ...line AND consistency (no margin) (n=13) | 6-7 (46%) | -2.60u | -20.0% |
 | 2+ core signals together (n=38) | 25-13 (66%) | +4.19u | +11.0% |
@@ -320,21 +320,21 @@ _pm_edge = PM's implied % for our side minus the market's implied %. Positive = 
 | PM with us (3–8) | 0 | — | — |
 | PM hard with us (8+) (n=2) | 0-2 (0%) | -2.00u | -100.0% |
 
-## Sharp-window line move × core signal (n=180 core picks)
+## Sharp-window line move × core signal (n=151 core picks)
 
 | slice | record | units | ROI/bet |
 |---|---|---|---|
-| core signal, any (n=180) | 102-78 (57%) | +0.91u | +0.5% |
-| core + moved in the SHARP window (early) (n=10) | 7-3 (70%) | +2.18u | +21.8% |
-| core + moved only in the PUBLIC window (late) (n=14) | 7-7 (50%) | -2.42u | -17.3% |
+| core signal, any (n=151) | 86-65 (57%) | +2.74u | +1.8% |
+| core + moved in the SHARP window (early) (n=5) | 4-1 (80%) | +2.25u | +45.0% |
+| core + moved only in the PUBLIC window (late) (n=7) | 4-3 (57%) | -0.27u | -3.9% |
 | core + sharps STRUCK the fresh opener | 0 | — | — |
 
 ## Value edge + core signal together
 
 | slice | record | units | ROI/bet |
 |---|---|---|---|
-| proj_edge ≥5 AND a core signal (n=84) | 44-40 (52%) | -1.72u | -2.0% |
-| proj_edge ≥8 AND a core signal (n=50) | 27-23 (54%) | +1.20u | +2.4% |
+| proj_edge ≥5 AND a core signal (n=77) | 40-37 (52%) | -2.34u | -3.0% |
+| proj_edge ≥8 AND a core signal (n=47) | 26-21 (55%) | +2.34u | +5.0% |
 | proj_edge ≥12 AND a core signal (n=29) | 15-14 (52%) | +0.05u | +0.2% |
 
 ## ALL signal combinations — every graded pick (every signal subset, n≥10, by ROI/bet)

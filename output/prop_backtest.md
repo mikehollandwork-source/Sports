@@ -1,4 +1,4 @@
-# Prop backtest — 127 props reconstructed of 136 historical board plays
+# Prop backtest — 127 props reconstructed of 137 historical board plays
 
 _The hits-in-wins prop rebuilt pre-game for each past board pick (target game excluded from the wins sample). Win% is real; ROI uses the assumed -200 1+hit line (real historical prop lines aren't captured), so read ROI as an estimate._
 
