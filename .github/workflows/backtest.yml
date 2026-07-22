@@ -36,12 +36,23 @@ jobs:
       - name: Run signal backtest (snapshot-based, real results)
         run: python -m src.signal_backtest
 
+      # Prop backtest: does the hits-in-wins prop, split by our signals, make ROI?
+      # Reconstructs each past board play's prop from the MLB API (slower).
+      - name: Run prop backtest
+        continue-on-error: true
+        timeout-minutes: 25
+        run: python -m src.prop_backtest
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue create --title "Signal backtest $(date -u +%Y-%m-%d)" \
             --body-file output/signal_backtest.md
+          if [ -f output/prop_backtest.md ]; then
+            gh issue create --title "Prop backtest $(date -u +%Y-%m-%d)" \
+              --body-file output/prop_backtest.md
+          fi
 
       - name: Commit report
         run: |

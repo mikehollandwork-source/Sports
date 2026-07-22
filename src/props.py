@@ -71,9 +71,16 @@ def _game_log(player_id: int, season: int) -> list:
     return splits
 
 
-def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool) -> dict | None:
-    """The picked team's most-consistent hitter-in-wins (see module doc)."""
+def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool,
+                  exclude_pk: int | None = None) -> dict | None:
+    """The picked team's most-consistent hitter-in-wins (see module doc).
+
+    exclude_pk drops one game from the season-wins sample - used by the backtest
+    to reconstruct the pre-game prop without leaking the game being graded (live
+    callers leave it None, since tonight's game isn't final yet anyway)."""
     wins = _team_win_pks(team_id, date)
+    if exclude_pk is not None:
+        wins = wins - {exclude_pk}
     if len(wins) < MIN_WINS_PLAYED:
         return None
     try:
