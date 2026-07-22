@@ -172,6 +172,14 @@ def _row(label: str, rows: list[dict]) -> str:
     return f"| {label} | {w}-{l} ({w / len(rows):.0%}) | {u:+.2f}u |"
 
 
+def roi3(label: str, rows: list[dict]) -> str:
+    """A row with the ROI/bet column: '| label (n=..) | W-L (win%) | +Xu | +Y% |'."""
+    if not rows:
+        return f"| {label} | 0 | — | — |"
+    w, l, u = _units(rows)
+    return f"| {label} (n={len(rows)}) | {w}-{l} ({w / len(rows):.0%}) | {u:+.2f}u | {u / len(rows):+.1%} |"
+
+
 def build() -> str:
     games: list[dict] = []
     total = graded = 0
@@ -381,6 +389,29 @@ def build() -> str:
            _row(f"DROPPED: tail + core signal (was played, now cut) (n={len(dropped_tail)})",
                 [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in dropped_tail]), ""]
 
+    # WHERE'S THE LEAK? Split the live board by WHICH core signal each pick carries.
+    # margin is the strongest core; the question is whether the non-margin picks
+    # (core = line-only or consistency-only) are a drag we could tighten out.
+    def ganti(sub):
+        return [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]
+    has = lambda g, s: g["sig"].get(s) is True
+    has_margin = [g for g in gate if has(g, "margin")]
+    no_margin = [g for g in gate if not has(g, "margin")]
+    line_only = [g for g in no_margin if has(g, "line") and not has(g, "consistency")]
+    cons_only = [g for g in no_margin if has(g, "consistency") and not has(g, "line")]
+    line_and_cons = [g for g in no_margin if has(g, "line") and has(g, "consistency")]
+    two_plus = [g for g in gate if sum(has(g, s) for s in ("margin", "line", "consistency")) >= 2]
+    md += ["## Board leak-finder — the live board by core-signal type", "",
+           "_Which picks on the current board (fade + core) carry ROI, and which "
+           "are the drag we could tighten out. All bet the fade side, $1/pick._", "",
+           "| board subset | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("has MARGIN (with anything)", ganti(has_margin)),
+           roi3("NO margin (core = line/consistency only)", ganti(no_margin)),
+           roi3("  ...line-only core (no margin, no consistency)", ganti(line_only)),
+           roi3("  ...consistency-only core (no margin, no line)", ganti(cons_only)),
+           roi3("  ...line AND consistency (no margin)", ganti(line_and_cons)),
+           roi3("2+ core signals together", ganti(two_plus)), ""]
+
     # #5 - do tighter numeric thresholds sharpen a signal? Sweep the margin and
     # consistency cutoffs on the fade side (bet the anti-Vegas team).
     md += ["## Threshold sweeps on the fade side (does a tighter bar help?)", "",
@@ -578,12 +609,6 @@ def build() -> str:
     md.append("")
 
     # ============================ NEW EXPERIMENTS ============================
-    def roi3(label, rows):
-        if not rows:
-            return f"| {label} | 0 | — | — |"
-        w, l, u = _units(rows)
-        return f"| {label} (n={len(rows)}) | {w}-{l} ({w/len(rows):.0%}) | {u:+.2f}u | {u/len(rows):+.1%} |"
-
     # (A) VALUE vs the market: our projected fair win% (stats alone) minus the
     # market's implied %. Does betting only when WE think the price is generous
     # beat flat betting everything? Bucketed, then a min-edge sweep.
