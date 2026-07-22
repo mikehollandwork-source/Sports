@@ -83,21 +83,24 @@ def grade_date(date: str) -> tuple[list, list]:
         team_won = res.get("winner") == adv
         score = f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}"
         key = f"{date}#{g['game_pk']}"
-        # single: the prop alone, at the assumed prop price
+        # real captured 1+ hit line if we have one, else the assumed fallback
+        prop_price = int(prop.get("odds", PROP_PRICE))
+        # single: the prop alone
         singles.append({
             "key": key, "date": date, "matchup": g["matchup"],
             "bet": f"{prop['player']} 1+ H", "result": "W" if got_hit else "L",
-            "score": score, "odds": PROP_PRICE,
-            "profit": round(grade.american_profit(PROP_PRICE) if got_hit else -STAKE, 2)})
+            "score": score, "odds": prop_price, "real_line": "odds" in prop,
+            "profit": round(grade.american_profit(prop_price) if got_hit else -STAKE, 2)})
         # parlay: team ML + prop; needs a real team price
         ml = pc.get("advantage_moneyline")
         if ml is not None:
             won = team_won and got_hit
-            po = parlay_odds(int(ml), PROP_PRICE)
+            po = parlay_odds(int(ml), prop_price)
             parlays.append({
                 "key": key, "date": date, "matchup": g["matchup"],
                 "bet": f"{adv} ML + {prop['player']} 1+ H",
                 "result": "W" if won else "L", "score": score, "odds": po,
+                "real_line": "odds" in prop,
                 "profit": round(grade.american_profit(po) if won else -STAKE, 2)})
     return singles, parlays
 
@@ -121,7 +124,15 @@ def records_lines(md: bool = True) -> list[str]:
     led = load_ledger()
     today = dt.datetime.now(EASTERN).date()
     price = led.get("prop_price", PROP_PRICE)
-    head = f"🎯 PROP RECORDS (1+ hit · assumed {price:+d} · separate from ML)"
+    entries = led["singles"]["entries"] + led["parlays"]["entries"]
+    n_real = sum(1 for e in entries if e.get("real_line"))
+    if n_real and n_real == len(entries):
+        pricing = "real lines"
+    elif n_real:
+        pricing = f"{n_real}/{len(entries)} real lines, rest assumed {price:+d}"
+    else:
+        pricing = f"assumed {price:+d}"
+    head = f"🎯 PROP RECORDS (1+ hit · {pricing} · separate from ML)"
     out = [head] if not md else [f"**{head}**"]
     for name, book in (("Prop singles", led["singles"]), ("Prop parlays (ML + prop)", led["parlays"])):
         rec = grade.windowed_records(book, today)

@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, prop_grade, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, prop_grade, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -163,6 +163,9 @@ def run(date: str) -> dict:
         try:
             prop = props.best_hit_prop(gm.game_pk, team.team_id, date, is_home)
             if prop:
+                line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
+                if line is not None:
+                    prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
                 r["pick_criteria"]["prop"] = prop
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
