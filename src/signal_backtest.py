@@ -379,7 +379,7 @@ def build() -> str:
     # Vegas does NOT need) carrying a CORE signal (margin/line/consistency). This is
     # what actually makes the board now - validate it's +EV and see what it drops.
     def is_core(g):
-        return any(g["sig"].get(s) is True for s in ("margin", "line", "consistency"))
+        return any(g["sig"].get(s) is True for s in ("margin", "consistency"))
     gate = [g for g in agree if is_core(g)]                     # fade + core
     dropped_tail = [g for g in veg if not g["anti_is_adv"] and is_core(g)]  # tail + core (now cut)
     md += ["## NEW BOARD GATE — fade + core signal (what makes the board now)", "",
@@ -646,7 +646,7 @@ def build() -> str:
     # (overnight, before the public) plus a core signal beat the same core signal
     # with a daytime/public move?
     def is_core(g):
-        return any(g["sig"].get(s) is True for s in ("margin", "line", "consistency"))
+        return any(g["sig"].get(s) is True for s in ("margin", "consistency"))
     core_pool = [g for g in games if is_core(g)]
     md += [f"## Sharp-window line move × core signal (n={len(core_pool)} core picks)", "",
            "| slice | record | units | ROI/bet |", "|---|---|---|---|",

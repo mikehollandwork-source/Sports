@@ -480,11 +480,14 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
     pc["signals_hit"] = len(hits)
     opp_name = home if adv == away else away
     shift = info.get("implied_shift")
-    # CORE signals carry a play; favorite + BvP are supporting only. The graded
-    # record: bets with a core signal (margin>=.50 / line toward / consistency>=3)
-    # went 11-4 (+3.06u), while no-core bets (favorite-only, BvP-only, favorite+BvP)
-    # went 7-8 (-1.78u). So ANY play now needs a core signal.
-    core_hit = m_hit or l_hit or c_hit
+    # CORE signals carry a play; favorite, BvP AND now LINE are supporting only.
+    # The 335-game leak-finder: line as a standalone core bled (line-only -9.3%
+    # ROI, line+consistency-no-margin -20%), because our line signal can't tell a
+    # sharp move from a public one and public-window moves grade -17%. Dropping it
+    # from core lifts the board 62%->65% / +8.9%->+13.4% ROI. margin (+34.6%) and
+    # consistency (+8.1%) are the only edges that carry a play alone; line still
+    # counts toward signals_hit / star / win-prob.
+    core_hit = m_hit or c_hit
     # Mild-public gate: a public lean UNDER PUBLIC_HEAVY% on the OTHER side has been
     # the sharp side (both the 106-game study and the live record: our side ~38%
     # into it). It's now a NO-ACTION, not a demoted lean - that bucket bled -2.23u.
@@ -581,7 +584,7 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         elif book and is_tail and core_hit:
             why = "core signal but not a fade setup — no play"
         elif not core_hit and hits:
-            why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
+            why = f"only {', '.join(hits)} — no core signal (margin/consistency), no play"
         else:
             why = "0/8 signals — no play"
         pc["reason"] = why
