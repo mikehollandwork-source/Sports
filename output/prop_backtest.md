@@ -1,4 +1,4 @@
-# Prop backtest — 127 props reconstructed of 137 historical board plays
+# Prop backtest — 134 props reconstructed of 137 historical board plays
 
 _The hits-in-wins prop rebuilt pre-game for each past board pick (target game excluded from the wins sample). Win% is real; ROI uses the assumed -200 1+hit line (real historical prop lines aren't captured), so read ROI as an estimate._
 
@@ -6,8 +6,8 @@ _The hits-in-wins prop rebuilt pre-game for each past board pick (target game ex
 
 | bet | record | units | ROI/bet |
 |---|---|---|---|
-| prop SINGLE (player 1+ hit) (n=127) | 88-39 (69%) | +5.00u | +3.9% |
-| prop PARLAY (team ML + 1+ hit) (n=127) | 57-70 (45%) | +21.67u | +17.1% |
+| prop SINGLE (player 1+ hit) (n=134) | 92-42 (69%) | +4.00u | +3.0% |
+| prop PARLAY (team ML + 1+ hit) (n=134) | 59-75 (44%) | +19.32u | +14.4% |
 
 ## Prop + each signal (does a signal-filtered prop make ROI?)
 
@@ -15,22 +15,22 @@ _Singles and ML+prop parlays, keeping only board plays where that signal fired o
 
 | signal on the pick | SINGLE record | S ROI | PARLAY record | P ROI |
 |---|---|---|---|---|
-| margin (n=24) | 18-6 (75%) | +12.5% | 15-9 (62%) | +57.3% |
-| favorite (n=110) | 80-30 (73%) | +9.1% | 52-58 (47%) | +20.7% |
-| line (n=41) | 27-14 (66%) | -1.2% | 17-24 (41%) | +2.3% |
-| consistency (n=73) | 54-19 (74%) | +11.0% | 35-38 (48%) | +25.5% |
-| bvp (n=91) | 63-28 (69%) | +3.8% | 39-52 (43%) | +12.0% |
+| margin (n=28) | 20-8 (71%) | +7.1% | 16-12 (57%) | +43.5% |
+| favorite (n=115) | 83-32 (72%) | +8.3% | 54-61 (47%) | +19.5% |
+| line (n=45) | 30-15 (67%) | +0.0% | 19-26 (42%) | +3.6% |
+| consistency (n=77) | 57-20 (74%) | +11.0% | 36-41 (47%) | +21.8% |
+| bvp (n=97) | 66-31 (68%) | +2.1% | 41-56 (42%) | +9.9% |
 | sharp (n=3) | 2-1 (67%) | +0.0% | 1-2 (33%) | -8.3% |
-| form (n=42) | 33-9 (79%) | +17.9% | 21-21 (50%) | +31.7% |
-| pitching_dog | 0 | — | 0 | — |
+| form (n=47) | 36-11 (77%) | +14.9% | 22-25 (47%) | +22.9% |
+| pitching_dog (n=2) | 1-1 (50%) | -25.0% | 0-2 (0%) | -100.0% |
 
 ## By the prop's own hit-in-wins rate (is the metric predictive?)
 
 | chosen hitter's win hit-rate | SINGLE record | ROI/bet |
 |---|---|---|
 | < 70% (n=1) | 1-0 (100%) | +0.50u | +50.0% |
-| 70–74% (n=19) | 15-4 (79%) | +3.50u | +18.4% |
-| 75–79% (n=38) | 24-14 (63%) | -2.00u | -5.3% |
-| ≥ 80% (n=69) | 48-21 (70%) | +3.00u | +4.3% |
+| 70–74% (n=20) | 15-5 (75%) | +2.50u | +12.5% |
+| 75–79% (n=41) | 26-15 (63%) | -2.00u | -4.9% |
+| ≥ 80% (n=72) | 50-22 (69%) | +3.00u | +4.2% |
 
 _Point-in-time: prop chosen from the frozen board's advantage side with the graded game excluded from its wins sample; hit confirmed from the box score; $1/bet. ROI at the assumed prop price._
