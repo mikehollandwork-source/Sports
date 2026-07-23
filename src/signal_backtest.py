@@ -207,7 +207,8 @@ def build() -> str:
                    "line_timing": lc.get("timing"),
                    "strike": (lc.get("strike_shift") or -9) >= LINE_CONFIRM_MIN,
                    "overnight": (lc.get("overnight_shift") or -9) >= LINE_CONFIRM_MIN,
-                   "shade": shading_gap(g), "prof": profile(g)}
+                   "shade": shading_gap(g), "prof": profile(g),
+                   "play": (g.get("pick_criteria") or {}).get("play")}
             # Polymarket's frozen price for both sides (recorded in the public
             # detail since the PM source was added). An exact 50/50 pair is an
             # unopened/placeholder market, not a real price - excluded.
@@ -767,6 +768,26 @@ def build() -> str:
     else:
         md.append("| _none clear the bar_ | — | — |")
     md.append("")
+
+    # PROMOTION VALIDATION: promoting only touches NO-PLAY games (board picks
+    # already stand). So the honest test of "promote bvp+form no-plays by fading
+    # the opponent" is the fade edge on the NO-PLAY subset specifically - if the
+    # edge lives in the already-played games, promoting the no-plays won't repeat it.
+    BOARD_PLAYS = ("pick", "lock", "lean")
+    bf = [g for g in games if g["sig"].get("bvp") is True and g["sig"].get("form") is True
+          and g.get("opp_odds") is not None]
+    bf_noplay = [g for g in bf if g.get("play") not in BOARD_PLAYS]
+    bf_play = [g for g in bf if g.get("play") in BOARD_PLAYS]
+
+    def fade_rows(sub):
+        return [{"won": not g["won"], "odds": g["opp_odds"]} for g in sub]
+    md += ["## Promotion check — fade bvp+form, NO-PLAY subset (what we'd promote)", "",
+           "_The promotion only touches no-play games, so this subset is the one "
+           "that matters. Fade = bet the opponent at its price._", "",
+           "| bvp+form fade | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("all bvp+form (context)", fade_rows(bf)),
+           roi3("NO-PLAY subset (the promotion)", fade_rows(bf_noplay)),
+           roi3("already-played subset (context)", fade_rows(bf_play)), ""]
 
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "
