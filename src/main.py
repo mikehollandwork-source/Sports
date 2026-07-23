@@ -534,19 +534,14 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
     else:
         is_tail = False
         qualifies = core_hit or pd_hit        # no book read -> core, or pitching dog
-    # UNDERDOG DISCIPLINE (this session's 85-dog study): our stat side priced as a
-    # DOG (ml>0) is a net loser (-11% ROI) UNLESS it carries margin (+4%) or the
-    # pitching-dog edge (~breakeven). Dogs carried only by consistency bled (12-17,
-    # -14% on 29) and consistency+BvP dogs were the worst bucket on the board (-42%).
-    # So on a dog we require margin or the pitching path - consistency alone can
-    # carry a FAVORITE (+8%) but not a dog. Favorites are unaffected.
-    is_dog = isinstance(ml, int) and ml > 0
-    dog_ok = (not is_dog) or m_hit or pd_hit
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when it
     # clears the fade gate + core signal and isn't a mild-public fade. A PITCHING
     # DOG also bypasses the fade + mild-public gates - it's its own high-conviction
     # path (backtested +11% ROI on 186 dogs). The internal play value stays "pick".
-    playable = qualifies and dog_ok and (not mild_public or pd_hit)
+    # (Tried an extra underdog gate — a dog needs margin/pitching — but the fade
+    # gate already cuts the losing dogs; on the fade board the survivors went 4-3
+    # +21%, so the rule dropped winners and LOWERED ROI. Reverted, kept as a note.)
+    playable = qualifies and (not mild_public or pd_hit)
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
@@ -587,9 +582,7 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         pc["status"] = "stay_away"
         pc["stay_bet"] = None
         pc["stay_odds"] = None
-        if not dog_ok and qualifies and not mild_public:
-            why = "underdog carried only by consistency — dogs need margin or a pitching edge, no play"
-        elif mild_public:
+        if mild_public:
             why = f"public mildly on {maj} ({pub_pct}% < {PUBLIC_HEAVY}) — sharp fade, no play"
         elif book and is_tail and core_hit:
             why = "core signal but not a fade setup — no play"
