@@ -444,4 +444,14 @@ _Combos (n≥25) where OUR side loses ≤−12% ROI. 'fade' bets the OPPONENT at
 | favorite + bvp + form (n=52) | 25-27 (48%) -8.3u (-16%) | 27-25 (52%) +4.7u (**+9%**) |
 | line + form (n=30) | 15-15 (50%) -3.8u (-13%) | 15-15 (50%) +1.5u (**+5%**) |
 
+## Promotion check — fade bvp+form, NO-PLAY subset (what we'd promote)
+
+_The promotion only touches no-play games, so this subset is the one that matters. Fade = bet the opponent at its price._
+
+| bvp+form fade | record | units | ROI/bet |
+|---|---|---|---|
+| all bvp+form (context) (n=71) | 43-28 (61%) | +12.71u | +17.9% |
+| NO-PLAY subset (the promotion) (n=36) | 24-12 (67%) | +9.06u | +25.2% |
+| already-played subset (context) (n=35) | 19-16 (54%) | +3.65u | +10.4% |
+
 _Point-in-time: signals recomputed from the frozen pre-game snapshot; winners from the MLB Stats API; $1/bet at the frozen moneyline. A signal with no recorded input on an older board is excluded from that row only (see n=)._
