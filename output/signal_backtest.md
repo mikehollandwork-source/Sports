@@ -430,4 +430,18 @@ _worst 6:_
 | line + bvp + form | 5-9 (36%) | -5.65u | -40% |
 | favorite + line + bvp + form | 5-9 (36%) | -5.65u | -40% |
 
+## Reversal finder — negative profiles, and whether fading them profits
+
+_Combos (n≥25) where OUR side loses ≤−12% ROI. 'fade' bets the OPPONENT at its real price - the honest test of reversing the profile. The vig is paid on the fade too, so only a BADLY losing profile clears +EV. Scanning many combos for the worst also risks overfitting - trust n and a reason._
+
+| profile | OUR side | FADE (bet opponent) |
+|---|---|---|
+| favorite + line + consistency (n=28) | 13-15 (46%) -6.9u (-25%) | 15-13 (54%) +5.6u (**+20%**) |
+| bvp + form (n=71) | 28-43 (39%) -21.1u (-30%) | 43-28 (61%) +12.7u (**+18%**) |
+| favorite + line + form (n=28) | 13-15 (46%) -6.0u (-21%) | 15-13 (54%) +3.5u (**+12%**) |
+| favorite + line + bvp (n=41) | 21-20 (51%) -7.2u (-18%) | 20-21 (49%) +4.0u (**+10%**) |
+| consistency + bvp + form (n=41) | 18-23 (44%) -8.5u (-21%) | 23-18 (56%) +3.9u (**+10%**) |
+| favorite + bvp + form (n=52) | 25-27 (48%) -8.3u (-16%) | 27-25 (52%) +4.7u (**+9%**) |
+| line + form (n=30) | 15-15 (50%) -3.8u (-13%) | 15-15 (50%) +1.5u (**+5%**) |
+
 _Point-in-time: signals recomputed from the frozen pre-game snapshot; winners from the MLB Stats API; $1/bet at the frozen moneyline. A signal with no recorded input on an older board is excluded from that row only (see n=)._
