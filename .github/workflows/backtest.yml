@@ -43,6 +43,12 @@ jobs:
         timeout-minutes: 25
         run: python -m src.prop_backtest
 
+      # Polymarket order-book money (size imbalance + run-up drift) x signals.
+      - name: Run PM order-book backtest
+        continue-on-error: true
+        timeout-minutes: 10
+        run: python -m src.pm_book_backtest
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -52,6 +58,10 @@ jobs:
           if [ -f output/prop_backtest.md ]; then
             gh issue create --title "Prop backtest $(date -u +%Y-%m-%d)" \
               --body-file output/prop_backtest.md
+          fi
+          if [ -f output/pm_book_backtest.md ]; then
+            gh issue create --title "PM order-book backtest $(date -u +%Y-%m-%d)" \
+              --body-file output/pm_book_backtest.md
           fi
 
       - name: Commit report
