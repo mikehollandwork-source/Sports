@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 
-from . import grade, main as picks_main, notify
+from . import early_lines, grade, main as picks_main, notify
 
 log = logging.getLogger("pregame")
 
@@ -40,6 +40,7 @@ def run(force_telegram: bool = False) -> bool:
 
     payload = picks_main.run(date)          # freezes started games, refreshes the rest
     picks_main.write_outputs(payload, date)
+    early_lines.append_checkpoint(date)     # dense line history: every game, every tick
     grade.update_ledger(date)               # move any now-final games into the record
 
     # once the LAST game of a slate is final, send a one-time end-of-day recap.
