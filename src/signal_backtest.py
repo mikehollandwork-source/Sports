@@ -432,6 +432,22 @@ def build() -> str:
            roi3("✅ the rest of the board", ganti(unstarred)),
            roi3("whole board (both tiers)", ganti(gate)), ""]
 
+    # UNDERDOG DISCIPLINE impact: a dog (ml>0) only plays with margin or the
+    # pitching-dog edge; a dog carried only by consistency is now no-action. Show
+    # the board before/after and what gets dropped.
+    def is_dogcut(g):
+        ml = g["sig"].get("_ml")
+        is_dog = isinstance(ml, int) and ml > 0
+        return is_dog and not (g["sig"].get("margin") is True
+                               or g["sig"].get("pitching_dog") is True)
+    kept = [g for g in gate if not is_dogcut(g)]
+    dogcut = [g for g in gate if is_dogcut(g)]
+    md += ["## Underdog discipline — drop dogs without margin / pitching edge", "",
+           "| board | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("BEFORE (whole fade+core board)", ganti(gate)),
+           roi3("AFTER (dogs need margin/pitching)", ganti(kept)),
+           roi3("DROPPED (consistency-only dogs)", ganti(dogcut)), ""]
+
     # #5 - do tighter numeric thresholds sharpen a signal? Sweep the margin and
     # consistency cutoffs on the fade side (bet the anti-Vegas team).
     md += ["## Threshold sweeps on the fade side (does a tighter bar help?)", "",
