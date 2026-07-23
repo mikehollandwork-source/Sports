@@ -235,6 +235,22 @@ def settle_day(date: str) -> tuple[list[dict], int]:
             pending += 1     # a play still to be decided -> slate not done
             continue
         entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
+
+    # Reversal picks (bvp+form promotion) bet the OPPONENT and are booked into the
+    # same record as any other play - one unified record, counted only from the
+    # date they first appear on a board forward (older snapshots carry no reversal).
+    for g in payload.get("games", []):
+        rev = (g.get("pick_criteria") or {}).get("reversal")
+        if not rev or not rev.get("bet") or rev.get("odds") is None:
+            continue
+        if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
+            continue
+        res = results.get(g.get("game_pk"))
+        if not res or not res["final"] or not res["winner"]:
+            pending += 1
+            continue
+        entries.append(_settle(date, g, res, rev["bet"],
+                               res["winner"] == rev["bet"], int(rev["odds"])))
     return entries, pending
 
 
