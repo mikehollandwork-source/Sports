@@ -150,6 +150,14 @@ _The board split by the current star rule. Both bet the fade side, $1/pick._
 | ✅ the rest of the board (n=73) | 46-27 (63%) | +9.71u | +13.3% |
 | whole board (both tiers) (n=102) | 66-36 (65%) | +13.54u | +13.3% |
 
+## Underdog discipline — drop dogs without margin / pitching edge
+
+| board | record | units | ROI/bet |
+|---|---|---|---|
+| BEFORE (whole fade+core board) (n=102) | 66-36 (65%) | +13.54u | +13.3% |
+| AFTER (dogs need margin/pitching) (n=95) | 62-33 (65%) | +12.04u | +12.7% |
+| DROPPED (consistency-only dogs) (n=7) | 4-3 (57%) | +1.50u | +21.4% |
+
 ## Threshold sweeps on the fade side (does a tighter bar help?)
 
 | margin ≥ | record | units |
