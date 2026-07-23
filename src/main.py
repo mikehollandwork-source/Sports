@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, reversal_grade, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -591,6 +591,16 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         else:
             why = "0/8 signals — no play"
         pc["reason"] = why
+        # REVERSAL PROMOTION (backtest-mined, validated on exactly this population:
+        # fading the bvp+form "public darling" profile went 24-12 / +25% ROI on the
+        # no-play subset). When our advantage side carries the narrative combo
+        # bvp+form, we PROMOTE the no-play by betting its OPPONENT. Kept as its own
+        # pick type with a separate ledger - it never touches the proven ML record.
+        # Forward-test tier until it proves out live.
+        opp_ml = pc.get("opponent_moneyline")
+        if b_hit and fh_hit and isinstance(opp_ml, int):
+            pc["reversal"] = {"bet": opp_name, "odds": opp_ml,
+                              "reason": "fade bvp+form public-darling profile"}
 
 
 def _play(g: dict) -> str:
@@ -1156,6 +1166,11 @@ def build_summary(payload: dict) -> str:
     out += ["", grade.records_block()]
     # props stay backend-only for now (still computed + tracked in prop_ledger.json,
     # just not shown on the board)
+    revs = _reversal_games(games)
+    if revs:
+        out += ["", "## 🔄 Reversal fades (forward test — separate record)"]
+        out += [_reversal_line(g) for g in revs]
+    out += ["", *reversal_grade.records_lines(md=True)]
     return "\n".join(out)
 
 
@@ -1172,6 +1187,26 @@ def write_outputs(payload: dict, date: str) -> None:
 def _ml_str(pc: dict) -> str:
     ml = pc.get("advantage_moneyline")
     return f" ({ml:+d})" if isinstance(ml, int) else ""
+
+
+def _reversal_games(games: list) -> list:
+    """No-play games promoted to an opponent-fade by the bvp+form reversal rule."""
+    return [g for g in games if (g.get("pick_criteria") or {}).get("reversal")]
+
+
+def _reversal_line(g: dict) -> str:
+    """'🔄 SD +130 vs LAD · 9:10 PM ET' — fade the bvp+form darling (bet the opp)."""
+    rev = g["pick_criteria"]["reversal"]
+    aa, ha = _abbrs(g)
+    away, home = g["matchup"].split(" @ ")
+    bet_ab, opp_ab = (ha, aa) if rev["bet"] == home else (aa, ha)
+    odds = rev.get("odds")
+    mls = f" {odds:+d}" if isinstance(odds, int) else ""
+    line = f"🔄 {bet_ab}{mls} vs {opp_ab}"
+    st = _start_time(g)
+    if st:
+        line += f" · {st}"
+    return line
 
 
 def _pick_line(g: dict) -> str:
@@ -1230,8 +1265,14 @@ def telegram_text(payload: dict) -> str:
     else:
         L.append("No plays on the board.")
 
+    revs = _reversal_games(games)
+    if revs:
+        L += ["", "🔄 REVERSAL FADES (forward test — separate record)"]
+        L += [_reversal_line(g) for g in revs]
+
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
+    L += ["", *reversal_grade.records_lines(md=False)]
     return "\n".join(L)
 
 
