@@ -735,6 +735,39 @@ def build() -> str:
     md += combo_table("ALL signal combinations — every graded pick", games)
     md += combo_table("ALL signal combinations — FADE-GATED picks (live board condition)", fade_pool)
 
+    # REVERSAL FINDER: is any signal profile so negative on OUR side that FADING it
+    # (betting the OPPONENT at its own price) clears the vig? Grade BOTH sides -
+    # the vig is paid twice, so a mild loser reverses to a mild loser; only a badly
+    # losing profile becomes a profitable fade. n>=25 and our-side ROI<=-12% only.
+    REV_MINN, REV_ROI = 25, -0.12
+    rev = []
+    for k in range(1, len(SIGNALS) + 1):
+        for cmb in itertools.combinations(SIGNALS, k):
+            sub = [g for g in games if all(g["sig"].get(s) is True for s in cmb)
+                   and g.get("opp_odds") is not None]
+            if len(sub) < REV_MINN:
+                continue
+            ow, ol, ou = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
+            if ou / len(sub) > REV_ROI:
+                continue
+            fr = [{"won": not g["won"], "odds": g["opp_odds"]} for g in sub]
+            fw, fl, fu = _units(fr)
+            rev.append((fu / len(fr), ou / len(sub), ow, ol, ou, fw, fl, fu, len(sub),
+                        " + ".join(cmb)))
+    md += ["## Reversal finder — negative profiles, and whether fading them profits", "",
+           "_Combos (n≥25) where OUR side loses ≤−12% ROI. 'fade' bets the OPPONENT "
+           "at its real price - the honest test of reversing the profile. The vig is "
+           "paid on the fade too, so only a BADLY losing profile clears +EV. Scanning "
+           "many combos for the worst also risks overfitting - trust n and a reason._", "",
+           "| profile | OUR side | FADE (bet opponent) |", "|---|---|---|"]
+    if rev:
+        for froi, oroi, ow, ol, ou, fw, fl, fu, n, name in sorted(rev, reverse=True):
+            md.append(f"| {name} (n={n}) | {ow}-{ol} ({ow/n:.0%}) {ou:+.1f}u ({oroi:+.0%}) "
+                      f"| {fw}-{fl} ({fw/n:.0%}) {fu:+.1f}u (**{froi:+.0%}**) |")
+    else:
+        md.append("| _none clear the bar_ | — | — |")
+    md.append("")
+
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "
               "signal with no recorded input on an older board is excluded from that "
