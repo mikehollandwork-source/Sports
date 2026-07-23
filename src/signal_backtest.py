@@ -412,6 +412,26 @@ def build() -> str:
            roi3("  ...line AND consistency (no margin)", ganti(line_and_cons)),
            roi3("2+ core signals together", ganti(two_plus)), ""]
 
+    # STARRED vs the rest of the board. Recompute the ⭐ under the CURRENT rule
+    # (margin+favorite+line together, OR 4+ of the 5 proven signals, and never
+    # when the book's informed money is against us) so the split reflects today's
+    # logic, not whatever each old snapshot happened to freeze.
+    def is_star(g):
+        s = g["sig"]
+        proven = sum(1 for k in ("margin", "favorite", "line", "consistency", "bvp")
+                     if s.get(k) is True)
+        hot = (s.get("margin") and s.get("favorite") and s.get("line")) or proven >= 4
+        return bool(hot and not g["stance_against"])
+    starred = [g for g in gate if is_star(g)]
+    unstarred = [g for g in gate if not is_star(g)]
+    md += ["## Starred (⭐) plays vs the rest of the board", "",
+           "_The board split by the current star rule. Both bet the fade side, "
+           "$1/pick._", "",
+           "| board tier | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("⭐ STARRED plays", ganti(starred)),
+           roi3("✅ the rest of the board", ganti(unstarred)),
+           roi3("whole board (both tiers)", ganti(gate)), ""]
+
     # #5 - do tighter numeric thresholds sharpen a signal? Sweep the margin and
     # consistency cutoffs on the fade side (bet the anti-Vegas team).
     md += ["## Threshold sweeps on the fade side (does a tighter bar help?)", "",
