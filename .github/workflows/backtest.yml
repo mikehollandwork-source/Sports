@@ -55,6 +55,12 @@ jobs:
         timeout-minutes: 20
         run: python -m src.pressure_test
 
+      # Edge finder: calibration, breakeven-by-price, win/loss stat profiles, dogs.
+      - name: Run edge finder
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.edge_finder
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,6 +78,10 @@ jobs:
           if [ -f output/pressure_test.md ]; then
             gh issue create --title "Pressure test $(date -u +%Y-%m-%d)" \
               --body-file output/pressure_test.md
+          fi
+          if [ -f output/edge_finder.md ]; then
+            gh issue create --title "Edge finder $(date -u +%Y-%m-%d)" \
+              --body-file output/edge_finder.md
           fi
 
       - name: Commit report
