@@ -61,6 +61,12 @@ jobs:
         timeout-minutes: 20
         run: python -m src.edge_finder
 
+      # Candidate rules: margin x price gates, holdout-judged, before anything ships.
+      - name: Run candidate rules
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.candidate_rules
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,6 +88,10 @@ jobs:
           if [ -f output/edge_finder.md ]; then
             gh issue create --title "Edge finder $(date -u +%Y-%m-%d)" \
               --body-file output/edge_finder.md
+          fi
+          if [ -f output/candidate_rules.md ]; then
+            gh issue create --title "Candidate rules $(date -u +%Y-%m-%d)" \
+              --body-file output/candidate_rules.md
           fi
 
       - name: Commit report
