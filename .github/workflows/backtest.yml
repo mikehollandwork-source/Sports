@@ -67,6 +67,18 @@ jobs:
         timeout-minutes: 20
         run: python -m src.candidate_rules
 
+      # Every signal/stat individually vs outcome, bet AND fade.
+      - name: Run signal audit
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.signal_audit
+
+      # Line movement + PM order book + the sharp/public alignment theory.
+      - name: Run market signals
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.market_signals
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,6 +104,14 @@ jobs:
           if [ -f output/candidate_rules.md ]; then
             gh issue create --title "Candidate rules $(date -u +%Y-%m-%d)" \
               --body-file output/candidate_rules.md
+          fi
+          if [ -f output/signal_audit.md ]; then
+            gh issue create --title "Signal audit $(date -u +%Y-%m-%d)" \
+              --body-file output/signal_audit.md
+          fi
+          if [ -f output/market_signals.md ]; then
+            gh issue create --title "Market signals $(date -u +%Y-%m-%d)" \
+              --body-file output/market_signals.md
           fi
 
       - name: Commit report
