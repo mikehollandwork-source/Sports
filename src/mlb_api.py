@@ -33,6 +33,10 @@ log = logging.getLogger("mlb_api")
 
 BASE = "https://statsapi.mlb.com/api/v1"
 SPORT_ID = 1
+
+# How many recent games the "form" stats sample. 5 is the live setting; the
+# window experiment (src/window_test.py) overrides it to test longer samples.
+FORM_WINDOW = 5
 TIMEOUT = 20
 POLITE_DELAY = 0.1
 SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
@@ -365,10 +369,11 @@ HIT_FIELDS = {
 
 
 def hitter_last5(player_id: int, team_name: str, season: int,
-                 as_of: str | None = None) -> dict:
-    """Sum a hitter's last-5 counting stats + PA-weighted park factor and the
-    PA-weighted strength (FIP, win%) of the pitching staffs faced."""
-    rows = _last_n_gamelog(player_id, "hitting", season, 5, as_of=as_of)
+                 as_of: str | None = None, n: int = FORM_WINDOW) -> dict:
+    """Sum a hitter's last-n counting stats + PA-weighted park factor and the
+    PA-weighted strength (FIP, win%) of the pitching staffs faced. n defaults to
+    FORM_WINDOW (5); the window experiment overrides it to test longer samples."""
+    rows = _last_n_gamelog(player_id, "hitting", season, n, as_of=as_of)
     acc = {k: 0.0 for k in HIT_FIELDS}
     park_pa = pf_weight = 0.0
     opp_fip_pa = opp_fip_w = opp_win_pa = 0.0
@@ -433,10 +438,11 @@ def _new_pitch_acc() -> dict:
             "opp_woba_ip": 0.0, "opp_woba_w": 0.0, "opp_win_ip": 0.0}
 
 
-def pitcher_last5(player_id: int, season: int, as_of: str | None = None) -> dict:
-    """Starter's last-5 FIP + IP-weighted opponent-offense strength faced."""
+def pitcher_last5(player_id: int, season: int, as_of: str | None = None,
+                  n: int = FORM_WINDOW) -> dict:
+    """Starter's last-n FIP + IP-weighted opponent-offense strength faced."""
     acc = _new_pitch_acc()
-    _accumulate_pitching(_last_n_gamelog(player_id, "pitching", season, 5, as_of=as_of),
+    _accumulate_pitching(_last_n_gamelog(player_id, "pitching", season, n, as_of=as_of),
                          season, acc, as_of)
     return _fip_from_acc(acc)
 
@@ -726,7 +732,8 @@ def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
 
 
 # --- orchestration ------------------------------------------------------------
-def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
+def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
+                      n: int = FORM_WINDOW) -> Game:
     """Populate last-5 offense + starter/bullpen FIP + handedness for both teams.
     With as_of (YYYY-MM-DD), only stats from games before that date are used -
     point-in-time, for an unbiased backtest. Default (None) = latest available."""
@@ -745,7 +752,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         per_hitter = []  # (pid, name, last5 line) for the hot/cold form pass
         for h in hitters:
             try:
-                line = hitter_last5(h.player_id, team.name, season, as_of=as_of)
+                line = hitter_last5(h.player_id, team.name, season, as_of=as_of, n=n)
             except Exception as exc:
                 log.warning("hitter %s last-5 failed: %s", h.player_id, exc)
                 continue
@@ -797,7 +804,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
             try:
-                sp = pitcher_last5(team.probable_pitcher.player_id, season, as_of=as_of)
+                sp = pitcher_last5(team.probable_pitcher.player_id, season, as_of=as_of, n=n)
                 team.starter_fip_last5 = sp["fip"]
                 team.starter_ip_last5 = sp["ip"]
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
