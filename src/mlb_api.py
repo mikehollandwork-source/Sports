@@ -6,10 +6,10 @@ all from the last 5 games:
 
   - today's schedule + probable pitchers (with throwing hand)
   - each team's projected lineup (boxscore battingOrder, falling back to roster)
-  - per-hitter last-5 counting stats (for wOBA / ISO / discipline / speed),
-    park-neutralized by the parks actually played in
-  - probable starter's last-5 FIP inputs
-  - bullpen's last-5 FIP inputs (relievers aggregated)
+  - per-hitter recent counting stats over the last FORM_WINDOW games (for
+    wOBA / ISO / discipline / speed), park-neutralized by the parks played in
+  - probable starter's FIP inputs over the same window
+  - bullpen's FIP inputs over the same window (relievers aggregated)
 
 The v1 API is undocumented; field paths below are best-effort and may need a
 small tweak after the first live run (this code can't be tested from the build
@@ -34,9 +34,12 @@ log = logging.getLogger("mlb_api")
 BASE = "https://statsapi.mlb.com/api/v1"
 SPORT_ID = 1
 
-# How many recent games the "form" stats sample. 5 is the live setting; the
-# window experiment (src/window_test.py) overrides it to test longer samples.
-FORM_WINDOW = 5
+# How many recent games the "form" stats sample (hitter counting stats, starter
+# and bullpen FIP). Moved 5 -> 10 on 2026-07-28: a 5-game window is ~20 PA per
+# hitter, which is mostly variance, and the live record (53.6% vs a 57.3%
+# breakeven bar) pointed at input noise rather than the gate. src/window_test.py
+# re-rates history at several windows to measure this.
+FORM_WINDOW = 10
 TIMEOUT = 20
 POLITE_DELAY = 0.1
 SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
@@ -479,7 +482,10 @@ def raw_woba(ab, h, d2, d3, hr, bb, hbp, sf) -> float | None:
             + 1.24 * d2 + 1.56 * d3 + 1.95 * hr) / den
 
 
-FORM_MIN_PA5 = 8       # hitter needs this many last-5 PA to count toward form
+# Hitter needs this many PA inside the form window to count toward the form
+# signal. Kept proportional to FORM_WINDOW (1.6 PA/game, i.e. the original 8 PA
+# per 5 games) so widening the window doesn't quietly let bench bats qualify.
+FORM_MIN_PA5 = round(1.6 * FORM_WINDOW)
 FORM_MIN_SEASON_PA = 80  # ...and this season sample for a stable baseline
 
 
