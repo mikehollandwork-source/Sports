@@ -252,12 +252,31 @@ def build() -> str:
 
     real = scan()
     rnd = random.Random(SEED)
-    winners = [r["winner"] for r in recs]
+    # MARKET-CALIBRATED NULL. Shuffling winners uniformly would destroy the fact
+    # that favourites win more often, leaving a world where every strategy just
+    # bleeds vig - so "no survivors" would be trivially true and prove nothing.
+    # Instead each game's winner is redrawn from its OWN price-implied
+    # probability: a world with no edge but realistic prices. Any combo that
+    # still looks good there is pure selection from scanning many slices.
+    sides = []
+    for r in recs:
+        teams = [t for t in (r["adv"], r["opp"]) if t in r["price"]]
+        if len(teams) == 2:
+            p = [_implied(r["price"][t]) for t in teams]
+            tot = sum(p) or 1.0
+            sides.append((teams, [p[0] / tot, p[1] / tot]))
+        else:
+            sides.append((None, None))
     null_counts = []
     for _ in range(PERMUTATIONS):
-        shuffled = winners[:]
-        rnd.shuffle(shuffled)
-        null_counts.append(len(scan(shuffled)))
+        draw = []
+        for i, r in enumerate(recs):
+            teams, probs = sides[i]
+            if not teams:
+                draw.append(r["winner"])
+            else:
+                draw.append(teams[0] if rnd.random() < probs[0] else teams[1])
+        null_counts.append(len(scan(draw)))
     null_mean = st.mean(null_counts) if null_counts else 0
     null_p95 = sorted(null_counts)[int(0.95 * len(null_counts))] if null_counts else 0
 
@@ -265,8 +284,10 @@ def build() -> str:
            f"_Scanned every 1- and 2-condition combination x 4 bet sides "
            f"(n≥{MINN}, holdout n≥{MINH}), keeping only those profitable in-sample "
            "AND in holdout._", "",
-           f"**Real scan found {len(real)}. On randomly shuffled outcomes the same "
-           f"scan finds {null_mean:.1f} on average (95th pct {null_p95}).** "
+           f"**Real scan found {len(real)}. Under a market-calibrated null - the "
+           f"same scan on outcomes redrawn from each game's own price-implied "
+           f"probability, i.e. a world with realistic prices but NO edge - it "
+           f"finds {null_mean:.1f} on average (95th pct {null_p95}).** "
            + ("Chance alone explains this many survivors — treat them as noise."
               if len(real) <= null_p95 else
               "The real scan beats what chance produces, so the survivors are "
@@ -279,9 +300,10 @@ def build() -> str:
         md.append("| _nothing survived both windows_ | — | — | — | — |")
     md.append("")
 
-    md.append("_The permutation null is the honest yardstick: any large scan finds "
-              "'consistent winners' in pure noise, so a survivor only means "
-              "something if the real count clearly exceeds the null count._")
+    md.append("_The null is the honest yardstick: any large scan finds 'consistent "
+              "winners' in noise, so a survivor only means something if the real "
+              "count clearly exceeds the null count. The null preserves each game's "
+              "market price (favourites still win more) and removes only the edge._")
     return "\n".join(md)
 
 
