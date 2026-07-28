@@ -478,7 +478,6 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
                       (pd_hit, pd_label)):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
-    opp_name = home if adv == away else away
     shift = info.get("implied_shift")
     # CORE signals carry a play; favorite, BvP AND now LINE are supporting only.
     # The 335-game leak-finder: line as a standalone core bled (line-only -9.3%
@@ -530,18 +529,21 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
     pc["vegas"] = book   # frozen book_needs read: drives the fade gate (behind the scenes)
     if book:
         is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
-        qualifies = (core_hit and not is_tail) or pd_hit  # fade+core, OR a pitching dog
+        qualifies = core_hit and not is_tail  # fade + core
     else:
         is_tail = False
-        qualifies = core_hit or pd_hit        # no book read -> core, or pitching dog
+        qualifies = core_hit                  # no book read -> core alone
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when it
-    # clears the fade gate + core signal and isn't a mild-public fade. A PITCHING
-    # DOG also bypasses the fade + mild-public gates - it's its own high-conviction
-    # path (backtested +11% ROI on 186 dogs). The internal play value stays "pick".
-    # (Tried an extra underdog gate — a dog needs margin/pitching — but the fade
-    # gate already cuts the losing dogs; on the fade board the survivors went 4-3
-    # +21%, so the rule dropped winners and LOWERED ROI. Reverted, kept as a note.)
-    playable = qualifies and (not mild_public or pd_hit)
+    # clears the fade gate + core signal and isn't a mild-public fade.
+    # PITCHING-DOG BYPASS — REMOVED (2026-07-28). It let a game skip BOTH the fade
+    # and mild-public gates on the strength of a 186-game backtest, and has since
+    # gone 0-5 (-100% ROI) - it has never once won, in-sample or holdout. A bypass
+    # that overrides safety gates has to earn it; this never did. pitching_dog is
+    # still computed and shown as a signal, it just can't carry a play by itself.
+    # (Also tried an extra underdog gate — dogs need margin/pitching — but the fade
+    # gate already cuts the losing dogs; the survivors went 4-3 +21%, so it dropped
+    # winners and LOWERED ROI. Reverted, kept as a note.)
+    playable = qualifies and not mild_public
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
@@ -591,16 +593,13 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         else:
             why = "0/8 signals — no play"
         pc["reason"] = why
-        # REVERSAL PROMOTION (backtest-mined, validated on exactly this population:
-        # fading the bvp+form "public darling" profile went 24-12 / +25% ROI on the
-        # no-play subset). When our advantage side carries the narrative combo
-        # bvp+form, we PROMOTE the no-play by betting its OPPONENT. It shows and
-        # grades as a normal board pick (one combined record), counted only from
-        # here forward - no backtest seeding.
-        opp_ml = pc.get("opponent_moneyline")
-        if b_hit and fh_hit and isinstance(opp_ml, int):
-            pc["reversal"] = {"bet": opp_name, "odds": opp_ml,
-                              "reason": "bvp+form profile"}
+        # REVERSAL PROMOTION — REMOVED (2026-07-28). Mined from the backtest at
+        # 24-12/+25% on the no-play subset, it collapsed the moment it went live:
+        # 5-11 (31%), -6.56u, -41% ROI on the real ledger - 59% of the system's
+        # entire all-time deficit from 10% of its bets. The holdout says it is
+        # exactly BACKWARDS: those same games bet on our STAT side returned +25.6%
+        # while fading them returned -31.7%. Textbook curve-fit; do not resurrect
+        # without out-of-sample evidence. Past entries stay in the record untouched.
 
 
 def _play(g: dict) -> str:
@@ -1155,8 +1154,7 @@ def build_summary(payload: dict) -> str:
     date = payload["date"]
     games = payload.get("games", [])
     board = _board_games(games)
-    # picks + reversal promotions are all just plays, ranked together, one format.
-    picks = _by_win([g for g in board if _play(g) == "pick"]) + _reversal_games(board)
+    picks = _by_win([g for g in board if _play(g) == "pick"])
     # Minimal board: only the plays, one clean line each, ranked by win chance.
     # No-plays are still recorded in the picks JSON (backend), just not shown.
     out = [f"# MLB Board — {date}", ""]
@@ -1183,12 +1181,6 @@ def write_outputs(payload: dict, date: str) -> None:
 def _ml_str(pc: dict) -> str:
     ml = pc.get("advantage_moneyline")
     return f" ({ml:+d})" if isinstance(ml, int) else ""
-
-
-def _reversal_games(games: list) -> list:
-    """No-play games promoted to a pick by the bvp+form rule (bet the opponent).
-    They render and grade as normal picks; this just isolates the promoted ones."""
-    return [g for g in games if (g.get("pick_criteria") or {}).get("reversal")]
 
 
 def _bet_side(pc: dict) -> tuple[str | None, object]:
@@ -1245,8 +1237,7 @@ def telegram_text(payload: dict) -> str:
     date = payload["date"]
     games = payload.get("games", [])
     board = _board_games(games)
-    # picks + reversal promotions ranked together, one format, one record.
-    picks = _by_win([g for g in board if _play(g) == "pick"]) + _reversal_games(board)
+    picks = _by_win([g for g in board if _play(g) == "pick"])
 
     # Minimal board: only the plays, one clean line each (ranked by win chance).
     # No-plays stay recorded in the picks JSON (backend); they're not shown.
