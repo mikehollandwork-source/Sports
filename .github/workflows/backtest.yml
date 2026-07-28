@@ -49,6 +49,12 @@ jobs:
         timeout-minutes: 10
         run: python -m src.pm_book_backtest
 
+      # Pressure test: baselines + true holdout split + every ablation/retired feature.
+      - name: Run pressure test
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.pressure_test
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,6 +68,10 @@ jobs:
           if [ -f output/pm_book_backtest.md ]; then
             gh issue create --title "PM order-book backtest $(date -u +%Y-%m-%d)" \
               --body-file output/pm_book_backtest.md
+          fi
+          if [ -f output/pressure_test.md ]; then
+            gh issue create --title "Pressure test $(date -u +%Y-%m-%d)" \
+              --body-file output/pressure_test.md
           fi
 
       - name: Commit report
