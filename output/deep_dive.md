@@ -25,7 +25,7 @@ Market-implied win rate for these exact bets: **60.4%**; actual **66.2%** (**+5.
 
 _Scanned every 1- and 2-condition combination x 4 bet sides (n≥25, holdout n≥8), keeping only those profitable in-sample AND in holdout._
 
-**Real scan found 15. On randomly shuffled outcomes the same scan finds 0.0 on average (95th pct 0).** The real scan beats what chance produces, so the survivors are worth a look.
+**Real scan found 15. Under a market-calibrated null - the same scan on outcomes redrawn from each game's own price-implied probability, i.e. a world with realistic prices but NO edge - it finds 13.3 on average (95th pct 23).** Chance alone explains this many survivors — treat them as noise.
 
 | conditions | bet side | ALL | in-sample | HOLDOUT |
 |---|---|---|---|---|
@@ -45,4 +45,4 @@ _Scanned every 1- and 2-condition combination x 4 bet sides (n≥25, holdout n�
 | PM drift up | consensus | 47-27 (64%) · **+10.6%** (n=74) | 28-14 (67%) · **+17.8%** (n=42) | 19-13 (59%) · **+1.3%** (n=32) |
 | consensus (money with public) | opp | 126-128 (50%) · **+1.3%** (n=254) | 105-107 (50%) · **+0.7%** (n=212) | 21-21 (50%) · **+3.9%** (n=42) |
 
-_The permutation null is the honest yardstick: any large scan finds 'consistent winners' in pure noise, so a survivor only means something if the real count clearly exceeds the null count._
+_The null is the honest yardstick: any large scan finds 'consistent winners' in noise, so a survivor only means something if the real count clearly exceeds the null count. The null preserves each game's market price (favourites still win more) and removes only the edge._
