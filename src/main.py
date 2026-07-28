@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import consensus as consensus_rule, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -134,6 +134,14 @@ def run(date: str) -> dict:
         if proj:
             pc["projected"] = proj
 
+    # CONSENSUS DECISION (2026-07-28): the board's pick logic. The old fade gate
+    # above still computes every signal (kept as context and for the backtests),
+    # but the PLAY is now decided here - back the side handle+tickets agree on,
+    # when the pre-game order book confirms it. See src/consensus.py for why.
+    cmetrics = consensus_rule.book_metrics(date)
+    for r in results:
+        _apply_consensus(r, cmetrics)
+
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
     # can't flip a pick to a lean or move the price after the game is underway.
@@ -157,7 +165,9 @@ def run(date: str) -> dict:
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
             continue
-        adv = r["pick_criteria"]["advantage_team"]
+        adv = _bet_side(r["pick_criteria"])[0]
+        if not adv:
+            continue
         is_home = adv == gm.home.name
         team = gm.home if is_home else gm.away
         try:
@@ -170,7 +180,7 @@ def run(date: str) -> dict:
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
-    picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
+    picks = [_bet_side(r["pick_criteria"])[0] for r in results if _play(r) == "pick"]
     no_action = sum(1 for r in results if _play(r) == "stay_away")
     log.info("Board: %d play(s), %d no-action", len(picks), no_action)
 
@@ -600,6 +610,37 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         # exactly BACKWARDS: those same games bet on our STAT side returned +25.6%
         # while fading them returned -31.7%. Textbook curve-fit; do not resurrect
         # without out-of-sample evidence. Past entries stay in the record untouched.
+
+
+def _bet_side(pc: dict) -> tuple:
+    """(team, moneyline) actually being bet. Consensus picks carry bet_team /
+    bet_moneyline; older frozen snapshots fall back to the advantage side so
+    history renders and grades exactly as it did."""
+    if pc.get("bet_team"):
+        return pc.get("bet_team"), pc.get("bet_moneyline")
+    return pc.get("advantage_team"), pc.get("advantage_moneyline")
+
+
+def _apply_consensus(r: dict, metrics: dict) -> None:
+    """Decide the play with the consensus rule, overriding the legacy fade gate."""
+    pc = r.setdefault("pick_criteria", {})
+    play = consensus_rule.evaluate(r, metrics)
+    if play:
+        pc.update(play="pick", status="pick",
+                  bet_team=play["bet"], bet_moneyline=play["odds"],
+                  reason=play["reason"], starred=[],
+                  consensus={"drift": play["drift"], "imbalance": play["imbalance"]},
+                  win_prob=68, win_driver="consensus")
+        return
+    pc.update(play="stay_away", status="stay_away",
+              bet_team=None, bet_moneyline=None, starred=[])
+    chk = r.get("public_check") or {}
+    if chk.get("money") != "with public":
+        pc["reason"] = f"no handle/ticket agreement ({chk.get('money') or 'no money read'}) — no play"
+    elif r.get("game_pk") not in metrics:
+        pc["reason"] = "no pre-game order-book read yet — no play"
+    else:
+        pc["reason"] = "order book does not confirm the consensus side — no play"
 
 
 def _play(g: dict) -> str:
@@ -1183,19 +1224,10 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
-def _bet_side(pc: dict) -> tuple[str | None, object]:
-    """(team, moneyline) actually being bet: the reversal opponent when a no-play
-    was promoted, otherwise the advantage side. Lets picks render/grade uniformly."""
-    rev = pc.get("reversal")
-    if rev:
-        return rev.get("bet"), rev.get("odds")
-    return pc.get("advantage_team"), pc.get("advantage_moneyline")
-
-
 def _pick_line(g: dict) -> str:
-    """Minimal board line: '⭐ BOS +115 vs TOR · 7:10 PM ET'
-    — pick abbr + moneyline, opponent, and first pitch. Reversal promotions bet
-    the opponent but render identically to any other pick."""
+    """Minimal board line: '✅ BOS +115 vs TOR · 7:10 PM ET' — the side we bet,
+    its moneyline, the opponent, and first pitch. Consensus picks bet the
+    ticket/handle side, which is often NOT the statistical favourite."""
     pc = g["pick_criteria"]
     aa, ha = _abbrs(g)
     away, home = g["matchup"].split(" @ ")

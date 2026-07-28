@@ -222,12 +222,16 @@ def settle_day(date: str) -> tuple[list[dict], int]:
     pending = 0
     for g in payload.get("games", []):
         pc = g.get("pick_criteria", {})
-        adv = pc.get("advantage_team")
+        # consensus picks carry bet_team/bet_moneyline; older snapshots fall back
+        # to the advantage side so already-booked history grades identically.
+        adv = pc.get("bet_team") or pc.get("advantage_team")
         if not adv or _play(g) != "pick":
             continue        # no-action / legacy lock snapshots: never booked
         if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
             continue
-        odds = _price(g, "advantage_moneyline")
+        odds = (int(pc["bet_moneyline"]) if pc.get("bet_team")
+                and pc.get("bet_moneyline") is not None
+                else _price(g, "advantage_moneyline"))
         if odds is None:
             continue        # unpriced: never booked at fake even money
         res = results.get(g.get("game_pk"))
