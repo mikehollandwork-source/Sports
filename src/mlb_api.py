@@ -533,8 +533,16 @@ def probable_hands(game: Game) -> None:
             pp.hand = people[pp.player_id].get("pitchHand", {}).get("code", "")
 
 
+_LINEUP_CACHE: dict[tuple, list] = {}
+
+
 def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
-    """Projected lineup: boxscore battingOrder if posted, else roster hitters."""
+    """Projected lineup: boxscore battingOrder if posted, else roster hitters.
+    Cached per (game, team, date) for the process - a backtest re-rating the same
+    slate at several form windows would otherwise re-fetch each boxscore."""
+    ck = (game_pk, team_id, date, home)
+    if ck in _LINEUP_CACHE:
+        return _LINEUP_CACHE[ck]
     try:
         box = SESSION.get(
             f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore", timeout=TIMEOUT
@@ -543,11 +551,12 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
         order = box["teams"][side].get("battingOrder", [])
         if order:
             people = _people(list(order))
-            return [
+            _LINEUP_CACHE[ck] = [
                 Player(pid, people.get(pid, {}).get("fullName", ""),
                        hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
                 for pid in order
             ]
+            return _LINEUP_CACHE[ck]
     except Exception as exc:
         log.warning("boxscore lineup unavailable for %s (%s); using roster", game_pk, exc)
 
@@ -558,11 +567,12 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
         if e.get("position", {}).get("type", "") not in ("Pitcher", "")
     ]
     people = _people(ids)
-    return [
+    _LINEUP_CACHE[ck] = [
         Player(pid, people.get(pid, {}).get("fullName", ""),
                hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
         for pid in ids
     ]
+    return _LINEUP_CACHE[ck]
 
 
 _TEAM_GAMELOG_CACHE: dict[tuple, tuple] = {}
@@ -733,7 +743,7 @@ def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
 
 # --- orchestration ------------------------------------------------------------
 def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
-                      n: int = FORM_WINDOW) -> Game:
+                      n: int = FORM_WINDOW, skip_context: bool = False) -> Game:
     """Populate last-5 offense + starter/bullpen FIP + handedness for both teams.
     With as_of (YYYY-MM-DD), only stats from games before that date are used -
     point-in-time, for an unbiased backtest. Default (None) = latest available."""
@@ -770,7 +780,8 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
         # hot/cold form: each hitter's last-5 wOBA vs his own season baseline
         try:
-            team.form_delta, team.player_form = _lineup_form(per_hitter, season)
+            if not skip_context:
+                team.form_delta, team.player_form = _lineup_form(per_hitter, season)
         except Exception as exc:
             log.warning("lineup form failed for %s: %s", team.name, exc)
         team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
@@ -783,7 +794,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
         # --- batter-vs-pitcher: this lineup's PA-weighted CAREER OPS vs the OPPOSING
         # starter (display context; samples are tiny so it carries a PA count). ---
         opp_sp = (game.away if is_home else game.home).probable_pitcher
-        if opp_sp:
+        if opp_sp and not skip_context:
             pa_tot = ops_w = 0.0
             for h in hitters:
                 try:

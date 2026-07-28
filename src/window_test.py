@@ -20,8 +20,10 @@ The headline metric is CALIBRATION SPREAD (win% at high margin minus win% at low
 margin), not ROI - it measures model quality directly and needs far less data to
 be meaningful. ROI is reported alongside.
 
-The full-season game log is cached per player, so the 2nd..4th windows are nearly
-free; the first window pays the API cost. Runs on GitHub Actions.
+Speed: full-season game logs and lineups are cached per process, and BvP/lineup-form
+are skipped (skip_context=True) - neither feeds team_score, so the margin is
+identical while the expensive per-hitter career lookups are avoided. The first
+window pays the API cost; later windows re-slice cached logs. Runs on Actions.
 Writes output/window_test.md.
 """
 
@@ -39,7 +41,7 @@ log = logging.getLogger("window_test")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 HOLDOUT_FROM = "2026-07-23"
-WINDOWS = (5, 10, 15, 20)
+WINDOWS = (5, 10, 15)
 
 
 def _prices(g: dict) -> dict:
@@ -100,7 +102,7 @@ def collect() -> dict:
                 continue
             for n in WINDOWS:
                 try:
-                    mlb_api.enrich_with_stats(gm, date, as_of=date, n=n)
+                    mlb_api.enrich_with_stats(gm, date, as_of=date, n=n, skip_context=True)
                 except Exception as exc:
                     log.warning("enrich failed %s n=%s: %s", gm.game_pk, n, exc)
                     continue
