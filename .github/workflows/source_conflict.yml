@@ -20,6 +20,9 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Run filter check
+        continue-on-error: true
+        run: python -m src.filter_check
       - name: Run source conflict
         run: python -m src.source_conflict
       - name: Post results issue
@@ -28,11 +31,14 @@ jobs:
         run: |
           gh issue create --title "Source conflict $(date -u +%Y-%m-%d)" \
             --body-file output/source_conflict.md
+          if [ -f output/filter_check.md ]; then
+            gh issue create --title "Filter check $(date -u +%Y-%m-%d)" --body-file output/filter_check.md
+          fi
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/source_conflict.md
+          git add output/source_conflict.md output/filter_check.md
           if git diff --staged --quiet; then
             echo "No changes."
           else

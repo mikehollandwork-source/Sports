@@ -44,6 +44,36 @@ MAX_SPREAD = 0.15      # wider than this is not a real two-sided market
 MIN_READINGS = 2       # need a run-up, not a single snapshot
 IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 
+# PRICE-DISCOUNT FILTER (added 2026-07-29, user's call, knowingly on thin data).
+# The money side wins ~62% whether or not the line moves with it - what changes
+# is the PRICE. When the line moves AWAY from the money, the same 62% is bought
+# at a discount, and ROI went +1.9% -> +17.3% (n=55, holdout +9.8%, p=0.043).
+# Caveats that were stated and accepted: ~20 configurations were scanned, so that
+# p-value does not survive a multiple-comparisons correction, and the bootstrap
+# CI (-10.7% to +44.0%) includes zero. Set REQUIRE_LINE_AGAINST = False to revert
+# to plain consensus; the line tag is recorded either way so both buckets stay
+# measurable from the snapshots.
+LINE_MOVE_MIN = 0.01       # implied-probability move that counts as a real move
+REQUIRE_LINE_AGAINST = True
+
+
+def line_tag(result: dict, team: str) -> str:
+    """How the line moved relative to `team`: 'against' (price drifted away from
+    it, so we buy at a discount), 'with' (price shortened on it), or 'flat'.
+
+    line_check.implied_shift is signed toward the ADVANTAGE side, so it is
+    flipped when the team we are backing is the other one."""
+    pc = result.get("pick_criteria") or {}
+    shift = (pc.get("line_check") or {}).get("implied_shift")
+    if not isinstance(shift, (int, float)):
+        return "flat"
+    toward = shift if team == pc.get("advantage_team") else -shift
+    if toward <= -LINE_MOVE_MIN:
+        return "against"
+    if toward >= LINE_MOVE_MIN:
+        return "with"
+    return "flat"
+
 
 def book_metrics(date: str) -> dict:
     """{game_pk: {"drift", "imbalance"}} for the advantage side's token, from the
@@ -109,6 +139,31 @@ def evaluate(result: dict, metrics: dict) -> dict | None:
         return None                      # no order-book read yet -> no play
     if not _confirms(m, maj == adv):
         return None
+    tag = line_tag(result, maj)
+    if REQUIRE_LINE_AGAINST and tag != "against":
+        return None                      # no price discount -> no play
     return {"bet": maj, "odds": odds,
-            "reason": "handle+tickets agree, order book confirms",
-            "drift": m["drift"], "imbalance": m["imbalance"]}
+            "reason": "handle+tickets agree, order book confirms, line moved against us",
+            "drift": m["drift"], "imbalance": m["imbalance"], "line": tag}
+
+
+def reject_reason(result: dict, metrics: dict) -> str:
+    """Why this game is not a play - checked in the same order as evaluate()."""
+    pc = result.get("pick_criteria") or {}
+    chk = result.get("public_check") or {}
+    maj = (result.get("public_majority") or {}).get("team")
+    if chk.get("money") != "with public":
+        return f"no handle/ticket agreement ({chk.get('money') or 'no money read'}) — no play"
+    if not maj:
+        return "no public majority read — no play"
+    m = metrics.get(result.get("game_pk"))
+    if not m:
+        return "no pre-game order-book read yet — no play"
+    adv = pc.get("advantage_team")
+    if not _confirms(m, maj == adv):
+        return "order book does not confirm the consensus side — no play"
+    if REQUIRE_LINE_AGAINST:
+        tag = line_tag(result, maj)
+        if tag != "against":
+            return (f"line moved {tag} the money — no price discount, no play")
+    return "no play"

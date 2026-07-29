@@ -625,22 +625,22 @@ def _apply_consensus(r: dict, metrics: dict) -> None:
     """Decide the play with the consensus rule, overriding the legacy fade gate."""
     pc = r.setdefault("pick_criteria", {})
     play = consensus_rule.evaluate(r, metrics)
+    # Record how the line moved relative to the consensus side even when the game
+    # is filtered out, so the counterfactual bucket stays gradeable from snapshots.
+    maj = (r.get("public_majority") or {}).get("team")
+    if maj:
+        pc["line_vs_money"] = consensus_rule.line_tag(r, maj)
     if play:
         pc.update(play="pick", status="pick",
                   bet_team=play["bet"], bet_moneyline=play["odds"],
                   reason=play["reason"], starred=[],
-                  consensus={"drift": play["drift"], "imbalance": play["imbalance"]},
+                  consensus={"drift": play["drift"], "imbalance": play["imbalance"],
+                             "line": play.get("line")},
                   win_prob=68, win_driver="consensus")
         return
     pc.update(play="stay_away", status="stay_away",
-              bet_team=None, bet_moneyline=None, starred=[])
-    chk = r.get("public_check") or {}
-    if chk.get("money") != "with public":
-        pc["reason"] = f"no handle/ticket agreement ({chk.get('money') or 'no money read'}) — no play"
-    elif r.get("game_pk") not in metrics:
-        pc["reason"] = "no pre-game order-book read yet — no play"
-    else:
-        pc["reason"] = "order book does not confirm the consensus side — no play"
+              bet_team=None, bet_moneyline=None, starred=[],
+              reason=consensus_rule.reject_reason(r, metrics))
 
 
 def _play(g: dict) -> str:
