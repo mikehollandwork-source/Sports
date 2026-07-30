@@ -293,6 +293,44 @@ def _mark_recap_sent(date: str) -> None:
     RECAPS_PATH.write_text(json.dumps(sorted(_recaps_sent() | {date})))
 
 
+# A pick is frozen this long before first pitch (mirrors main.LOCK_LEAD; defined
+# here rather than imported because main imports grade, not the other way round).
+LOCK_LEAD = dt.timedelta(minutes=15)
+
+
+def slate_locked(date: str, now: dt.datetime | None = None) -> bool:
+    """True once NO game on the slate can still turn into a new pick.
+
+    The consensus rule decides plays dynamically: a later game is not a pick until
+    its pre-game order book has enough readings, so the board GROWS through the
+    day. Waiting only for 'every current play is final' therefore fires the recap
+    early - the afternoon games finish, nothing is pending, and then the evening
+    games become picks. A pick can only appear while a game is still unlocked, so
+    the slate is safe once every first pitch (minus the lock lead) has passed.
+
+    Games with no recorded start time can't be judged and are treated as locked,
+    so a missing timestamp delays the recap rather than blocking it forever."""
+    picks_path = OUTPUT_DIR / f"picks_{date}.json"
+    if not picks_path.exists():
+        return False
+    try:
+        payload = json.loads(picks_path.read_text())
+    except ValueError:
+        return False
+    now = now or dt.datetime.now(dt.timezone.utc)
+    for g in payload.get("games", []):
+        raw = g.get("game_datetime")
+        if not raw:
+            continue
+        try:
+            start = dt.datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if now < start - LOCK_LEAD:
+            return False          # this game could still become a pick
+    return True
+
+
 def send_day_recap_if_complete(date: str, send) -> bool:
     """Send the day's recap via `send(text)` exactly once, and only after EVERY
     play on the slate is final AND graded into the ledger (the last game of the
@@ -304,6 +342,11 @@ def send_day_recap_if_complete(date: str, send) -> bool:
     the end-of-day board, whose play set / sides / odds can drift through the day
     and would otherwise disagree with the record."""
     if date in _recaps_sent():
+        return False
+    # The board grows through the day (see slate_locked), so "no play is pending"
+    # is not enough on its own - hold until no game can still become a pick.
+    if not slate_locked(date):
+        log.info("recap for %s held: games on the slate can still become picks", date)
         return False
     settled, pending = settle_day(date)   # settled = final+priced plays; pending = not-final
     if pending or not settled:            # a play still live/undecided, or nothing to book
