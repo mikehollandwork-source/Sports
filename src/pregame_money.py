@@ -365,6 +365,23 @@ def build() -> str:
 
     md += _controls(recs, mode)
 
+    md += ["## Verdict — do not put this on the board", "",
+           "The headline (+7.0% over 169 lopsided games, holdout +13.0%, beats "
+           "the favourite control by 14 points) looks like the best signal found "
+           "so far. The subset split is what disqualifies it: the 140 games "
+           "where the money agrees with the favourite return ~0%, and the entire "
+           "result comes from **29 games** where the money backs the dog. A "
+           "+40% ROI on 29 games is the exact profile of the reversal rule that "
+           "shipped at +25% in-sample and went 5-11 / -41% live.",
+           "",
+           "The bootstrap CI also includes zero, and p=0.036 is unadjusted for "
+           "the many rules tested against this same history - across dozens of "
+           "comparisons, one result at that level is what noise produces.",
+           "",
+           "What it does justify: `money_log` records both venues' pre-game money "
+           "on both sides every day, so the dog-disagreement subset accumulates "
+           "forward. Revisit when that subset alone reaches a real sample.", ""]
+
     md.append("_Volume counts both sides of every trade, so this is a proxy for "
               "interest in a side, not a ledger of money backing it. Holdout "
               "discipline still applies before any of this touches the board._")
