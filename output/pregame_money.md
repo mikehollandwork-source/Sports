@@ -40,6 +40,13 @@ _Lopsided — one side holds 70%+ of pre-game volume:_
 - the more-money side is the favourite in **140/169** (83%) of these games
 - backing the FAVOURITE on the same games: **-7.3%**  ← if this matches, the money adds nothing
 
+| subset | n | ROI |
+|---|---|---|
+| money side IS the favourite | 140 | +0.1% |
+| money side is the DOG | 29 | +40.2% |
+
+_The dog subset is 29 games — that is the real sample behind any edge here, not the headline n._
+
 - market-calibrated null: **p = 0.036** (4000 redraws from de-vigged prices)
 
 - in-sample (< 2026-07-23): **+4.4%** (n=118)
