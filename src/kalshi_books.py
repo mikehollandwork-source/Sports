@@ -67,12 +67,15 @@ def run(date: str | None = None) -> int:
         log.warning("kalshi markets fetch failed: %s", exc)
         return 0
     if not markets:
-        log.warning("kalshi returned no active MLB markets")
+        log.warning("kalshi returned no active MLB markets (series=%s)", kalshi.SERIES)
         return 0
+    log.info("kalshi: %d market keys, e.g. %s", len(markets),
+             list(markets)[:5])
 
     day = load_day(date) or {"date": date, "games": {}}
     now = int(time.time())
     logged = 0
+    missed: list = []
     for g in games:
         pc = g.get("pick_criteria") or {}
         adv = pc.get("advantage_team")
@@ -84,6 +87,7 @@ def run(date: str | None = None) -> int:
             continue
         pair = markets.get((aa, ha))
         if not pair:
+            missed.append((aa, ha))
             continue
         away, home = matchup.split(" @ ")
         adv_abbr = ha if adv == home else aa
@@ -105,6 +109,11 @@ def run(date: str | None = None) -> int:
         entry["readings"].append({"t": now, **book})
         logged += 1
 
+    if missed:
+        # the usual failure is an abbreviation mismatch (Kalshi codes vs ours),
+        # so print both sides rather than a bare count
+        log.warning("kalshi: no market for %d game(s), e.g. %s | kalshi has e.g. %s",
+                    len(missed), missed[:5], list(markets)[:5])
     if logged:
         OUTPUT_DIR.mkdir(exist_ok=True)
         path_for(date).write_text(json.dumps(day, indent=1))
