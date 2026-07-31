@@ -35,4 +35,16 @@ _Lopsided — one side holds 70%+ of pre-game volume:_
 | back the MORE side | 104-65 (62%) · +11.9u · **+7.0%** (n=169) |
 | back the LESS side | 65-104 (38%) · -25.7u · **-15.2%** (n=169) |
 
+## Controls — is this an edge, or just backing favourites?
+
+- the more-money side is the favourite in **140/169** (83%) of these games
+- backing the FAVOURITE on the same games: **-7.3%**  ← if this matches, the money adds nothing
+
+- market-calibrated null: **p = 0.036** (4000 redraws from de-vigged prices)
+
+- in-sample (< 2026-07-23): **+4.4%** (n=118)
+- holdout (>= 2026-07-23): **+13.0%** (n=51)
+
+- day-block bootstrap 95% CI: **-3.7% to +17.8%**
+
 _Volume counts both sides of every trade, so this is a proxy for interest in a side, not a ledger of money backing it. Holdout discipline still applies before any of this touches the board._
