@@ -213,6 +213,104 @@ def _rows(recs, mode, pick, gate=None) -> list:
     return out
 
 
+HOLDOUT_FROM = "2026-07-23"
+
+
+def _implied(ml: int) -> float:
+    return (-ml) / (-ml + 100) if ml < 0 else 100 / (ml + 100)
+
+
+def _devig(r: dict, team: str) -> float:
+    """Price-implied win probability for `team`, vig removed."""
+    a = _implied(r["price"][r["adv"]])
+    o = _implied(r["price"][r["opp"]])
+    tot = a + o
+    if tot <= 0:
+        return 0.5
+    return (a if team == r["adv"] else o) / tot
+
+
+def _picked(recs, mode, gate=None):
+    """[(rec, team)] for the MORE-money side, honouring the lopsided gate."""
+    out = []
+    for r in recs:
+        more, _less, share = _sides(r, mode)
+        if not more or (gate and not gate(share)):
+            continue
+        if more in r["price"]:
+            out.append((r, more))
+    return out
+
+
+def _roi(pairs) -> float:
+    if not pairs:
+        return 0.0
+    u = sum(grade.american_profit(r["price"][t]) if r["winner"] == t else -1
+            for r, t in pairs)
+    return u / len(pairs)
+
+
+def _controls(recs, mode) -> list[str]:
+    """The three tests that decide whether +7% is real or is the favourite."""
+    import random
+
+    md = ["## Controls — is this an edge, or just backing favourites?", ""]
+    gate = lambda s: s is not None and s >= 0.70
+    pairs = _picked(recs, mode, gate)
+    if len(pairs) < MIN_N:
+        return md + ["_Too few lopsided games to test._", ""]
+
+    # 1. THE CONTROL THAT MATTERS: on these same games, is the more-money side
+    #    simply the favourite? If so, this rediscovers the price, not an edge.
+    fav_agree = sum(1 for r, t in pairs if _devig(r, t) > 0.5)
+    fav_pairs = [(r, r["adv"] if _devig(r, r["adv"]) > 0.5 else r["opp"])
+                 for r, _ in pairs]
+    md += [f"- the more-money side is the favourite in **{fav_agree}/{len(pairs)}** "
+           f"({fav_agree/len(pairs):.0%}) of these games",
+           f"- backing the FAVOURITE on the same games: **{_roi(fav_pairs):+.1%}**"
+           "  ← if this matches, the money adds nothing", ""]
+
+    # 2. Market-calibrated null: redraw winners from de-vigged prices. Asks
+    #    "how often would this ROI appear if the market were exactly right?"
+    actual = _roi(pairs)
+    rng = random.Random(7)
+    beats = 0
+    trials = 4000
+    for _ in range(trials):
+        u = 0.0
+        for r, t in pairs:
+            if rng.random() < _devig(r, t):
+                u += grade.american_profit(r["price"][t])
+            else:
+                u -= 1
+        if u / len(pairs) >= actual:
+            beats += 1
+    md += [f"- market-calibrated null: **p = {beats/trials:.3f}** "
+           f"({trials} redraws from de-vigged prices)", ""]
+
+    # 3. Holdout - rules were derived through 07-22, so 07-23+ is untouched.
+    pre = [(r, t) for r, t in pairs if r["date"] < HOLDOUT_FROM]
+    post = [(r, t) for r, t in pairs if r["date"] >= HOLDOUT_FROM]
+    md += [f"- in-sample (< {HOLDOUT_FROM}): **{_roi(pre):+.1%}** (n={len(pre)})",
+           f"- holdout (>= {HOLDOUT_FROM}): **{_roi(post):+.1%}** (n={len(post)})", ""]
+
+    # 4. Day-block bootstrap - same-day games are not independent.
+    by_day: dict = {}
+    for r, t in pairs:
+        by_day.setdefault(r["date"], []).append((r, t))
+    days = list(by_day)
+    rois = []
+    for _ in range(2000):
+        samp = []
+        for _ in days:
+            samp.extend(by_day[rng.choice(days)])
+        rois.append(_roi(samp))
+    rois.sort()
+    md += [f"- day-block bootstrap 95% CI: **{rois[50]:+.1%} to "
+           f"{rois[-50]:+.1%}**", ""]
+    return md
+
+
 def build() -> str:
     recs, diag = collect()
     mode = "last" if diag["cum_hits"] >= diag["sum_hits"] else "sum"
@@ -252,6 +350,8 @@ def build() -> str:
                "| strategy | result |", "|---|---|",
                f"| back the MORE side | {_fmt(_rows(recs, mode, 'more', gate))} |",
                f"| back the LESS side | {_fmt(_rows(recs, mode, 'less', gate))} |", ""]
+
+    md += _controls(recs, mode)
 
     md.append("_Volume counts both sides of every trade, so this is a proxy for "
               "interest in a side, not a ledger of money backing it. Holdout "
