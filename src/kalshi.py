@@ -83,7 +83,10 @@ def game_markets() -> dict:
     events: dict = {}
     cursor = None
     for _ in range(20):                    # paginate, hard-capped
-        params = {"series_ticker": SERIES, "status": "active", "limit": 200}
+        # NOTE: Kalshi rejects status="active" with a 400 - the valid values are
+        # unopened / open / closed / settled. An earlier fix here set "active"
+        # and silently 400'd every call, so nothing was ever returned.
+        params = {"series_ticker": SERIES, "status": "open", "limit": 200}
         if cursor:
             params["cursor"] = cursor
         data = _get("/markets", **params)
@@ -108,7 +111,7 @@ def game_markets() -> dict:
         if len(abbrs) == 2:
             index[(abbrs[0], abbrs[1])] = tick_by_team
             index[(abbrs[1], abbrs[0])] = tick_by_team
-    log.info("kalshi: %d active game market pair(s)", len(index) // 2)
+    log.info("kalshi: %d open game market pair(s)", len(index) // 2)
     return index
 
 

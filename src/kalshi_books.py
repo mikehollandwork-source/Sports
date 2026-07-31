@@ -67,7 +67,7 @@ def run(date: str | None = None) -> int:
         log.warning("kalshi markets fetch failed: %s", exc)
         return 0
     if not markets:
-        log.warning("kalshi returned no active MLB markets (series=%s)", kalshi.SERIES)
+        log.warning("kalshi returned no open MLB markets (series=%s)", kalshi.SERIES)
         return 0
     log.info("kalshi: %d market keys, e.g. %s", len(markets),
              list(markets)[:5])
