@@ -118,6 +118,51 @@ def game_markets() -> dict:
 _MARKET_CACHE: dict = {}
 
 
+def market_row(ticker: str) -> dict | None:
+    """The full cached market row (volume, open_interest, result, prices...).
+    Falls back to a single fetch on a cache miss. None on failure."""
+    m = _MARKET_CACHE.get(ticker)
+    if m is None:
+        data = _get(f"/markets/{ticker}")
+        m = (data or {}).get("market")
+    return m
+
+
+def money(ticker: str) -> dict:
+    """{volume, open_interest} for a market - the TOTAL money that has traded /
+    is still at risk on that side. Unlike top-of-book depth these are cumulative
+    and survive on settled markets, so they can be pulled for past games."""
+    m = market_row(ticker) or {}
+    out = {}
+    for src, dst in (("volume", "volume"), ("open_interest", "open_interest")):
+        v = m.get(src)
+        if isinstance(v, (int, float)):
+            out[dst] = float(v)
+    if isinstance(m.get("result"), str) and m["result"]:
+        out["result"] = m["result"]
+    return out
+
+
+def settled_markets(limit_pages: int = 40) -> list:
+    """All SETTLED MLB game markets (paginated). These carry final volume /
+    open_interest / result per team, which is what makes a historical
+    money-per-side comparison possible."""
+    out, cursor = [], None
+    for _ in range(limit_pages):
+        params = {"series_ticker": SERIES, "status": "settled", "limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        data = _get("/markets", **params)
+        mkts = (data or {}).get("markets") or []
+        out.extend(mkts)
+        cursor = (data or {}).get("cursor")
+        if not cursor or not mkts:
+            break
+        time.sleep(0.2)
+    log.info("kalshi: %d settled market row(s)", len(out))
+    return out
+
+
 def top_of_book(ticker: str) -> dict | None:
     """{bid, ask, bid_sz, ask_sz} for a market's YES side (prices 0-1). Uses the
     cached row from the last game_markets() pass; on a miss (or for a fresh
