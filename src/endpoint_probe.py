@@ -28,6 +28,7 @@ from . import kalshi, pm_books
 
 log = logging.getLogger("endpoint_probe")
 TIMEOUT = 20
+PROBE_PERIOD = 60
 
 
 def _show(label: str, obj, limit: int = 400) -> None:
@@ -94,6 +95,34 @@ def probe() -> None:
                 print(f"  body: {r.text[:200]}")
         except Exception as exc:
             print(f"candlesticks failed: {exc}")
+
+    # ---------- 3b. do candlesticks exist for OLD markets? ----------
+    # The pre-game backtest lost 320 of 343 games to empty candle responses, so
+    # find out whether that is age-based retention, a window-size limit, or
+    # something else - the status code and body say which.
+    import datetime as dt
+
+    from .venue_volume import _ticker_date
+
+    seen: dict[str, str] = {}
+    for m in kalshi.settled_markets(limit_pages=6):
+        d = _ticker_date(m.get("ticker") or "")
+        if d and d not in seen:
+            seen[d] = m["ticker"]
+    for d in sorted(seen)[::max(1, len(seen) // 6)][:8]:
+        tk = seen[d]
+        try:
+            end = int(dt.datetime.fromisoformat(d + "T23:59:00+00:00").timestamp())
+            r = requests.get(
+                f"{kalshi.BASE}/series/{kalshi.SERIES}/markets/{tk}/candlesticks",
+                params={"start_ts": end - 86400, "end_ts": end,
+                        "period_interval": PROBE_PERIOD},
+                timeout=TIMEOUT, headers={"User-Agent": "mlb-edge-finder (research)"})
+            n = len((r.json() or {}).get("candlesticks") or []) if r.ok else -1
+            print(f"  {d} {tk}: HTTP {r.status_code}, candles={n}"
+                  f"{'' if r.ok else ' | ' + r.text[:120]}")
+        except Exception as exc:
+            print(f"  {d} {tk}: failed {exc}")
 
     # ---------- 4. trade history ----------
     for path, params in (("/markets/trades", {"ticker": open_ticker, "limit": 5}),):
