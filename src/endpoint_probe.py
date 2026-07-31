@@ -56,15 +56,22 @@ def probe() -> None:
     print(f"\nOPEN market populated fields ({len(keys)}):\n  {keys}")
     _show("money() on an OPEN market", kalshi.money(open_ticker))
 
-    # ---------- 2. single-market fetch on a SETTLED ticker ----------
+    # ---------- 2. SETTLED markets: do they carry cumulative money? ----------
+    # This is the question that decides the historical backtest. The list
+    # endpoint's rows are what venue_volume actually consumes, so check those
+    # directly rather than only the single-market fetch.
     settled = kalshi.settled_markets(limit_pages=1)
     if settled:
-        st = settled[0].get("ticker")
+        s = settled[0]
+        keys = sorted(k for k, v in s.items() if v not in (None, ""))
+        print(f"\nSETTLED list-row populated fields ({len(keys)}):\n  {keys}")
+        _show("market_money() on a SETTLED list row", kalshi.market_money(s))
+        have = sum(1 for m in settled if kalshi.market_money(m).get("volume"))
+        print(f"settled rows with a usable volume: {have}/{len(settled)}")
+        st = s.get("ticker")
         data = kalshi._get(f"/markets/{st}")
         m = (data or {}).get("market") or {}
-        pop = {k: m.get(k) for k in ("volume", "open_interest", "result",
-                                     "last_price", "close_time") if m.get(k) is not None}
-        _show(f"single fetch of SETTLED {st}", pop)
+        _show(f"single fetch of SETTLED {st}", kalshi.market_money(m))
 
     # ---------- 3. candlesticks (historical price + volume) ----------
     for path, params in (

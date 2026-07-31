@@ -66,13 +66,7 @@ def kalshi_by_game() -> dict:
         team = kalshi._abbr(tk)
         if not team:
             continue
-        rec = {}
-        for k in ("volume", "open_interest"):
-            v = m.get(k)
-            if isinstance(v, (int, float)):
-                rec[k] = float(v)
-        if isinstance(m.get("result"), str):
-            rec["result"] = m["result"]
+        rec = kalshi.market_money(m)
         by_event.setdefault(ev, {"date": _ticker_date(tk), "teams": {}})
         by_event[ev]["teams"][team] = rec
     out = {}
@@ -94,7 +88,8 @@ def build() -> str:
     # --- what did Kalshi actually give us? ---
     fields = Counter()
     for m in raw[:400]:
-        for k in ("volume", "open_interest", "result", "close_time", "event_ticker"):
+        for k in ("volume_fp", "open_interest_fp", "result", "close_time",
+                  "event_ticker"):
             if m.get(k) not in (None, ""):
                 fields[k] += 1
     md += ["## 1. What Kalshi returns for settled markets", "",
@@ -106,8 +101,9 @@ def build() -> str:
         sample = raw[0]
         md += ["", "_sample row:_", "```",
                json.dumps({k: sample.get(k) for k in
-                           ("ticker", "event_ticker", "volume", "open_interest",
-                            "result", "close_time")}, indent=1), "```"]
+                           ("ticker", "event_ticker", "volume_fp",
+                            "open_interest_fp", "result", "close_time")}, indent=1),
+               "```"]
     md.append("")
 
     if not kmap:

@@ -128,19 +128,42 @@ def market_row(ticker: str) -> dict | None:
     return m
 
 
+def _num(v) -> float | None:
+    """Kalshi returns fixed-point numbers as STRINGS ('23315.40'), so a plain
+    isinstance(v, float) check silently drops every one of them."""
+    if isinstance(v, bool) or v in (None, ""):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def market_money(m: dict) -> dict:
+    """{volume, open_interest, result} out of a market row.
+
+    Kalshi's payload uses `volume_fp` / `open_interest_fp`; the un-suffixed
+    names this code originally read no longer exist, which is why every
+    historical money-per-side read came back empty. Legacy names are still
+    tried second in case they come back."""
+    out = {}
+    for dst, srcs in (("volume", ("volume_fp", "volume")),
+                      ("open_interest", ("open_interest_fp", "open_interest"))):
+        for s in srcs:
+            v = _num((m or {}).get(s))
+            if v is not None:
+                out[dst] = v
+                break
+    if isinstance((m or {}).get("result"), str) and m["result"]:
+        out["result"] = m["result"]
+    return out
+
+
 def money(ticker: str) -> dict:
     """{volume, open_interest} for a market - the TOTAL money that has traded /
     is still at risk on that side. Unlike top-of-book depth these are cumulative
     and survive on settled markets, so they can be pulled for past games."""
-    m = market_row(ticker) or {}
-    out = {}
-    for src, dst in (("volume", "volume"), ("open_interest", "open_interest")):
-        v = m.get(src)
-        if isinstance(v, (int, float)):
-            out[dst] = float(v)
-    if isinstance(m.get("result"), str) and m["result"]:
-        out["result"] = m["result"]
-    return out
+    return market_money(market_row(ticker) or {})
 
 
 def settled_markets(limit_pages: int = 40) -> list:
