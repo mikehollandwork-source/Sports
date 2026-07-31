@@ -28,6 +28,7 @@ import glob
 import json
 import logging
 import time
+from collections import Counter
 from pathlib import Path
 
 import requests
@@ -41,25 +42,46 @@ log = logging.getLogger("pregame_money")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 TIMEOUT = 20
 MIN_N = 30
-LOOKBACK = 3 * 86400          # candles from 3 days before first pitch
+# 24h exactly: the probe confirmed this window returns 24 candles on markets of
+# every age, from June through July. A 3-day window returned nothing, and the
+# last 24h before first pitch is the pre-game money we actually want.
+LOOKBACK = 86400
 PERIOD = 60                   # minutes per candle
 MAX_GAMES = 400               # hard cap on API work
+PACE = 0.25                   # seconds between candle calls
+
+STATUS = Counter()            # what the endpoint actually returned, for diagnosis
 
 
 def _candles(ticker: str, start_ts: int, end_ts: int) -> list:
-    """Hourly candles for a market, or [] on any failure."""
+    """Hourly candles for a market, or [] on any failure. Retries on 429 - a
+    burst of several hundred calls is exactly what a rate limiter exists for,
+    and a silent [] there would look identical to 'no data'."""
     url = f"{kalshi.BASE}/series/{kalshi.SERIES}/markets/{ticker}/candlesticks"
-    try:
-        r = requests.get(url, timeout=TIMEOUT,
-                         params={"start_ts": start_ts, "end_ts": end_ts,
-                                 "period_interval": PERIOD},
-                         headers={"User-Agent": "mlb-edge-finder (research)"})
-        if not r.ok:
+    for attempt in range(4):
+        try:
+            r = requests.get(url, timeout=TIMEOUT,
+                             params={"start_ts": start_ts, "end_ts": end_ts,
+                                     "period_interval": PERIOD},
+                             headers={"User-Agent": "mlb-edge-finder (research)"})
+            STATUS[r.status_code] += 1
+            if r.status_code == 429:
+                time.sleep(2 ** attempt)
+                continue
+            if not r.ok:
+                if attempt == 0:
+                    log.warning("candles %s -> %s: %s", ticker,
+                                r.status_code, r.text[:160])
+                return []
+            cs = (r.json() or {}).get("candlesticks") or []
+            if not cs:
+                STATUS["ok_but_empty"] += 1
+            return cs
+        except Exception as exc:
+            STATUS["exception"] += 1
+            log.warning("candles failed (%s): %s", ticker, exc)
             return []
-        return (r.json() or {}).get("candlesticks") or []
-    except Exception as exc:
-        log.warning("candles failed (%s): %s", ticker, exc)
-        return []
+    return []
 
 
 def _vol(c: dict) -> float:
@@ -144,7 +166,7 @@ def collect() -> tuple[list, dict]:
                     else:
                         diag["sum_hits"] += 1
                 pre[ab] = {"last": vols[-1], "sum": sum(vols)}
-                time.sleep(0.05)
+                time.sleep(PACE)
 
             if len(pre) != 2:
                 diag["no_candles"] += 1
@@ -202,7 +224,10 @@ def build() -> str:
           "## Coverage", "",
           f"- games matched with a start time: **{diag['matched']}**",
           f"- usable (candles on both sides): **{len(recs)}**",
-          f"- dropped, no candles: **{diag['no_candles']}**", ""]
+          f"- dropped, no candles: **{diag['no_candles']}**", "",
+          "_Candle fetch outcomes: " +
+          (", ".join(f"`{k}` {v}" for k, v in STATUS.most_common()) or "none") +
+          "._", ""]
 
     md += ["## Is candle `volume_fp` cumulative or per-period?", "",
            f"Reconciled against each market's known total on {diag['checked']} "
