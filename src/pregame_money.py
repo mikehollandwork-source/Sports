@@ -270,6 +270,18 @@ def _controls(recs, mode) -> list[str]:
            f"- backing the FAVOURITE on the same games: **{_roi(fav_pairs):+.1%}**"
            "  ← if this matches, the money adds nothing", ""]
 
+    # 1b. WHERE the edge lives. If the more-money side is the favourite 83% of
+    #     the time yet the favourite loses money, the whole result must rest on
+    #     the minority of games where the money backs the DOG. That is a much
+    #     smaller sample than the headline n, so size it explicitly.
+    agree = [(r, t) for r, t in pairs if _devig(r, t) > 0.5]
+    disagree = [(r, t) for r, t in pairs if _devig(r, t) <= 0.5]
+    md += ["| subset | n | ROI |", "|---|---|---|",
+           f"| money side IS the favourite | {len(agree)} | {_roi(agree):+.1%} |",
+           f"| money side is the DOG | {len(disagree)} | {_roi(disagree):+.1%} |",
+           "", f"_The dog subset is {len(disagree)} games — that is the real "
+           "sample behind any edge here, not the headline n._", ""]
+
     # 2. Market-calibrated null: redraw winners from de-vigged prices. Asks
     #    "how often would this ROI appear if the market were exactly right?"
     actual = _roi(pairs)
