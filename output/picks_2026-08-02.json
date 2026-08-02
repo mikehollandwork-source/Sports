@@ -1,6 +1,6 @@
 {
   "date": "2026-08-02",
-  "generated_at": "2026-08-02T20:10:53.458134+00:00",
+  "generated_at": "2026-08-02T20:55:31.728771+00:00",
   "games": [
     {
       "game_pk": 824807,
@@ -1550,7 +1550,7 @@
           "losses": 25
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 824404,
@@ -3121,7 +3121,7 @@
           "losses": 31
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 823592,
@@ -3645,7 +3645,7 @@
           "losses": 32
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 824163,
@@ -7349,8 +7349,8 @@
       "park_factor": 0.98,
       "statistical_advantage": {
         "team": "Los Angeles Dodgers",
-        "home_score": 0.24952499999999989,
-        "away_score": 0.1102,
+        "home_score": 0.2562372222222222,
+        "away_score": 0.1094,
         "home": {
           "name": "Los Angeles Dodgers",
           "probable_pitcher": "Emmet Sheehan",
@@ -7377,22 +7377,22 @@
           "bullpen_fip_last5": 4.274,
           "bullpen_ip_last5": 162.0,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 4.341,
+          "combined_fip_sos_adj": 4.34,
           "strength_of_schedule": {
             "bat_opp_pitching_factor": 1.037,
-            "arm_opp_offense_factor": 0.98,
+            "arm_opp_offense_factor": 0.981,
             "raw": {
-              "bat_opp_fip": 3.820547952137337,
-              "bat_opp_win": 0.4820896358543417,
-              "sp_opp_woba": 0.31360269910565886,
-              "sp_opp_win": 0.48996453900709225,
-              "bp_opp_woba": 0.31412608962537875,
-              "bp_opp_win": 0.47939094650205777
+              "bat_opp_fip": 3.818803743732492,
+              "bat_opp_win": 0.4809019607843137,
+              "sp_opp_woba": 0.3139258818622885,
+              "sp_opp_win": 0.4900709219858156,
+              "bp_opp_woba": 0.31428769992414807,
+              "bp_opp_win": 0.4789218106995886
             }
           },
-          "offense_index": 0.0771,
-          "pitching_index": -0.0587,
-          "score": 0.0184
+          "offense_index": 0.0767,
+          "pitching_index": -0.0585,
+          "score": 0.0182
         },
         "away": {
           "name": "Boston Red Sox",
@@ -7420,26 +7420,26 @@
           "bullpen_fip_last5": 3.148,
           "bullpen_ip_last5": 161.33,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 3.326,
+          "combined_fip_sos_adj": 3.327,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.95,
+            "bat_opp_pitching_factor": 0.949,
             "arm_opp_offense_factor": 0.993,
             "raw": {
-              "bat_opp_fip": 4.343156465182898,
-              "bat_opp_win": 0.485594674556213,
-              "sp_opp_woba": 0.3183499931222213,
-              "sp_opp_win": 0.49403296703296706,
-              "bp_opp_woba": 0.31826517789680286,
-              "bp_opp_win": 0.4825206611570247
+              "bat_opp_fip": 4.343830338032896,
+              "bat_opp_win": 0.48452366863905316,
+              "sp_opp_woba": 0.31852231513541013,
+              "sp_opp_win": 0.49291208791208796,
+              "bp_opp_woba": 0.3182999144504444,
+              "bp_opp_win": 0.481427685950413
             }
           },
-          "offense_index": -0.0785,
-          "pitching_index": 0.1887,
-          "score": 0.1102
+          "offense_index": -0.079,
+          "pitching_index": 0.1884,
+          "score": 0.1094
         }
       },
       "public_majority": {
-        "team": "Los Angeles Dodgers",
+        "team": "Boston Red Sox",
         "detail": {
           "consensus": {
             "pick": "Bos",
@@ -7450,13 +7450,13 @@
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 8,
-            "away": 10
+            "home": 10,
+            "away": 15
           },
           "agree": true,
-          "forum_lean": -0.111,
+          "forum_lean": -0.2,
           "consensus_lean": -0.02,
-          "blended_lean": 0.013,
+          "blended_lean": -0.018,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -7488,39 +7488,40 @@
           {
             "name": "covers",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "vsin_bets",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 2,
-        "dissent": 3,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (covers, forum, vsin_bets differ)",
+        "majority_side": "away",
+        "agree": 3,
+        "dissent": 2,
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "3/5 sources agree (scoresodds_bets, polymarket_bets differ)",
         "flags": [
-          "money sources disagree"
+          "money sources disagree",
+          "reverse line move \u2014 money went against the public %"
         ],
-        "line": "with public",
+        "line": "against public",
         "money": "sources split",
         "money_side": null
       },
@@ -7541,13 +7542,13 @@
         "meaningful": true
       },
       "bvp_pen": {
-        "home_ops": 0.756,
-        "away_ops": 0.681,
-        "home_pa": 166,
-        "away_pa": 87,
-        "total_pa": 253,
+        "home_ops": 0.763,
+        "away_ops": 0.697,
+        "home_pa": 165,
+        "away_pa": 85,
+        "total_pa": 250,
         "edge_team": "Los Angeles Dodgers",
-        "gap": 0.075,
+        "gap": 0.066,
         "meaningful": true
       },
       "form": {
@@ -7600,14 +7601,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "Los Angeles Dodgers",
-          "consensus_pct": 49.0,
-          "moneyline": "-180"
-        },
-        "non_majority": {
           "team": "Boston Red Sox",
           "consensus_pct": 51.0,
-          "moneyline": "+145"
+          "moneyline": "+155"
+        },
+        "non_majority": {
+          "team": "Los Angeles Dodgers",
+          "consensus_pct": 49.0,
+          "moneyline": "-200"
         }
       },
       "consistency": {
@@ -7644,7 +7645,7 @@
               "allowed": 2,
               "hits": 11,
               "hits_allowed": 5,
-              "adj_scored": 4.24,
+              "adj_scored": 4.25,
               "adj_allowed": 2.08,
               "opp_win_pct": 0.482
             },
@@ -7760,20 +7761,20 @@
         "status": "stay_away",
         "reason": "no handle/ticket agreement (sources split) \u2014 no play",
         "advantage_team": "Los Angeles Dodgers",
-        "public_edge": false,
-        "public_trusted": false,
+        "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.192,
+        "confidence": 0.207,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.139,
-            "strength": 0.348,
+            "margin": 0.147,
+            "strength": 0.367,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.013,
-            "strength": 0.0,
+            "blended_lean": -0.018,
+            "strength": 0.011,
             "weight": 0.45
           },
           "consistency": {
@@ -7802,19 +7803,22 @@
         "sp_dog_edge": -1.123,
         "pitching_dog": false,
         "signals_hit": 4,
+        "public_pct_against": 49,
         "book_stance": {
-          "side": null,
+          "side": "Los Angeles Dodgers",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "reverse line move"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Los Angeles Dodgers",
           "odds": -186,
           "basis": "ticket %",
-          "hold_home": 1393443,
-          "hold_away": -1485058
+          "hold_home": 1489118,
+          "hold_away": -1642480
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -7826,10 +7830,10 @@
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 54.2,
-          "fair_american": -118
+          "win_prob": 54.4,
+          "fair_american": -119
         },
-        "line_vs_money": "with",
+        "line_vs_money": "against",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": []
@@ -7838,8 +7842,8 @@
       "pick": null,
       "game_datetime": "2026-08-02T23:20:00Z",
       "weather": {
-        "temp_f": 85,
-        "wind_mph": 8,
+        "temp_f": 87,
+        "wind_mph": 9,
         "wind_dir": "WSW",
         "precip_pct": 0,
         "roof": "open"
