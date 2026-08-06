@@ -157,6 +157,9 @@ def collect() -> list:
             recs.append({
                 "date": date, "dog": dog, "odds": price[dog],
                 "won": res["winner"] == dog,
+                # the other side of the same game, so a losing dog cell can be
+                # priced as a favourite bet rather than assumed to be one
+                "fav_odds": price[fav], "fav_won": res["winner"] == fav,
                 "p": _implied(price[dog]) / (_implied(a_ml) + _implied(o_ml)),
                 "feats": _feats(g, dog, fav, dog == home),
             })
@@ -211,6 +214,17 @@ def _fmt(recs, idx) -> str:
     return f"{w}-{len(idx)-w} ({w/len(idx):.0%}) · {u:+.1f}u · **{u/len(idx):+.1%}** (n={len(idx)})"
 
 
+def _fmt_fav(recs, idx) -> str:
+    """Backing the FAVOURITE in the same games - what 'fade this dog cell'
+    actually pays, rather than what a losing dog ROI implies it pays."""
+    if not idx:
+        return "—"
+    w = sum(1 for i in idx if recs[i]["fav_won"])
+    u = sum(grade.american_profit(recs[i]["fav_odds"]) if recs[i]["fav_won"] else -1
+            for i in idx)
+    return f"{w}-{len(idx)-w} ({w/len(idx):.0%}) · {u:+.1f}u · **{u/len(idx):+.1%}** (n={len(idx)})"
+
+
 def build() -> str:
     recs = collect()
     md = ["# What do winning underdogs have in common?", "",
@@ -244,16 +258,25 @@ def build() -> str:
                   f"{_fmt(recs, post)} |")
     md.append("")
 
-    # ---- max-statistic permutation: how good is the BEST cell in pure noise? ----
+    # ---- permutation: how extreme are the BEST and WORST cells in pure noise? ----
+    # Both tails are tested. Scanning 60+ cells throws up extreme NEGATIVES as
+    # readily as extreme positives, and treating an untested negative cell as
+    # real - then reversing it - is exactly what produced the reversal rule that
+    # went 5-11 / -41% live.
     best_label, best_idx = ranked[0]
-    best_roi = _roi(recs, best_idx)
+    worst_label, worst_idx = ranked[-1]
+    best_roi, worst_roi = _roi(recs, best_idx), _roi(recs, worst_idx)
     rng = random.Random(23)
-    null_max = []
+    null_max, null_min = [], []
     for _ in range(TRIALS):
         w = [rng.random() < r["p"] for r in recs]
-        null_max.append(max(_roi(recs, idx, w) for idx in cells.values()))
+        rois = [_roi(recs, idx, w) for idx in cells.values()]
+        null_max.append(max(rois))
+        null_min.append(min(rois))
     beats = sum(1 for m in null_max if m >= best_roi)
+    beats_lo = sum(1 for m in null_min if m <= worst_roi)
     null_max.sort()
+    null_min.sort()
 
     md += ["## The test that matters", "",
            f"Best cell: `{best_label}` at **{best_roi:+.1%}**.", "",
@@ -275,6 +298,33 @@ def build() -> str:
                "headline number is what the search produced, not what the data "
                "contains. Whatever story fits the best cell, it is not evidence.",
                ""]
+
+    # ---- the other tail, and what fading it actually pays ----
+    md += ["## The other tail — are the LOSING cells real?", "",
+           f"Worst cell: `{worst_label}` at **{worst_roi:+.1%}**.", "",
+           f"- median worst-in-noise: **{st.median(null_min):+.1%}**",
+           f"- 5th percentile of worst-in-noise: **{null_min[int(.05*TRIALS)]:+.1%}**",
+           f"- our worst cell: **{worst_roi:+.1%}**",
+           f"- **corrected p = {beats_lo/TRIALS:.3f}**", ""]
+    if beats_lo / TRIALS <= 0.05:
+        md += ["**The losing tail clears the bar** — this cell is worse than a "
+               "scan of this size manufactures. That makes it a real avoid.", ""]
+    else:
+        md += ["**The losing tail does not clear either.** A scan this wide "
+               "produces cells this bad in noise routinely, so the losing cells "
+               "are no more real than the winning ones — and reversing them "
+               "would be betting on the search, not the data.", ""]
+
+    md += ["### Fading the worst cells — what it actually pays", "",
+           "_A dog cell losing 20% does NOT mean backing the favourite there "
+           "wins 20%; the favourite is priced too. This is the same games, "
+           "betting the other side._", "",
+           "| cell | backing the dog | backing the FAVOURITE instead |",
+           "|---|---|---|"]
+    for label, idx in ranked[-5:]:
+        md.append(f"| `{label}` | {_fmt(recs, idx)} | {_fmt_fav(recs, idx)} |")
+    md += ["", f"_For reference, backing the favourite in every underdog game: "
+           f"{_fmt_fav(recs, all_idx)}._", ""]
 
     md += ["## Reading the cells above", "",
            "A cell is only interesting if it is strong all-time AND holds in the "
