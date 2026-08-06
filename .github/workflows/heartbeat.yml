@@ -1,0 +1,57 @@
+name: Board heartbeat
+
+# Safety net for the board going stale. Deliberately a SEPARATE workflow on its
+# own offset schedule: the refresh loop cannot detect its own absence, and
+# anything sharing that cron shares its failure. Runs at :25 past the hour so it
+# never races the :00 refresh kick, and has its own concurrency group so the two
+# can never cancel each other.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 16-23 * * *"   # :25 past, noon ET -> 7pm ET
+    - cron: "25 0-5 * * *"     # :25 past, 8pm ET -> 1am ET
+
+permissions:
+  contents: write
+
+concurrency:
+  group: board-heartbeat
+  cancel-in-progress: false
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check board freshness, rebuild if stale
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
+          python -m src.board_heartbeat
+
+      - name: Commit anything the rebuild produced
+        if: always()
+        run: |
+          git add output/
+          if ! git diff --staged --quiet; then
+            git commit -m "Board heartbeat rebuild ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase -X theirs origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
