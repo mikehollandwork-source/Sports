@@ -20,9 +20,13 @@ on:
 permissions:
   contents: write
 
-# newest kick wins: it cancels the running loop and takes over the day
+# Newest kick wins: it cancels the running loop and takes over the day. The
+# group is keyed on the EVENT so a manual "give me a board now" can never be
+# cancelled by a cron that happens to fire a few seconds later - which is
+# exactly what killed one on 2026-08-06, leaving the board 6h stale with no
+# error surfaced anywhere.
 concurrency:
-  group: pregame-refresh
+  group: pregame-refresh-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -39,7 +43,34 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # A manual run means "give me a board NOW" - build once, post, exit. It
+      # deliberately does not start a loop, so it can't double-post alongside
+      # the scheduled one.
+      - name: One-shot board (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
+          python -m src.pregame --telegram
+          git add output/
+          if ! git diff --staged --quiet; then
+            git commit -m "Pre-game refresh, manual ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase -X theirs origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
+
       - name: Hourly on-the-hour board post
+        if: github.event_name != 'workflow_dispatch'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
