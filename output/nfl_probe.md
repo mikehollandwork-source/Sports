@@ -19,6 +19,13 @@ _Everything here fails soft, so a broken NFL path looks identical to an empty sc
 | `Jacksonville Jaguars` | `JAC` |
 | `Tush Push banned for 2026 NFL Season?` | `None` |
 
+## 1b. Odds API football sport keys
+
+- exposed: `americanfootball_cfl`, `americanfootball_ncaaf`, `americanfootball_ncaaf_championship_winner`, `americanfootball_nfl`, `americanfootball_nfl_super_bowl_winner`
+- we query: `americanfootball_nfl`, `americanfootball_nfl_preseason`
+
+**We query keys the API does not expose: ['americanfootball_nfl_preseason']** — that returns an empty schedule rather than an error.
+
 ## 2. Schedule and kickoff times
 
 - dates with games in the next 21: **0**
