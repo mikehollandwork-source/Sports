@@ -20,11 +20,25 @@ forgotten.
 `live=False` - it records picks and grades them, silently, until its own holdout
 says otherwise.
 
-VENUE IDENTIFIERS ARE UNVERIFIED except MLB's. Kalshi's MLB series is
-KXMLBGAME, confirmed against the API; the others are the obvious pattern and
-nothing more. src/sport_probe.py checks them against the live endpoints - run it
-before trusting any of them, because an unverified selector here fails silently,
-which is exactly how the Kalshi logger sat dead for weeks.
+VENUE IDENTIFIERS ARE VERIFIED (sport_probe.py, 2026-08-06). All four Kalshi
+series return two-sided events whose tickers parse into teams, with volume on
+settled markets. Re-run the probe if anything downstream starts coming back
+empty.
+
+TWO PORTABILITY TRAPS the probe surfaced, both of which would have failed
+silently:
+
+  1. TICKER DATE FORMATS DIFFER BY SPORT.
+        MLB  KXMLBGAME-26AUG092020HOUSD-SD   date + HHMM
+        NFL  KXNFLGAME-26AUG15DALSEA-SEA     date only, no time
+     Anything reusing dog_money.ticker_start() - which expects the HHMM - gets
+     nothing for NFL. First pitch has to come from the schedule for sports whose
+     tickers omit it.
+
+  2. THE POLYMARKET TAG RETURNS FUTURES, NOT GAMES. `nfl` returns "Tush Push
+     banned for 2026 Season?", `mlb` returns "World Series Champion 2026". The
+     tag is a starting filter only; per-game events still have to be matched the
+     way pm_books already does for MLB.
 """
 
 from __future__ import annotations
@@ -39,7 +53,7 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 class Sport:
     key: str
     name: str
-    kalshi_series: str        # UNVERIFIED except mlb - see sport_probe.py
+    kalshi_series: str        # all verified 2026-08-06 via sport_probe.py
     pm_tag: str               # gamma tag_slug
     holdout_from: str         # rules derived before this date; after it is clean
     live: bool                # False = shadow only, never reaches the board
@@ -47,10 +61,12 @@ class Sport:
 
 SPORTS: dict[str, Sport] = {
     "mlb": Sport("mlb", "MLB", "KXMLBGAME", "mlb", "2026-07-23", live=True),
-    # Not live. NFL is the first branch: it starts soonest, carries the deepest
-    # prediction-market liquidity (which the order-book gate needs), and gives
-    # days of pre-game market action rather than hours. Its holdout starts at
-    # the 2026 season opener, so every NFL bet is out-of-sample from day one.
+    # Not live. NFL is the first branch: deepest prediction-market liquidity
+    # (which the order-book gate needs) and days of pre-game action rather than
+    # hours. Kalshi already lists it - 32 two-sided preseason games as of
+    # 2026-08-06 - but holdout starts at the regular-season opener ON PURPOSE.
+    # Preseason outcomes are close to noise (starters barely play) and the money
+    # behaves differently, so grading against it would teach us the wrong thing.
     "nfl": Sport("nfl", "NFL", "KXNFLGAME", "nfl", "2026-09-01", live=False),
     # NBA follows in late October. This is where the SAMPLE comes from: ~1230
     # games a season against the NFL's 272, so it accumulates evidence roughly
