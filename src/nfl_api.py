@@ -42,10 +42,14 @@ from . import apitime
 log = logging.getLogger("nfl_api")
 
 API = "https://api.the-odds-api.com/v4/sports"
-# The Odds API splits preseason into its own sport key. Querying only
-# `americanfootball_nfl` in August returns nothing while Kalshi is already
-# listing preseason games - which looked exactly like "no games scheduled".
-SPORT_KEYS = ("americanfootball_nfl", "americanfootball_nfl_preseason")
+# Verified against /v4/sports (nfl_probe, 2026-08-07): the only NFL keys are
+# `americanfootball_nfl` and a Super Bowl futures market. There is NO preseason
+# key - The Odds API does not cover preseason at all, and regular-season events
+# only appear once books price them. So in August this returns nothing, which is
+# correct rather than broken: NFL is not graded until the September opener.
+# Kickoff for any game the odds API has not listed comes from Polymarket, whose
+# gamma events carry a start time and which already matches NFL games by team.
+SPORT_KEYS = ("americanfootball_nfl",)
 TIMEOUT = 20
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 UA = {"User-Agent": "mlb-edge-finder (personal research)"}

@@ -151,6 +151,29 @@ def build() -> str:
                "`nfl_api.name_abbr` — check the sample titles in "
                "`sport_probe.md` before assuming the former._", ""]
 
+    # ---- 5. does Polymarket carry a kickoff time? ----
+    md += ["## 5. Kickoff from Polymarket (fallback source)", "",
+           "_The odds API has no preseason coverage, so this checks whether "
+           "gamma events carry a usable start time for games it cannot see._", ""]
+    try:
+        batch = pm_books._get(pm_books.GAMMA, tag_slug="nfl", closed="false",
+                              limit=5, offset=0)
+        ev = (batch or [{}])[0] if isinstance(batch, list) else {}
+        date_fields = {k: v for k, v in (ev or {}).items()
+                       if any(w in k.lower() for w in
+                              ("date", "time", "start", "end")) and v}
+        if date_fields:
+            md += ["| field | value |", "|---|---|"]
+            for k, v in list(date_fields.items())[:10]:
+                md.append(f"| `{k}` | `{str(v)[:40]}` |")
+            md.append("")
+        else:
+            md += ["_No date-like fields on the sample event._", ""]
+        md.append(f"_sample event: {str(ev.get('title'))[:70]}_")
+        md.append("")
+    except Exception as exc:
+        md += [f"_gamma field probe failed: {exc}_", ""]
+
     md.append("_NFL stays `live=False` regardless of these results. This probe "
               "verifies the plumbing carries data, not that the rule works._")
     return "\n".join(md)
