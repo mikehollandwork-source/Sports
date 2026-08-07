@@ -22,9 +22,7 @@ _Everything here fails soft, so a broken NFL path looks identical to an empty sc
 ## 1b. Odds API football sport keys
 
 - exposed: `americanfootball_cfl`, `americanfootball_ncaaf`, `americanfootball_ncaaf_championship_winner`, `americanfootball_nfl`, `americanfootball_nfl_super_bowl_winner`
-- we query: `americanfootball_nfl`, `americanfootball_nfl_preseason`
-
-**We query keys the API does not expose: ['americanfootball_nfl_preseason']** — that returns an empty schedule rather than an error.
+- we query: `americanfootball_nfl`
 
 ## 2. Schedule and kickoff times
 
@@ -53,5 +51,18 @@ _No Kalshi-side mismatches: every abbreviation Kalshi uses is in our table, so n
 | `BUF` vs `CAR` |
 | `PHI` vs `BAL` |
 | `BAL` vs `PHI` |
+
+## 5. Kickoff from Polymarket (fallback source)
+
+_The odds API has no preseason coverage, so this checks whether gamma events carry a usable start time for games it cannot see._
+
+| field | value |
+|---|---|
+| `startDate` | `2025-11-22T01:10:50.408182Z` |
+| `creationDate` | `2025-11-22T01:19:04.708288Z` |
+| `endDate` | `2026-09-10T00:00:00Z` |
+| `updatedAt` | `2026-08-07T06:02:45.415166Z` |
+
+_sample event: Tush Push banned for 2026 NFL Season?_
 
 _NFL stays `live=False` regardless of these results. This probe verifies the plumbing carries data, not that the rule works._
