@@ -56,13 +56,17 @@ _No Kalshi-side mismatches: every abbreviation Kalshi uses is in our table, so n
 
 _The odds API has no preseason coverage, so this checks whether gamma events carry a usable start time for games it cannot see._
 
+_sample GAME event: Panthers vs. Cardinals_
+
 | field | value |
 |---|---|
-| `startDate` | `2025-11-22T01:10:50.408182Z` |
-| `creationDate` | `2025-11-22T01:19:04.708288Z` |
-| `endDate` | `2026-09-10T00:00:00Z` |
-| `updatedAt` | `2026-08-07T06:02:45.415166Z` |
-
-_sample event: Tush Push banned for 2026 NFL Season?_
+| `startDate` | `2026-07-09T12:03:01.935741Z` |
+| `creationDate` | `2026-08-07T00:00:00Z` |
+| `endDate` | `2026-08-07T00:00:00Z` |
+| `updatedAt` | `2026-08-07T06:06:39.265777Z` |
+| `eventDate` | `2026-08-06` |
+| `startTime` | `2026-08-07T00:00:00Z` |
+| `ended` | `True` |
+| `finishedTimestamp` | `2026-08-07T03:05:43.088393Z` |
 
 _NFL stays `live=False` regardless of these results. This probe verifies the plumbing carries data, not that the rule works._
