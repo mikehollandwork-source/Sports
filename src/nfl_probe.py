@@ -25,6 +25,7 @@ Writes output/nfl_probe.md.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import zoneinfo
 from pathlib import Path
@@ -156,21 +157,49 @@ def build() -> str:
            "_The odds API has no preseason coverage, so this checks whether "
            "gamma events carry a usable start time for games it cannot see._", ""]
     try:
-        batch = pm_books._get(pm_books.GAMMA, tag_slug="nfl", closed="false",
-                              limit=5, offset=0)
-        ev = (batch or [{}])[0] if isinstance(batch, list) else {}
-        date_fields = {k: v for k, v in (ev or {}).items()
-                       if any(w in k.lower() for w in
-                              ("date", "time", "start", "end")) and v}
-        if date_fields:
-            md += ["| field | value |", "|---|---|"]
-            for k, v in list(date_fields.items())[:10]:
-                md.append(f"| `{k}` | `{str(v)[:40]}` |")
+        # take the first event that is actually a GAME - the tag also returns
+        # season futures, and sampling one of those reports its creation date
+        # as if it were a kickoff time.
+        game_ev = None
+        for off in (0, 100):
+            batch = pm_books._get(pm_books.GAMMA, tag_slug="nfl", closed="false",
+                                  limit=100, offset=off)
+            if not isinstance(batch, list):
+                break
+            for ev in batch:
+                for m in ev.get("markets") or []:
+                    outs = m.get("outcomes")
+                    if isinstance(outs, str):
+                        try:
+                            outs = json.loads(outs)
+                        except ValueError:
+                            continue
+                    if not outs or len(outs) != 2:
+                        continue
+                    a1, a2 = (nfl_api.name_abbr(str(outs[0])),
+                              nfl_api.name_abbr(str(outs[1])))
+                    if a1 and a2 and a1 != a2:
+                        game_ev = ev
+                        break
+                if game_ev:
+                    break
+            if game_ev or not batch:
+                break
+        if game_ev:
+            md.append(f"_sample GAME event: {str(game_ev.get('title'))[:70]}_")
             md.append("")
+            fields = {k: v for k, v in game_ev.items()
+                      if any(w in k.lower() for w in
+                             ("date", "time", "start", "end")) and v}
+            if fields:
+                md += ["| field | value |", "|---|---|"]
+                for k, v in list(fields.items())[:12]:
+                    md.append(f"| `{k}` | `{str(v)[:40]}` |")
+                md.append("")
+            else:
+                md += ["_No date-like fields on the game event._", ""]
         else:
-            md += ["_No date-like fields on the sample event._", ""]
-        md.append(f"_sample event: {str(ev.get('title'))[:70]}_")
-        md.append("")
+            md += ["_No game event found under the nfl tag._", ""]
     except Exception as exc:
         md += [f"_gamma field probe failed: {exc}_", ""]
 
