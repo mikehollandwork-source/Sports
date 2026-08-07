@@ -203,6 +203,15 @@ def build() -> str:
     except Exception as exc:
         md += [f"_gamma field probe failed: {exc}_", ""]
 
+    ks = nfl_api.pm_kickoffs()
+    md += ["", f"- **kickoffs recovered from Polymarket: {len(ks)} games**", ""]
+    if ks:
+        md += ["| teams | kickoff (UTC) | ended |", "|---|---|---|"]
+        for pair, v in list(ks.items())[:6]:
+            when = dt.datetime.utcfromtimestamp(v["start_ts"]).isoformat()
+            md.append(f"| {' vs '.join(sorted(pair))} | {when}Z | {v['ended']} |")
+        md.append("")
+
     md.append("_NFL stays `live=False` regardless of these results. This probe "
               "verifies the plumbing carries data, not that the rule works._")
     return "\n".join(md)

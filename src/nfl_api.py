@@ -31,6 +31,7 @@ results_for(date) -> {game_id: {final, winner, away_score, home_score}} with
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import os
 import zoneinfo
@@ -201,13 +202,68 @@ def results_for(date: str) -> dict:
     return out
 
 
+def pm_kickoffs(tag: str = "nfl") -> dict:
+    """{frozenset{abbr, abbr}: {start_ts, event_date, ended}} from Polymarket.
+
+    The odds API has no preseason coverage and lists regular-season games only
+    once books price them, so gamma is the kickoff source for everything it
+    cannot see. Verified field names (nfl_probe, 2026-08-07) on a real game
+    event: `startTime` is kickoff, `eventDate` the local game date, `ended` /
+    `finishedTimestamp` completion. NOT `startDate` - that is when the market
+    was created, which on the sampled game was a month before kickoff.
+
+    Keyed by an unordered pair: gamma's title ("Panthers vs. Cardinals") does
+    not reliably say which side is home."""
+    from . import pm_books
+
+    out: dict = {}
+    for off in (0, 100, 200):
+        batch = pm_books._get(pm_books.GAMMA, tag_slug=tag, closed="false",
+                              limit=100, offset=off)
+        if not isinstance(batch, list) or not batch:
+            break
+        for ev in batch:
+            pair = None
+            for m in ev.get("markets") or []:
+                outs = m.get("outcomes")
+                if isinstance(outs, str):
+                    try:
+                        outs = json.loads(outs)
+                    except ValueError:
+                        continue
+                if not outs or len(outs) != 2:
+                    continue
+                a1, a2 = name_abbr(str(outs[0])), name_abbr(str(outs[1]))
+                if a1 and a2 and a1 != a2:
+                    pair = frozenset({a1, a2})
+                    break
+            if not pair:
+                continue                      # a futures market, not a game
+            ts = _iso_ts(ev.get("startTime"))
+            if ts is None:
+                continue
+            out[pair] = {"start_ts": ts, "event_date": ev.get("eventDate"),
+                         "ended": bool(ev.get("ended"))}
+        if len(batch) < 100:
+            break
+    return out
+
+
+_PM_CACHE: dict | None = None
+
+
 def start_ts_for(date: str, away_abbr: str, home_abbr: str) -> int | None:
-    """Kickoff for one matchup - the thing Kalshi's NFL ticker omits."""
+    """Kickoff for one matchup - the thing Kalshi's NFL ticker omits. Tries the
+    odds API first, then falls back to Polymarket."""
+    global _PM_CACHE
     a, h = (away_abbr or "").upper(), (home_abbr or "").upper()
     for g in schedule(date):
         if g["away_abbr"] == a and g["home_abbr"] == h:
             return g["start_ts"]
-    return None
+    if _PM_CACHE is None:
+        _PM_CACHE = pm_kickoffs()
+    hit = _PM_CACHE.get(frozenset({a, h}))
+    return hit["start_ts"] if hit else None
 
 
 def main() -> None:
