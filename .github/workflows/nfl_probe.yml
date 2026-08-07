@@ -20,6 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Probe
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: python -m src.nfl_probe
       - name: Commit
         run: |

@@ -1,17 +1,17 @@
 """
 Verify the NFL plumbing end to end, on a runner with real network access.
 
-The dev sandbox firewalls ESPN, so none of this can be checked locally - and
+The dev sandbox firewalls outbound APIs, so none of this can be checked locally - and
 every piece here fails soft, which means a broken NFL path would look exactly
 like an empty schedule. It has to be exercised where the network is open.
 
 FOUR CHECKS, in dependency order:
 
-  1. ESPN team map - does it load, and do the name forms Kalshi and Polymarket
-     actually use resolve to abbreviations?
-  2. ESPN schedule - are there games, and do they carry kickoff times? This is
+  1. team table - do the name forms Kalshi and Polymarket actually use resolve
+     to abbreviations?
+  2. schedule - are there games, and do they carry kickoff times? This is
      the whole reason the module exists: Kalshi's NFL ticker has no HHMM.
-  3. ABBREVIATION AGREEMENT between Kalshi and ESPN. The check that matters
+  3. ABBREVIATION AGREEMENT between Kalshi and our table. The check that matters
      most. MLB needed an alias table (WAS/WSH, CHW/CWS, SDP/SD...) and the NFL
      has the same hazards - Washington, both LA teams, Jacksonville. A mismatch
      silently drops that team's games forever, which is how the Kalshi logger
@@ -63,7 +63,7 @@ def build() -> str:
 
     # ---- 1. team map ----
     tm = nfl_api.team_map()
-    md += ["## 1. ESPN team map", "",
+    md += ["## 1. Team table", "",
            f"- name forms loaded: **{len(tm)}**",
            f"- distinct teams: **{len(set(tm.values()))}** (expect 32)", ""]
     if tm:
@@ -76,7 +76,7 @@ def build() -> str:
             md.append(f"| `{s}` | `{nfl_api.name_abbr(s)}` |")
         md.append("")
     else:
-        md += ["**ESPN team list did not load — everything below is blocked.**", ""]
+        md += ["**Team table did not load — everything below is blocked.**", ""]
 
     # ---- 2. schedule with kickoff times ----
     today = dt.datetime.now(EASTERN).date()
@@ -104,23 +104,23 @@ def build() -> str:
     # ---- 3. abbreviation agreement (the one that silently kills teams) ----
     k_abbrs, samples = _kalshi_nfl_abbrs()
     espn_abbrs = set(tm.values())
-    md += ["## 3. Kalshi vs ESPN abbreviations", "",
+    md += ["## 3. Kalshi vs our table's abbreviations", "",
            f"- Kalshi abbreviations in open tickers: **{len(k_abbrs)}**",
-           f"- ESPN abbreviations: **{len(espn_abbrs)}**"]
+           f"- our table's abbreviations: **{len(espn_abbrs)}**"]
     if samples:
         md.append(f"- sample tickers: {', '.join('`%s`' % s for s in samples)}")
     only_k = sorted(k_abbrs - espn_abbrs)
     only_e = sorted(espn_abbrs - k_abbrs)
-    md += ["", f"- **in Kalshi but not ESPN: {only_k or 'none'}**",
-           f"- in ESPN but not Kalshi: {only_e or 'none'}", ""]
+    md += ["", f"- **in Kalshi but not our table: {only_k or 'none'}**",
+           f"- in our table but not Kalshi: {only_e or 'none'}", ""]
     if only_k:
         md += ["**These need alias entries.** Any team here has games that will "
                "never match, silently — the MLB equivalent of WAS/WSH and "
-               "CHW/CWS. Off-season teams appearing only in the ESPN column are "
+               "CHW/CWS. Teams appearing only in our column are "
                "expected (not every team plays in a given window).", ""]
     else:
-        md += ["_No Kalshi-side mismatches: every abbreviation Kalshi uses is one "
-               "ESPN also uses, so no alias table is needed yet._", ""]
+        md += ["_No Kalshi-side mismatches: every abbreviation Kalshi uses is in "
+               "our table, so no alias entries are needed._", ""]
 
     # ---- 4. Polymarket game markets ----
     try:

@@ -11,13 +11,17 @@ Two gaps blocked NFL entirely, both found by sport_probe:
   2. `_name_abbr` in public_sources is built from an MLB nickname table, so no
      NFL team name resolves to an abbreviation anywhere in the codebase.
 
-ESPN's public site API covers both, needs no key, and returns schedule and
-results from one endpoint.
+SOURCE: THE ODDS API, not ESPN. ESPN's public API was the obvious choice and
+returned nothing from a GitHub runner (nfl_probe, 2026-08-07) - it blocks cloud
+IPs. The Odds API is already wired into these workflows via THE_ODDS_API_KEY,
+already proven in prop_odds, and serves schedule (`commence_time`) and results
+(`/scores`) from one authenticated source.
 
-THE TEAM MAP IS FETCHED, NOT TYPED. Hand-writing 32 nickname->abbr pairs is a
-silent-failure generator - one typo and that team's games quietly never match,
-which is precisely the class of bug that has cost the most time here. ESPN
-publishes the mapping, so it is read from source and cached.
+THE TEAM MAP IS A STATIC TABLE, VERIFIED BY PROBE. The Odds API returns full
+team names, not abbreviations, so a mapping is unavoidable. A hand-typed table
+is normally a silent-failure generator - one typo and that team's games quietly
+never match - so nfl_probe checks it against the 32 abbreviations Kalshi
+actually uses and fails loudly on any gap.
 
 Mirrors mlb_api's shapes so downstream modules need no special-casing:
 results_for(date) -> {game_id: {final, winner, away_score, home_score}} with
@@ -28,6 +32,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
 import zoneinfo
 
 import requests
@@ -36,67 +41,73 @@ from . import apitime
 
 log = logging.getLogger("nfl_api")
 
-BASE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl"
+BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
 TIMEOUT = 20
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 UA = {"User-Agent": "mlb-edge-finder (personal research)"}
 
 
+def _key() -> str | None:
+    return os.environ.get("THE_ODDS_API_KEY") or None
+
+
 def _get(path: str, **params):
+    if not _key():
+        log.warning("THE_ODDS_API_KEY not set - NFL data unavailable")
+        return None
     try:
-        with apitime.timed("espn", path):
-            r = requests.get(f"{BASE}{path}", params=params, timeout=TIMEOUT,
-                             headers=UA)
+        with apitime.timed("oddsapi", path):
+            r = requests.get(f"{BASE}{path}",
+                             params={"apiKey": _key(), **params},
+                             timeout=TIMEOUT, headers=UA)
             r.raise_for_status()
             return r.json()
     except Exception as exc:
-        log.warning("espn fetch failed (%s %s): %s", path, params, exc)
+        log.warning("odds api fetch failed (%s %s): %s", path, params, exc)
         return None
 
 
-_TEAMS: dict[str, str] | None = None
+# The 32 NFL teams, keyed by the abbreviation Kalshi uses in its tickers.
+# nfl_probe verifies this against Kalshi's live abbreviation set - a missing or
+# misspelled entry would silently drop that team's games forever.
+TEAMS: dict[str, tuple[str, ...]] = {
+    "ARI": ("Arizona Cardinals",), "ATL": ("Atlanta Falcons",),
+    "BAL": ("Baltimore Ravens",), "BUF": ("Buffalo Bills",),
+    "CAR": ("Carolina Panthers",), "CHI": ("Chicago Bears",),
+    "CIN": ("Cincinnati Bengals",), "CLE": ("Cleveland Browns",),
+    "DAL": ("Dallas Cowboys",), "DEN": ("Denver Broncos",),
+    "DET": ("Detroit Lions",), "GB": ("Green Bay Packers",),
+    "HOU": ("Houston Texans",), "IND": ("Indianapolis Colts",),
+    "JAC": ("Jacksonville Jaguars",), "KC": ("Kansas City Chiefs",),
+    "LAC": ("Los Angeles Chargers",), "LAR": ("Los Angeles Rams",),
+    "LV": ("Las Vegas Raiders",), "MIA": ("Miami Dolphins",),
+    "MIN": ("Minnesota Vikings",), "NE": ("New England Patriots",),
+    "NO": ("New Orleans Saints",), "NYG": ("New York Giants",),
+    "NYJ": ("New York Jets",), "PHI": ("Philadelphia Eagles",),
+    "PIT": ("Pittsburgh Steelers",), "SEA": ("Seattle Seahawks",),
+    "SF": ("San Francisco 49ers",), "TB": ("Tampa Bay Buccaneers",),
+    "TEN": ("Tennessee Titans",), "WAS": ("Washington Commanders",),
+}
+
+_NAME2ABBR = {n.lower(): ab for ab, names in TEAMS.items() for n in names}
 
 
 def team_map() -> dict[str, str]:
-    """{lowercased name fragment: abbr} built from ESPN's own team list.
-
-    Several keys per team - full name, nickname, location - so whichever form a
-    venue happens to use still resolves."""
-    global _TEAMS
-    if _TEAMS is not None:
-        return _TEAMS
-    out: dict[str, str] = {}
-    data = _get("/teams") or {}
-    try:
-        groups = data["sports"][0]["leagues"][0]["teams"]
-    except (KeyError, IndexError, TypeError):
-        groups = []
-    for g in groups:
-        t = (g or {}).get("team") or {}
-        ab = (t.get("abbreviation") or "").upper()
-        if not ab:
-            continue
-        for form in (t.get("displayName"), t.get("shortDisplayName"),
-                     t.get("name"), t.get("nickname"), t.get("location")):
-            if form and len(str(form)) >= 3:
-                out[str(form).strip().lower()] = ab
-    _TEAMS = out
-    log.info("espn: %d NFL team name forms -> %d teams",
-             len(out), len(set(out.values())))
-    return out
+    """{lowercased team name: abbr}."""
+    return dict(_NAME2ABBR)
 
 
 def name_abbr(text: str) -> str | None:
-    """NFL counterpart to public_sources._name_abbr. Exact match first, then an
+    """NFL counterpart to public_sources._name_abbr. Exact match, then an
     endswith-nickname match, length-capped so prose cannot hit."""
     low = (text or "").strip().lower()
     if not 3 <= len(low) <= 40:
         return None
-    tm = team_map()
-    if low in tm:
-        return tm[low]
-    for form, ab in tm.items():
-        if len(form) >= 4 and low.endswith(form):
+    if low in _NAME2ABBR:
+        return _NAME2ABBR[low]
+    for name, ab in _NAME2ABBR.items():
+        nick = name.rsplit(" ", 1)[-1]
+        if len(nick) >= 4 and low.endswith(nick):
             return ab
     return None
 
@@ -108,67 +119,58 @@ def _iso_ts(iso) -> int | None:
         return None
 
 
-def _events(date: str) -> list:
-    """Raw ESPN events for a YYYY-MM-DD date."""
-    data = _get("/scoreboard", dates=date.replace("-", "")) or {}
-    return data.get("events") or []
+def _upcoming() -> list:
+    """All scheduled NFL events the odds API knows about."""
+    return _get("/events") or []
+
+
+def _scores(days_from: int = 3) -> list:
+    """Recent + live events with scores. days_from is capped at 3 by the API."""
+    return _get("/scores", daysFrom=max(1, min(3, days_from))) or []
+
+
+def _row(ev: dict) -> dict | None:
+    an, hn = ev.get("away_team"), ev.get("home_team")
+    aa, ha = name_abbr(str(an or "")), name_abbr(str(hn or ""))
+    if not an or not hn or not aa or not ha:
+        return None
+    return {"game_id": ev.get("id"), "matchup": f"{an} @ {hn}",
+            "away": an, "home": hn, "away_abbr": aa, "home_abbr": ha,
+            "game_datetime": ev.get("commence_time"),
+            "start_ts": _iso_ts(ev.get("commence_time"))}
 
 
 def schedule(date: str) -> list[dict]:
-    """[{game_id, matchup, away, home, away_abbr, home_abbr, start_ts,
-    game_datetime}] for the date. [] on failure."""
+    """Games on a YYYY-MM-DD date (by kickoff in UTC). [] on failure."""
     out = []
-    for ev in _events(date):
-        try:
-            comp = (ev.get("competitions") or [{}])[0]
-            sides = comp.get("competitors") or []
-            if len(sides) != 2:
-                continue
-            home = next(s for s in sides if s.get("homeAway") == "home")
-            away = next(s for s in sides if s.get("homeAway") == "away")
-            ht, at = home.get("team") or {}, away.get("team") or {}
-            hn, an = ht.get("displayName"), at.get("displayName")
-            if not hn or not an:
-                continue
-            out.append({
-                "game_id": ev.get("id"),
-                "matchup": f"{an} @ {hn}",
-                "away": an, "home": hn,
-                "away_abbr": (at.get("abbreviation") or "").upper(),
-                "home_abbr": (ht.get("abbreviation") or "").upper(),
-                "game_datetime": ev.get("date"),
-                "start_ts": _iso_ts(ev.get("date")),
-            })
-        except (StopIteration, AttributeError, TypeError):
-            continue
+    for ev in _upcoming():
+        r = _row(ev)
+        if r and str(r["game_datetime"] or "")[:10] == date:
+            out.append(r)
     return out
 
 
 def results_for(date: str) -> dict:
     """{game_id: {final, winner, away_score, home_score}} - mlb_api's shape, so
-    downstream graders need no special-casing. `winner` is the display name."""
+    downstream graders need no special-casing. `winner` is the full team name."""
     out: dict = {}
-    for ev in _events(date):
-        try:
-            comp = (ev.get("competitions") or [{}])[0]
-            sides = comp.get("competitors") or []
-            if len(sides) != 2:
-                continue
-            home = next(s for s in sides if s.get("homeAway") == "home")
-            away = next(s for s in sides if s.get("homeAway") == "away")
-            state = (((ev.get("status") or {}).get("type") or {})
-                     .get("state") or "").lower()
-            final = state == "post"
-            hs = int(home.get("score")) if str(home.get("score", "")).isdigit() else None
-            as_ = int(away.get("score")) if str(away.get("score", "")).isdigit() else None
-            winner = None
-            if final and hs is not None and as_ is not None and hs != as_:
-                w = home if hs > as_ else away
-                winner = (w.get("team") or {}).get("displayName")
-            out[ev.get("id")] = {"final": final, "winner": winner,
-                                 "home_score": hs, "away_score": as_}
-        except (StopIteration, AttributeError, TypeError, ValueError):
+    for ev in _scores():
+        if str(ev.get("commence_time") or "")[:10] != date:
             continue
+        an, hn = ev.get("away_team"), ev.get("home_team")
+        sc = {}
+        for s in ev.get("scores") or []:
+            try:
+                sc[s.get("name")] = int(s.get("score"))
+            except (TypeError, ValueError):
+                continue
+        a, h = sc.get(an), sc.get(hn)
+        final = bool(ev.get("completed"))
+        winner = None
+        if final and a is not None and h is not None and a != h:
+            winner = hn if h > a else an
+        out[ev.get("id")] = {"final": final, "winner": winner,
+                             "away_score": a, "home_score": h}
     return out
 
 
