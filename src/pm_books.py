@@ -67,12 +67,22 @@ def _implied(ml) -> float:
     return 100.0 / (ml + 100) if ml > 0 else -ml / (-ml + 100.0)
 
 
-def open_market_index() -> dict:
-    """{(away_abbr, home_abbr): {abbr: token_id}} for OPEN MLB game markets."""
+def open_market_index(tag: str = "mlb", name_fn=None) -> dict:
+    """{(away_abbr, home_abbr): {abbr: token_id}} for OPEN game markets.
+
+    Defaults are MLB's, so existing callers are unaffected. `name_fn` maps an
+    outcome label to an abbreviation; the MLB default is built from an MLB
+    nickname table, so another sport must pass its own (nfl_api.name_abbr).
+
+    Note the tag alone is not a game filter - `nfl` also returns season futures
+    like "Tush Push banned for 2026 Season?". Those are dropped naturally: a
+    futures market's outcomes do not resolve to two different teams."""
+    if name_fn is None:
+        name_fn = _name_abbr
     index: dict = {}
     offset = 0
     while True:
-        batch = _get(GAMMA, tag_slug="mlb", closed="false", limit=100, offset=offset)
+        batch = _get(GAMMA, tag_slug=tag, closed="false", limit=100, offset=offset)
         if not isinstance(batch, list) or not batch:
             break
         for ev in batch:
@@ -85,7 +95,7 @@ def open_market_index() -> dict:
                         tokens = json.loads(tokens)
                     if not outcomes or not tokens or len(outcomes) != 2 or len(tokens) != 2:
                         continue
-                    a1, a2 = _name_abbr(str(outcomes[0])), _name_abbr(str(outcomes[1]))
+                    a1, a2 = name_fn(str(outcomes[0])), name_fn(str(outcomes[1]))
                     if not a1 or not a2 or a1 == a2:
                         continue
                     tok = {a1: tokens[0], a2: tokens[1]}
@@ -97,7 +107,7 @@ def open_market_index() -> dict:
         if len(batch) < 100:
             break
         time.sleep(0.2)
-    log.info("gamma: %d open market keys", len(index))
+    log.info("gamma[%s]: %d open market keys", tag, len(index))
     return index
 
 

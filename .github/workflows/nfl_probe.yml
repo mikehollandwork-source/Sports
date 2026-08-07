@@ -1,0 +1,36 @@
+name: NFL plumbing probe
+
+# Verify the NFL schedule source, name mapping, Kalshi/ESPN abbreviation
+# agreement, and Polymarket game matching - on a runner with real network.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Probe
+        run: python -m src.nfl_probe
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/nfl_probe.md
+          if ! git diff --staged --quiet; then
+            git commit -m "NFL plumbing probe ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
