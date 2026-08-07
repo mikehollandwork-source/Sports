@@ -79,6 +79,15 @@ def build() -> str:
         md += ["**Team table did not load — everything below is blocked.**", ""]
 
     # ---- 2. schedule with kickoff times ----
+    keys = nfl_api.sport_keys()
+    md += ["## 1b. Odds API football sport keys", "",
+           f"- exposed: {', '.join('`%s`' % k for k in keys) or '**none**'}",
+           f"- we query: {', '.join('`%s`' % k for k in nfl_api.SPORT_KEYS)}", ""]
+    missing = [k for k in nfl_api.SPORT_KEYS if keys and k not in keys]
+    if missing:
+        md += [f"**We query keys the API does not expose: {missing}** — that "
+               "returns an empty schedule rather than an error.", ""]
+
     today = dt.datetime.now(EASTERN).date()
     found = []
     for d in range(LOOKAHEAD_DAYS):

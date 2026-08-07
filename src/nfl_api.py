@@ -41,7 +41,11 @@ from . import apitime
 
 log = logging.getLogger("nfl_api")
 
-BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
+API = "https://api.the-odds-api.com/v4/sports"
+# The Odds API splits preseason into its own sport key. Querying only
+# `americanfootball_nfl` in August returns nothing while Kalshi is already
+# listing preseason games - which looked exactly like "no games scheduled".
+SPORT_KEYS = ("americanfootball_nfl", "americanfootball_nfl_preseason")
 TIMEOUT = 20
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 UA = {"User-Agent": "mlb-edge-finder (personal research)"}
@@ -51,20 +55,33 @@ def _key() -> str | None:
     return os.environ.get("THE_ODDS_API_KEY") or None
 
 
-def _get(path: str, **params):
+def _get(path: str, sport: str, **params):
     if not _key():
         log.warning("THE_ODDS_API_KEY not set - NFL data unavailable")
         return None
     try:
         with apitime.timed("oddsapi", path):
-            r = requests.get(f"{BASE}{path}",
+            r = requests.get(f"{API}/{sport}{path}",
                              params={"apiKey": _key(), **params},
                              timeout=TIMEOUT, headers=UA)
             r.raise_for_status()
             return r.json()
     except Exception as exc:
-        log.warning("odds api fetch failed (%s %s): %s", path, params, exc)
+        log.warning("odds api fetch failed (%s %s %s): %s", sport, path, params, exc)
         return None
+
+
+def sport_keys() -> list:
+    """Every football sport key the API currently exposes - so a renamed or
+    missing preseason key shows up as data rather than an empty schedule."""
+    try:
+        r = requests.get(API, params={"apiKey": _key()}, timeout=TIMEOUT, headers=UA)
+        r.raise_for_status()
+        return [s.get("key") for s in (r.json() or [])
+                if "americanfootball" in str(s.get("key", ""))]
+    except Exception as exc:
+        log.warning("sport key list failed: %s", exc)
+        return []
 
 
 # The 32 NFL teams, keyed by the abbreviation Kalshi uses in its tickers.
@@ -120,13 +137,19 @@ def _iso_ts(iso) -> int | None:
 
 
 def _upcoming() -> list:
-    """All scheduled NFL events the odds API knows about."""
-    return _get("/events") or []
+    """Scheduled NFL events across regular season AND preseason keys."""
+    out = []
+    for sk in SPORT_KEYS:
+        out.extend(_get("/events", sk) or [])
+    return out
 
 
 def _scores(days_from: int = 3) -> list:
-    """Recent + live events with scores. days_from is capped at 3 by the API."""
-    return _get("/scores", daysFrom=max(1, min(3, days_from))) or []
+    """Recent + live events with scores, both keys. days_from capped at 3."""
+    out = []
+    for sk in SPORT_KEYS:
+        out.extend(_get("/scores", sk, daysFrom=max(1, min(3, days_from))) or [])
+    return out
 
 
 def _row(ev: dict) -> dict | None:
