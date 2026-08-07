@@ -63,10 +63,22 @@ _sample GAME event: Panthers vs. Cardinals_
 | `startDate` | `2026-07-09T12:03:01.935741Z` |
 | `creationDate` | `2026-08-07T00:00:00Z` |
 | `endDate` | `2026-08-07T00:00:00Z` |
-| `updatedAt` | `2026-08-07T06:06:39.265777Z` |
+| `updatedAt` | `2026-08-07T06:10:41.619674Z` |
 | `eventDate` | `2026-08-06` |
 | `startTime` | `2026-08-07T00:00:00Z` |
 | `ended` | `True` |
 | `finishedTimestamp` | `2026-08-07T03:05:43.088393Z` |
+
+
+- **kickoffs recovered from Polymarket: 65 games**
+
+| teams | kickoff (UTC) | ended |
+|---|---|---|
+| ARI vs CAR | 2026-08-07T00:00:00Z | True |
+| BUF vs CAR | 2026-08-15T17:00:00Z | False |
+| BAL vs PHI | 2026-08-15T23:00:00Z | False |
+| GB vs PIT | 2026-08-13T23:00:00Z | False |
+| CIN vs DET | 2026-08-13T23:00:00Z | False |
+| HOU vs LAC | 2026-08-14T00:00:00Z | False |
 
 _NFL stays `live=False` regardless of these results. This probe verifies the plumbing carries data, not that the rule works._
