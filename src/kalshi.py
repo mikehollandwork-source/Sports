@@ -74,10 +74,12 @@ def _book(m: dict) -> dict:
     return out
 
 
-def game_markets() -> dict:
-    """{(abbr1, abbr2): {abbr: ticker}} for ACTIVE MLB game markets, keyed in both
-    orders (a game's two 'TEAM wins' markets share an event_ticker). Caches each
-    market row's inline prices for same-tick reads via top_of_book()."""
+def game_markets(series: str | None = None) -> dict:
+    """{(abbr1, abbr2): {abbr: ticker}} for OPEN game markets in a series, keyed
+    in both orders (a game's two 'TEAM wins' markets share an event_ticker).
+    Caches each market row's inline prices for same-tick reads via
+    top_of_book(). Defaults to MLB so existing callers are unaffected."""
+    series = series or SERIES
     global _MARKET_CACHE
     _MARKET_CACHE = {}
     events: dict = {}
@@ -86,7 +88,7 @@ def game_markets() -> dict:
         # NOTE: Kalshi rejects status="active" with a 400 - the valid values are
         # unopened / open / closed / settled. An earlier fix here set "active"
         # and silently 400'd every call, so nothing was ever returned.
-        params = {"series_ticker": SERIES, "status": "open", "limit": 200}
+        params = {"series_ticker": series, "status": "open", "limit": 200}
         if cursor:
             params["cursor"] = cursor
         data = _get("/markets", **params)
@@ -111,7 +113,7 @@ def game_markets() -> dict:
         if len(abbrs) == 2:
             index[(abbrs[0], abbrs[1])] = tick_by_team
             index[(abbrs[1], abbrs[0])] = tick_by_team
-    log.info("kalshi: %d open game market pair(s)", len(index) // 2)
+    log.info("kalshi[%s]: %d open game market pair(s)", series, len(index) // 2)
     return index
 
 

@@ -1,0 +1,48 @@
+name: WNBA shadow log
+
+# Records both venues' books, book moneylines and outcomes for every WNBA game.
+# Decides nothing and posts nothing - it builds the dataset a rule would need.
+# Depth cannot be reconstructed later, so this runs whether or not a rule exists.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 16-23 * * *"   # :20 past, noon ET -> 7pm ET
+    - cron: "20 0-4 * * *"     # :20 past, 8pm ET -> midnight ET
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shadow-wnba
+  cancel-in-progress: false
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Record
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: python -m src.shadow_log wnba
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
+          git add output/shadow_wnba_*.json
+          if ! git diff --staged --quiet; then
+            git commit -m "WNBA shadow log ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase -X theirs origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
