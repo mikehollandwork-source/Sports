@@ -210,10 +210,10 @@ def _parse_vsin(soup: BeautifulSoup) -> list[dict]:
     return out
 
 
-def vsin_splits() -> list[dict]:
+def vsin_splits(url: str | None = None) -> list[dict]:
     """VSiN's DraftKings MLB betting splits: moneyline handle% (money) + bets%
     (tickets) per game. Fail soft to []."""
-    soup, text, final_url = _fetch(VSIN_URL)
+    soup, text, final_url = _fetch(url or VSIN_URL)
     if soup is None:
         return []
     out = _parse_vsin(soup)

@@ -28,7 +28,7 @@ import logging
 import re
 from pathlib import Path
 
-from . import covers
+from . import covers, public_sources
 
 log = logging.getLogger("covers_probe")
 
@@ -53,6 +53,10 @@ CANDIDATES = {
         "odds": covers.ODDS_URL,
     },
 }
+
+# VSiN supplies the HANDLE (share of dollars). covers supplies TICKETS. The
+# consensus rule fires only when the two agree, so both are load-bearing.
+VSIN = {s: f"https://data.vsin.com/{s}/betting-splits/" for s in CANDIDATES}
 
 _PCT = re.compile(r"\b\d{1,3}%")
 
@@ -119,6 +123,23 @@ def build() -> str:
     md += ["", "_MLB parsing while another sport returns zero means the markup "
            "differs there and the selectors need work - not that the sport is "
            "unavailable._", ""]
+
+    # ---- VSiN: the HANDLE half of the rule ----
+    md += ["## VSiN handle splits", "",
+           "_covers gives tickets; VSiN gives dollars. The rule only fires when "
+           "the two AGREE, so a sport without VSiN cannot run it at all._", "",
+           "| sport | rows parsed | sample |", "|---|---|---|"]
+    for sport, url in VSIN.items():
+        try:
+            rows = public_sources.vsin_splits(url) or []
+        except Exception as exc:
+            md.append(f"| {sport.upper()} | _error: {str(exc)[:40]}_ | |")
+            continue
+        sample = str(rows[0])[:90] if rows else ""
+        md.append(f"| {sport.upper()} | **{len(rows)}** | `{sample}` |")
+    md += ["", "_Zero rows for an in-season sport means the splits page differs "
+           "there. Without handle, the consensus rule has nothing to agree "
+           "with._", ""]
 
     md.append("_A consensus page that redirects elsewhere, or returns a page "
               "with no percentage tokens, does not carry that sport - and would "
