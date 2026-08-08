@@ -79,7 +79,11 @@ def build() -> str:
           "handle would not be the same rule._", "",
           "_A page is only useful if it carries COMPLEMENTARY percentage pairs "
           "(two numbers summing to ~100). A lone percentage could be anything._",
-          ""]
+          "",
+          "_CAVEAT on the VSiN table below: the MLB control scores the same 3 "
+          "pairs as WNBA, yet `_parse_vsin` extracts 15 rows from MLB and 0 from "
+          "WNBA. So this metric does not detect VSiN's structure and its VSiN "
+          "rows are uninformative - the parser result is the real signal._", ""]
 
     md += ["## covers.com pages", "",
            "| page | reached | money words | ticket words | pct pairs | complementary |",
@@ -102,6 +106,35 @@ def build() -> str:
         md.append(f"| `{url}` {tag} | {'yes' if r['reached'] else 'no'} | "
                   f"**{r.get('complementary', 0)}** |")
     md.append("")
+
+    # ---- what ARE those complementary pairs on the matchups page? ----
+    md += ["## Context around the complementary pairs", "",
+           "_Counting pairs is not enough - a bets/money split and two unrelated "
+           "percentages look identical to a counter. This prints the surrounding "
+           "text so the pairs can be identified, with MLB's matchups page "
+           "alongside for shape comparison._", ""]
+    for label, url in (("WNBA matchups", "https://www.covers.com/sports/wnba/matchups"),
+                       ("MLB matchups (control)", "https://www.covers.com/sports/mlb/matchups")):
+        soup, text, _f = covers._fetch(url)
+        md.append(f"**{label}**")
+        md.append("")
+        if not text:
+            md += ["_no response_", ""]
+            continue
+        shown = 0
+        for m in re.finditer(r"(\d{1,3})%\D{0,40}?(\d{1,3})%", text):
+            a, b = int(m.group(1)), int(m.group(2))
+            if not 97 <= a + b <= 103:
+                continue
+            lo = max(0, m.start() - 90)
+            ctx = re.sub(r"\s+", " ", text[lo:m.end() + 40]).strip()
+            md.append(f"- `...{ctx}...`")
+            shown += 1
+            if shown >= 6:
+                break
+        if not shown:
+            md.append("- _no complementary pairs found_")
+        md.append("")
 
     md.append("_If no WNBA page carries complementary pairs alongside a money "
               "label, there is no handle source - and a 'WNBA board' would be "
