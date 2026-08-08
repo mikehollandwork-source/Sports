@@ -96,6 +96,30 @@ def build() -> str:
             elif r.get("note"):
                 md.append(f"  - _{r['note']}_")
         md.append("")
+    # ---- the test that actually matters: does OUR PARSER read it? ----
+    md += ["## Does our parser extract games?", "",
+           "_Reaching a page with a table is not the same as parsing it. This "
+           "runs `covers.consensus()` - the exact function the live rule uses - "
+           "against each sport's URL._", "",
+           "| sport | games parsed | sample |", "|---|---|---|"]
+    for sport, urls in CANDIDATES.items():
+        try:
+            got = covers.consensus(urls["consensus"]) or {}
+        except Exception as exc:
+            md.append(f"| {sport.upper()} | _error: {str(exc)[:40]}_ | |")
+            continue
+        sample = ""
+        if got:
+            k, v = next(iter(got.items()))
+            a, h = v.get("away") or {}, v.get("home") or {}
+            sample = (f"`{k}` → {a.get('abbr')} {a.get('pct')}% "
+                      f"({a.get('moneyline')}) / {h.get('abbr')} {h.get('pct')}% "
+                      f"({h.get('moneyline')})")
+        md.append(f"| {sport.upper()} | **{len(got)}** | {sample} |")
+    md += ["", "_MLB parsing while another sport returns zero means the markup "
+           "differs there and the selectors need work - not that the sport is "
+           "unavailable._", ""]
+
     md.append("_A consensus page that redirects elsewhere, or returns a page "
               "with no percentage tokens, does not carry that sport - and would "
               "otherwise parse to an empty result that looks like 'no games'._")

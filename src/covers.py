@@ -105,18 +105,22 @@ def _fingerprint(text: str, final_url: str, soup: BeautifulSoup, what: str) -> N
     )
 
 
-def consensus() -> dict[str, dict]:
+def consensus(url: str | None = None) -> dict[str, dict]:
     """
-    Parse the contests.covers.com MLB consensus table.
+    Parse a contests.covers.com consensus table.
 
     Returns {"away@home": {"away": side, "home": side}} where each `side` is
     {abbr, pct, moneyline}. Keys/abbrevs are matched to games by
     analysis._name_hit on team.abbreviation. Returns {} on any failure.
 
     moneyline is read off the consensus row (the signed odds next to the bet %).
-    covers' MLB consensus is moneyline-only - it carries no run-line consensus.
+    covers' consensus is moneyline-only - it carries no run-line consensus.
+
+    `url` defaults to MLB. covers puts the sport in the path, so another sport
+    is the same parser against a different URL - the table markup is shared
+    across sports on this site.
     """
-    soup, text, final_url = _fetch(CONSENSUS_URL)
+    soup, text, final_url = _fetch(url or CONSENSUS_URL)
     if soup is None:
         return {}
     out = _parse_consensus_rows(soup)
