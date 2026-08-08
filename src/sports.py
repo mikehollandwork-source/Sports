@@ -55,24 +55,35 @@ class Sport:
     name: str
     kalshi_series: str        # all verified 2026-08-06 via sport_probe.py
     pm_tag: str               # gamma tag_slug
+    odds_key: str             # The Odds API /v4/sports key
     holdout_from: str         # rules derived before this date; after it is clean
     live: bool                # False = shadow only, never reaches the board
 
 
 SPORTS: dict[str, Sport] = {
-    "mlb": Sport("mlb", "MLB", "KXMLBGAME", "mlb", "2026-07-23", live=True),
+    "mlb": Sport("mlb", "MLB", "KXMLBGAME", "mlb", "baseball_mlb",
+                 "2026-07-23", live=True),
     # Not live. NFL is the first branch: deepest prediction-market liquidity
     # (which the order-book gate needs) and days of pre-game action rather than
     # hours. Kalshi already lists it - 32 two-sided preseason games as of
     # 2026-08-06 - but holdout starts at the regular-season opener ON PURPOSE.
     # Preseason outcomes are close to noise (starters barely play) and the money
     # behaves differently, so grading against it would teach us the wrong thing.
-    "nfl": Sport("nfl", "NFL", "KXNFLGAME", "nfl", "2026-09-01", live=False),
+    "nfl": Sport("nfl", "NFL", "KXNFLGAME", "nfl", "americanfootball_nfl",
+                 "2026-09-01", live=False),
     # NBA follows in late October. This is where the SAMPLE comes from: ~1230
     # games a season against the NFL's 272, so it accumulates evidence roughly
     # 4.5x faster.
-    "nba": Sport("nba", "NBA", "KXNBAGAME", "nba", "2026-10-01", live=False),
-    "nhl": Sport("nhl", "NHL", "KXNHLGAME", "nhl", "2026-10-01", live=False),
+    "nba": Sport("nba", "NBA", "KXNBAGAME", "nba", "basketball_nba",
+                 "2026-10-01", live=False),
+    "nhl": Sport("nhl", "NHL", "KXNHLGAME", "nhl", "icehockey_nhl",
+                 "2026-10-01", live=False),
+    # WNBA is the one branch that is IN SEASON right now, so it starts
+    # accumulating out-of-sample evidence immediately instead of in October.
+    # Holdout begins the day logging starts - there is no history to fit to, so
+    # every WNBA game is clean by construction.
+    "wnba": Sport("wnba", "WNBA", "KXWNBAGAME", "wnba", "basketball_wnba",
+                  "2026-08-08", live=False),
 }
 
 DEFAULT = "mlb"
