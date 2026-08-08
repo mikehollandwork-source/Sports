@@ -96,13 +96,45 @@ def _kalshi_side(ticker: str) -> dict:
     return out
 
 
-def _pm_side(token: str) -> dict:
+SIDE_TOL = 0.12      # same tolerance pm_books uses to validate a token
+MIN_SIZE = 50.0      # below this the quote is a placeholder, not a market
+
+
+def _implied(ml) -> float:
+    ml = int(ml)
+    return 100.0 / (ml + 100) if ml > 0 else -ml / (-ml + 100.0)
+
+
+def _pm_side(token: str, ref: float | None) -> dict:
+    """Top-of-book for a PM token, validated against the book's implied price.
+
+    Gamma's outcome->token pairing cannot be trusted blind - pm_books learned
+    this the hard way and validates every token the same way. The first WNBA
+    capture proved the point: Indiana at -220 (68.8% implied) came back from
+    gamma at 0.49/0.50, a 19-point disagreement with both the sportsbook and
+    Kalshi. Storing that unflagged would poison any later analysis with numbers
+    that look real.
+
+    Suspect quotes are RECORDED with a flag rather than dropped - knowing a
+    token was wrong is itself data, and silently discarding it would hide how
+    often gamma mispairs."""
     try:
         b = pm_books.best_of_book(token)
-        return b if b and not b.get("empty") else {}
     except Exception as exc:
         log.warning("pm side failed: %s", exc)
         return {}
+    if not b or b.get("empty"):
+        return {}
+    bid, ask = b.get("bid"), b.get("ask")
+    if isinstance(bid, (int, float)) and isinstance(ask, (int, float)):
+        mid = (bid + ask) / 2
+        if ref is not None and abs(mid - ref) > SIDE_TOL:
+            b["suspect"] = round(mid - ref, 3)
+        if (ask - bid) > 0.15:
+            b["wide"] = True
+    if max(float(b.get("bid_sz") or 0), float(b.get("ask_sz") or 0)) < MIN_SIZE:
+        b["thin"] = True
+    return b
 
 
 def run(sport: str = "wnba", date: str | None = None) -> int:
@@ -166,10 +198,16 @@ def run(sport: str = "wnba", date: str | None = None) -> int:
         if ka or kh:
             reading["k"] = {"away": _kalshi_side(ka) if ka else {},
                             "home": _kalshi_side(kh) if kh else {}}
+        # the book's implied price is the reference gamma's token is checked
+        # against; without it a mispaired token is indistinguishable from a
+        # genuine disagreement between venues
+        bk = entry.get("book") or {}
+        ref_a = _implied(bk[g["away"]]) if isinstance(bk.get(g["away"]), int) else None
+        ref_h = _implied(bk[g["home"]]) if isinstance(bk.get(g["home"]), int) else None
         pa, ph = entry["pm"].get("away_token"), entry["pm"].get("home_token")
         if pa or ph:
-            reading["p"] = {"away": _pm_side(pa) if pa else {},
-                            "home": _pm_side(ph) if ph else {}}
+            reading["p"] = {"away": _pm_side(pa, ref_a) if pa else {},
+                            "home": _pm_side(ph, ref_h) if ph else {}}
         if "k" not in reading and "p" not in reading:
             continue
         entry["readings"].append(reading)
