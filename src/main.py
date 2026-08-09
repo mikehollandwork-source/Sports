@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import consensus as consensus_rule, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -141,6 +141,13 @@ def run(date: str) -> dict:
     cmetrics = consensus_rule.book_metrics(date)
     for r in results:
         _apply_consensus(r, cmetrics)
+
+    # Operator-entered picks, applied last so they are the final word. The board
+    # is stateless, so a hand-edited pick would be wiped by the next refresh -
+    # these live in their own file and are re-applied on every rebuild. They
+    # carry source="manual" so the consensus rule's own record stays separable
+    # from them inside the shared ledger.
+    manual_picks.apply(results, date)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
