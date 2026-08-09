@@ -1,6 +1,6 @@
 {
   "date": "2026-08-09",
-  "generated_at": "2026-08-09T23:08:49.590520+00:00",
+  "generated_at": "2026-08-09T23:35:51.759914+00:00",
   "games": [
     {
       "game_pk": 822700,
@@ -4155,7 +4155,7 @@
           "losses": 29
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 823751,
@@ -7245,7 +7245,7 @@
       "statistical_advantage": {
         "team": "Houston Astros",
         "home_score": -0.0013999999999999985,
-        "away_score": 0.003801444444444309,
+        "away_score": 0.020524888888888787,
         "home": {
           "name": "San Diego Padres",
           "probable_pitcher": "Randy V\u00e1squez",
@@ -7320,11 +7320,11 @@
             "bat_opp_pitching_factor": 0.972,
             "arm_opp_offense_factor": 0.947,
             "raw": {
-              "bat_opp_fip": 4.168650778638341,
+              "bat_opp_fip": 4.168717242819271,
               "bat_opp_win": 0.4725421052631579,
               "sp_opp_woba": 0.3121778980511155,
               "sp_opp_win": 0.4407560975609756,
-              "bp_opp_woba": 0.3143939614053863,
+              "bp_opp_woba": 0.31437053738231574,
               "bp_opp_win": 0.4820599520383694
             }
           },
@@ -7345,13 +7345,13 @@
           },
           "forum": {
             "pick": "San Diego Padres",
-            "home": 8,
-            "away": 4
+            "home": 11,
+            "away": 5
           },
           "agree": true,
-          "forum_lean": 0.333,
+          "forum_lean": 0.375,
           "consensus_lean": 0.12,
-          "blended_lean": 0.188,
+          "blended_lean": 0.199,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -7371,9 +7371,9 @@
               "lean": 0.12
             },
             "vsin_bets": {
-              "away": 42,
-              "home": 58,
-              "lean": 0.16
+              "away": 43,
+              "home": 57,
+              "lean": 0.14
             }
           }
         }
@@ -7413,9 +7413,10 @@
         "verdict": "corroborated",
         "note": "all 5 sources agree on the public side",
         "flags": [
-          "money sources disagree"
+          "money sources disagree",
+          "reverse line move \u2014 money went against the public %"
         ],
-        "line": "flat",
+        "line": "against public",
         "money": "sources split",
         "money_side": null
       },
@@ -7436,13 +7437,13 @@
         "meaningful": false
       },
       "bvp_pen": {
-        "home_ops": 0.655,
+        "home_ops": 0.653,
         "away_ops": 0.778,
-        "home_pa": 148,
+        "home_pa": 147,
         "away_pa": 194,
-        "total_pa": 342,
+        "total_pa": 341,
         "edge_team": "Houston Astros",
-        "gap": 0.123,
+        "gap": 0.125,
         "meaningful": true
       },
       "form": {
@@ -7497,12 +7498,12 @@
         "majority": {
           "team": "San Diego Padres",
           "consensus_pct": 56.0,
-          "moneyline": "-112"
+          "moneyline": "-115"
         },
         "non_majority": {
           "team": "Houston Astros",
           "consensus_pct": 44.0,
-          "moneyline": "+107"
+          "moneyline": "-104"
         }
       },
       "consistency": {
@@ -7658,17 +7659,17 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.092,
+        "confidence": 0.12,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.005,
-            "strength": 0.013,
+            "margin": 0.022,
+            "strength": 0.055,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.188,
-            "strength": 0.188,
+            "blended_lean": 0.199,
+            "strength": 0.199,
             "weight": 0.45
           },
           "consistency": {
@@ -7677,14 +7678,14 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": 106,
-        "opponent_moneyline": -111,
+        "advantage_moneyline": 108,
+        "opponent_moneyline": -109,
         "line_check": {
           "open": 109,
-          "current": 106,
-          "implied_shift": 0.007,
+          "current": 108,
+          "implied_shift": 0.002,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (+109\u2192+106, +0.7%)"
+          "reason": "only a slight move our way, below the 2% signal floor (+109\u2192+108, +0.2%)"
         },
         "form_edge": true,
         "form_gap": 0.015,
@@ -7694,18 +7695,20 @@
         "signals_hit": 3,
         "public_pct_against": 58,
         "book_stance": {
-          "side": null,
+          "side": "Houston Astros",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "reverse line move"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Houston Astros",
-          "odds": 106,
+          "odds": 108,
           "basis": "ticket %",
-          "hold_home": -682174,
-          "hold_away": 905147
+          "hold_home": -778060,
+          "hold_away": 877520
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -7713,12 +7716,12 @@
         "pm_quote": {
           "pm_pct": 48,
           "pm_american": 108,
-          "edge_pts": 0.5,
+          "edge_pts": 0.1,
           "vs_book": "same"
         },
         "projected": {
-          "win_prob": 50.1,
-          "fair_american": -101
+          "win_prob": 50.7,
+          "fair_american": -103
         },
         "line_vs_money": "flat",
         "bet_team": null,
@@ -7729,10 +7732,10 @@
       "pick": null,
       "game_datetime": "2026-08-10T00:20:00Z",
       "weather": {
-        "temp_f": 79,
-        "wind_mph": 8,
-        "wind_dir": "WSW",
-        "precip_pct": 0,
+        "temp_f": 82,
+        "wind_mph": 7,
+        "wind_dir": "WNW",
+        "precip_pct": 3,
         "roof": "open"
       },
       "umpire_hp": "Jacob Metz",
