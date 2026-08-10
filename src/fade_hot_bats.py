@@ -26,6 +26,14 @@ matters is not the cell's ROI. It is the cell MINUS the control. If fading hot
 bats adds nothing over "bet cheap favourites", the difference is zero and the
 signal is the price bucket, not the bats.
 
+The first version of that control was wrong, and wrong in the direction that
+flatters the result: it filtered the fade-the-hot-side rows, which are already
+form-selected, so it isolated the line-movement condition and left the cheap-
+favourite confound entirely unmeasured while the report claimed otherwise. Two
+controls are now carried - `fade-only` (drops the line filter) and `price-only`
+(the favourite in every game, no form, no line) - and every corrected statistic
+scores against `price-only`, the one the proposal actually needs.
+
 "-130 OR LESS" IS AMBIGUOUS AND BOTH READINGS ARE SWEPT
 It can mean "no worse than -130" (-100..-130, cheap favourites) or "-130 and
 longer" (-130..-300, real favourites). The threshold sweep covers both, which is
@@ -39,7 +47,7 @@ A cell is promotable only if ALL of these hold:
   2. plateau: three adjacent thresholds all positive, not a lone spike
   3. corrected p <= 0.05 against the max-statistic null over the sweep
   4. holdout (>= 2026-07-23) positive
-  5. edge over the same-price control has a bootstrap CI excluding zero
+  5. edge over the price-only control has a bootstrap CI excluding zero
 Anything less is recorded and not shipped. Five have been missed before; this
 is the sixth statement of the same bar.
 
@@ -118,11 +126,17 @@ def collect() -> list[dict]:
             toward_hot = shift if hot == adv else -shift
 
             tot = _implied(a_ml) + _implied(o_ml)
+            # The pure price control: the favourite in this game, chosen with no
+            # reference to form or line movement at all. Kept per row so the
+            # "cheap favourites win anyway" confound can be priced directly.
+            fav = adv if a_ml < o_ml else opp
             recs.append({
                 "date": date,
+                "fav_odds": price[fav], "fav_won": res["winner"] == fav,
                 "bet": cold, "odds": price[cold],       # we back the COLD side
                 "won": res["winner"] == cold,
                 "p": (_implied(price[cold]) / tot) if tot > 0 else 0.5,
+                "fav_is_cold": fav == cold,
                 "line_against_hot": toward_hot <= -MOVE_MIN,
                 "stars_hot": stars_hot,
                 "hot_is_home": hot == home,
@@ -133,12 +147,28 @@ def collect() -> list[dict]:
 
 
 def _stat(rows, wins=None) -> tuple[int, int, float, float]:
+    """`wins` is indexed by game and always means 'the COLD side won', so a view
+    holding the other side of the same game carries invert=True. Redrawing one
+    winner per game keeps the two views consistent under permutation instead of
+    letting both sides of a game win."""
     w = u = 0
     for x in rows:
-        won = x["won"] if wins is None else wins[x["_i"]]
+        if wins is None:
+            won = x["won"]
+        else:
+            won = wins[x["_i"]]
+            if x.get("invert"):
+                won = not won
         w += 1 if won else 0
         u += grade.american_profit(x["odds"]) if won else -1
     return w, len(rows) - w, u, (u / len(rows) if rows else 0.0)
+
+
+def _fav_view(rows) -> list[dict]:
+    """The favourite in each game, picked with no reference to form or the line.
+    This is the 'cheap favourites win anyway' control the -130 proposal needs."""
+    return [{"_i": r["_i"], "odds": r["fav_odds"], "won": r["fav_won"],
+             "invert": not r["fav_is_cold"]} for r in rows]
 
 
 def _roi(rows, wins=None) -> float:
@@ -199,21 +229,27 @@ def build() -> str:
 
     # ---- the sweep, each cell against its own same-price control ----
     md += ["## By price of the side we back", "",
-           "The control is the SAME price bucket in every game, ignoring form "
-           "and line movement. It is what \"just bet cheap favourites\" returns "
-           "on its own. The edge column is the only one that is about hot bats.",
-           "", "| we pay no worse than | qualifying cell | same-price control | "
-           "edge |", "|---|---|---|---|"]
+           "Two controls, because they answer different questions. **Fade-only** "
+           "drops the line-movement requirement, so the gap to it is what the "
+           "line filter adds. **Price-only** backs the favourite at that price "
+           "in every game with no reference to form or the line at all - it is "
+           "literally \"just bet cheap favourites\", and the gap to IT is the "
+           "only number that is about hot bats.", "",
+           "| we pay no worse than | qualifying cell | fade-only | price-only "
+           "(the confound) | edge vs price-only |", "|---|---|---|---|---|"]
     cells: dict = {}
-    controls: dict = {}
+    fade_ctl: dict = {}
+    price_ctl: dict = {}
     for c in CEILINGS:
         sub = [r for r in qual if c <= r["odds"] < 0]
-        ctl = [r for r in recs if c <= r["odds"] < 0]
+        fc = [r for r in recs if c <= r["odds"] < 0]
+        pc_ = [r for r in _fav_view(recs) if c <= r["odds"] < 0]
         if len(sub) >= MIN_CELL:
             cells[f"{c}"] = sub
-            controls[f"{c}"] = ctl
-        edge = (_roi(sub) - _roi(ctl)) if sub and ctl else 0.0
-        md.append(f"| {c} or cheaper | {_fmt(sub)} | {_fmt(ctl)} | "
+            fade_ctl[f"{c}"] = fc
+            price_ctl[f"{c}"] = pc_
+        edge = (_roi(sub) - _roi(pc_)) if sub and pc_ else 0.0
+        md.append(f"| {c} or cheaper | {_fmt(sub)} | {_fmt(fc)} | {_fmt(pc_)} | "
                   f"**{edge:+.1%}** |")
     md.append("")
 
@@ -222,7 +258,7 @@ def build() -> str:
         return "\n".join(md)
 
     # ---- plateau or spike ----
-    seq = [(c, _roi(cells[c]) - _roi(controls[c])) for c in
+    seq = [(c, _roi(cells[c]) - _roi(price_ctl[c])) for c in
            (str(x) for x in CEILINGS) if c in cells]
     runs, best_run = 0, 0
     for _, e in seq:
@@ -236,20 +272,21 @@ def build() -> str:
            "+40% dog signal.", ""]
 
     # ---- max-statistic correction over the sweep ----
-    best_label = max(cells, key=lambda k: _roi(cells[k]) - _roi(controls[k]))
+    best_label = max(cells, key=lambda k: _roi(cells[k]) - _roi(price_ctl[k]))
     best_rows = cells[best_label]
-    best_edge = _roi(best_rows) - _roi(controls[best_label])
+    best_edge = _roi(best_rows) - _roi(price_ctl[best_label])
     rng = random.Random(71)
     null_max = []
     for _ in range(TRIALS):
         w = [rng.random() < r["p"] for r in recs]
-        null_max.append(max(_roi(cells[k], w) - _roi(controls[k], w)
+        null_max.append(max(_roi(cells[k], w) - _roi(price_ctl[k], w)
                             for k in cells))
     beats = sum(1 for m in null_max if m >= best_edge)
     null_max.sort()
     md += ["## Does the best threshold beat the sweep itself?", "",
            f"- thresholds at n>={MIN_CELL}: **{len(cells)}**",
-           f"- best: `{best_label} or cheaper` at an edge of **{best_edge:+.1%}**",
+           f"- best: `{best_label} or cheaper` at an edge of **{best_edge:+.1%}** "
+           f"over price-only (its own ROI is {_roi(best_rows):+.1%})",
            f"- median best-edge in noise: **{st.median(null_max):+.1%}**",
            f"- 95th percentile in noise: **{null_max[int(.95*TRIALS)]:+.1%}**",
            f"- **corrected p = {beats/TRIALS:.3f}**", ""]
@@ -257,10 +294,10 @@ def build() -> str:
            ["**Does not clear.** A sweep this size produces an edge this good "
             "from noise more than 5% of the time.", ""])
 
-    lo, hi = _boot_diff(best_rows, controls[best_label])
+    lo, hi = _boot_diff(best_rows, price_ctl[best_label])
     pre = [r for r in best_rows if r["date"] < HOLDOUT_FROM]
     post = [r for r in best_rows if r["date"] >= HOLDOUT_FROM]
-    md += [f"- edge CI vs same-price control: **{lo:+.1%} to {hi:+.1%}**",
+    md += [f"- edge CI vs price-only control: **{lo:+.1%} to {hi:+.1%}**",
            f"- in-sample: {_fmt(pre)}", f"- holdout: {_fmt(post)}",
            f"- games needed to call a real +10% edge: ~**{_needed_n(best_rows)}**",
            ""]
