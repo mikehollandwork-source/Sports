@@ -55,6 +55,7 @@ log = logging.getLogger("hot_home_dog")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 MOVE_MIN = 0.01
+TRIALS = 4000
 
 
 def collect() -> list[dict]:
@@ -83,6 +84,7 @@ def collect() -> list[dict]:
             if price.get(home) is None or price[home] <= 0:
                 continue                      # home team is not the underdog
             dog, odds = home, price[home]
+            fav_odds = price[away]
 
             form = g.get("form") or {}
             fh, fa = form.get("home") or {}, form.get("away") or {}
@@ -100,7 +102,7 @@ def collect() -> list[dict]:
 
             tot = _implied(a_ml) + _implied(o_ml)
             recs.append({
-                "date": date, "dog": dog, "odds": odds,
+                "date": date, "dog": dog, "odds": odds, "fav_odds": fav_odds,
                 "won": res["winner"] == dog,
                 "p": (_implied(odds) / tot) if tot > 0 else 0.5,
                 "hotter_bats": dh > da,
@@ -200,6 +202,28 @@ def build() -> str:
            f"- in-sample: {_fmt(pre)}", f"- holdout: {_fmt(post)}",
            f"- **games needed to distinguish a real +10% edge from zero: "
            f"~{need}**", ""]
+    # Is this worse than the PRICES predict, or is it just what backing dogs
+    # costs? Redraw each winner from its de-vigged implied probability.
+    rng = random.Random(53)
+    null = []
+    for _ in range(TRIALS):
+        u = sum(grade.american_profit(r["odds"]) if rng.random() < r["p"] else -1
+                for r in final)
+        null.append(u / len(final))
+    worse = sum(1 for m in null if m <= roi) / TRIALS
+    md += [f"- market-calibrated null: median **{st.median(null):+.1%}**, and "
+           f"**{worse:.0%}** of redraws land at or below our {roi:+.1%}", ""]
+
+    # The other side. Priced because this hypothesis was specified in advance
+    # rather than picked out of a scan - one hypothesis, two directions - so
+    # this is not the "fade the losing cell" error the underdog scan ruled out.
+    fav = [{"odds": r["fav_odds"], "won": not r["won"]} for r in final]
+    md += ["### The other side (the road favourite in these same games)", "",
+           f"- {_fmt(fav)}",
+           "- One hypothesis tested in both directions, which is legitimate here "
+           "because the conditions were specified before looking. It is still "
+           f"n={len(fav)}: not actionable, only recorded.", ""]
+
     swing = (grade.american_profit(st.median([x["odds"] for x in final])) + 1) / len(final)
     md += [f"_One extra win here moves ROI by about **{swing:.0%} points**. "
            "Any conclusion drawn from this cell is a conclusion about one or two "
