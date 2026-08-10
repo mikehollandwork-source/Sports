@@ -142,17 +142,17 @@ def run(date: str) -> dict:
     for r in results:
         _apply_consensus(r, cmetrics)
 
-    # Operator-entered picks, applied last so they are the final word. The board
-    # is stateless, so a hand-edited pick would be wiped by the next refresh -
-    # these live in their own file and are re-applied on every rebuild. They
-    # carry source="manual" so the consensus rule's own record stays separable
-    # from them inside the shared ledger.
-    manual_picks.apply(results, date)
-
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
     # can't flip a pick to a lean or move the price after the game is underway.
     results = _lock_started_games(date, results)
+
+    # Operator-entered picks go AFTER the lock, which is the only place they are
+    # genuinely last. Applied before it, _lock_started_games restores the frozen
+    # snapshot over the top and silently discards them - which is exactly what
+    # happened on 2026-08-09: a pick entered 24 min before first pitch was wiped
+    # by the lock window that opens 15 min before it, and never reached any board.
+    manual_picks.apply(results, date)
 
     # Tag each game's live state (upcoming / live / final) for the board.
     try:
