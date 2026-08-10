@@ -30,6 +30,13 @@ _Overlap of the two form conditions: 11 bats only, 7 stars only, 30 both. They a
 - holdout: 2-7 (22%) · -4.8u · **-53.4%** (n=9)
 - **games needed to distinguish a real +10% edge from zero: ~781**
 
+- market-calibrated null: median **-3.4%**, and **17%** of redraws land at or below our -29.4%
+
+### The other side (the road favourite in these same games)
+
+- 12-6 (67%) · +1.9u · **+10.8%** (n=18)
+- One hypothesis tested in both directions, which is legitimate here because the conditions were specified before looking. It is still n=18: not actionable, only recorded.
+
 _One extra win here moves ROI by about **12% points**. Any conclusion drawn from this cell is a conclusion about one or two games._
 
 _Stacking filters on a fixed dataset always finds a subset that looks good; the underdog scan's best of 64 cells matched the noise median almost exactly. The interval above is the honest read, not the point estimate._
