@@ -1,0 +1,44 @@
+name: Hot home dog backtest
+
+# Home underdog + hotter bats + stars producing + line moving against them.
+# Built as a funnel: prints n and ROI after every condition, because the
+# collapse in sample size is as much the answer as the final number.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.hot_home_dog
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Hot home dog backtest $(date -u +%Y-%m-%d)" \
+            --body-file output/hot_home_dog.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/hot_home_dog.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Hot home dog backtest ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
