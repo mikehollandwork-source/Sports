@@ -80,6 +80,15 @@ Both directions at every threshold, because choosing the direction after seeing 
 
 **Does not clear.** A grid this size produces a cell this good from noise more than 5% of the time.
 
+## The other tail — is anything reliably bad enough to invert?
+
+- worst cell: `agree:m>=0.3:g>=0.04` at **-23.6%** (n=89)
+- median worst-in-noise: **-21.2%**
+- **corrected p = 0.382**
+- backing the OTHER side of that cell instead: **48-41 (54%) · +17.9u · **+20.1%** (n=89)**
+
+**Not invertible.** The worst of these cells is no more extreme than the worst a grid this size throws up by chance, so fading it is the same search one step removed - and the reversal still has to pay the vig on the other side.
+
 - in-sample: 19-11 (63%) · +4.1u · **+13.6%** (n=30) _(thin)_
 - holdout: 8-5 (62%) · +1.6u · **+12.5%** (n=13) _(thin)_
 
