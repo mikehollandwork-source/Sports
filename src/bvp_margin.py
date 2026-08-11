@@ -152,6 +152,21 @@ def _fmt(rows) -> str:
     return f"{w}-{l} ({w/len(rows):.0%}) · {u:+.1f}u · **{roi:+.1%}** (n={len(rows)}){tag}"
 
 
+def _flip(rows, recs) -> list[dict]:
+    """The opposite side of every bet in a cell, at the opposite side's real
+    price - so an inverted rule still pays the vig instead of assuming that a
+    -X% cell becomes +X% backwards."""
+    out = []
+    for x in rows:
+        r = recs[x["_i"]]
+        on_adv = x["invert"]          # was backing the opponent -> now the adv
+        out.append({"_i": x["_i"],
+                    "odds": r["adv_odds"] if on_adv else r["opp_odds"],
+                    "won": r["adv_won"] if on_adv else not r["adv_won"],
+                    "invert": not on_adv})
+    return out
+
+
 def _toward(r, on_adv: bool):
     """Signed line movement toward the side we are backing."""
     if r["shift"] is None:
@@ -272,6 +287,34 @@ def build() -> str:
     md += (["**Clears the bar.**", ""] if beats <= 0.05 else
            ["**Does not clear.** A grid this size produces a cell this good from "
             "noise more than 5% of the time.", ""])
+
+    # ---- the other tail: is any cell reliably BAD enough to invert? ----
+    # A dependable loser is a winner backwards, but only if the loss is deeper
+    # than the search manufactures AND the other side's price still clears. The
+    # underdog scan failed exactly here: its worst cell was less extreme than
+    # noise's median worst, so fading it was the same search one step removed.
+    worst_label = min(cells, key=lambda k: _roi(cells[k]))
+    worst_rows = cells[worst_label]
+    worst = _roi(worst_rows)
+    null_min = []
+    rng2 = random.Random(97)
+    for _ in range(TRIALS):
+        w = [rng2.random() < r["p_adv"] for r in recs]
+        null_min.append(min(_roi(v, w) for v in cells.values()))
+    below = sum(1 for m in null_min if m <= worst) / TRIALS
+    null_min.sort()
+    md += ["## The other tail — is anything reliably bad enough to invert?", "",
+           f"- worst cell: `{worst_label}` at **{worst:+.1%}** (n={len(worst_rows)})",
+           f"- median worst-in-noise: **{st.median(null_min):+.1%}**",
+           f"- **corrected p = {below:.3f}**",
+           f"- backing the OTHER side of that cell instead: "
+           f"**{_fmt(_flip(worst_rows, recs))}**", ""]
+    md += (["A loss deeper than the search manufactures, so the reversal is "
+            "worth carrying forward.", ""] if below <= 0.05 else
+           ["**Not invertible.** The worst of these cells is no more extreme "
+            "than the worst a grid this size throws up by chance, so fading it "
+            "is the same search one step removed - and the reversal still has "
+            "to pay the vig on the other side.", ""])
 
     pre = [r for r in best_rows if recs[r["_i"]]["date"] < HOLDOUT_FROM]
     post = [r for r in best_rows if recs[r["_i"]]["date"] >= HOLDOUT_FROM]
