@@ -1,14 +1,16 @@
 # Source health — 2026-08-14
 
-- board generated: `2026-08-14T19:12:35.725625+00:00`
-- games on slate: **14** · picks: **2**
+- board generated: `2026-08-14T19:55:30.491238+00:00`
+- games on slate: **14** · picks: **1**
 
 | input | games covered | state |
 |---|---|---|
-| covers tickets | 8/14 (57%) | ⚠️ degraded |
+| covers tickets | 9/14 (64%) | ✅ ok |
 | handle (VSiN) | 14/14 (100%) | ✅ ok |
 | line movement | 14/14 (100%) | ✅ ok |
 | moneylines | 14/14 (100%) | ✅ ok |
 | PM order book | 14/14 (100%) | ✅ ok |
 
-## ⚠️ Degraded: covers tickets
+## ✅ All inputs healthy
+
+An empty board today would be a genuinely quiet slate.
