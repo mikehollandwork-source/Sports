@@ -1,7 +1,7 @@
 # Source health — 2026-08-16
 
-- board generated: `2026-08-16T16:27:40.719409+00:00`
-- games on slate: **15** · picks: **1**
+- board generated: `2026-08-16T17:24:40.767487+00:00`
+- games on slate: **15** · picks: **0**
 
 | input | games covered | state |
 |---|---|---|
