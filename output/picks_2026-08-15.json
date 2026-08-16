@@ -1,6 +1,6 @@
 {
   "date": "2026-08-15",
-  "generated_at": "2026-08-15T23:23:00.891831+00:00",
+  "generated_at": "2026-08-16T00:09:39.530008+00:00",
   "games": [
     {
       "game_pk": 824239,
@@ -6781,7 +6781,7 @@
       "park_factor": 1.0,
       "statistical_advantage": {
         "team": "Kansas City Royals",
-        "home_score": 0.08670000000000001,
+        "home_score": 0.0863,
         "away_score": 0.18761499999999998,
         "home": {
           "name": "Los Angeles Angels",
@@ -6809,22 +6809,22 @@
           "bullpen_fip_last5": 4.255,
           "bullpen_ip_last5": 122.0,
           "pen_arms_down": 1,
-          "combined_fip_sos_adj": 4.001,
+          "combined_fip_sos_adj": 4.0,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.98,
-            "arm_opp_offense_factor": 0.982,
+            "bat_opp_pitching_factor": 0.979,
+            "arm_opp_offense_factor": 0.983,
             "raw": {
-              "bat_opp_fip": 4.161949381796008,
+              "bat_opp_fip": 4.168204953330061,
               "bat_opp_win": 0.484875,
-              "sp_opp_woba": 0.3173772743711673,
+              "sp_opp_woba": 0.31753876275952164,
               "sp_opp_win": 0.4803333333333332,
-              "bp_opp_woba": 0.3176251699626411,
+              "bp_opp_woba": 0.3178741659916121,
               "bp_opp_win": 0.49587978142076505
             }
           },
-          "offense_index": -0.1174,
-          "pitching_index": 0.0241,
-          "score": -0.0933
+          "offense_index": -0.1181,
+          "pitching_index": 0.0244,
+          "score": -0.0937
         },
         "away": {
           "name": "Kansas City Royals",
@@ -6857,23 +6857,29 @@
             "bat_opp_pitching_factor": 0.973,
             "arm_opp_offense_factor": 1.01,
             "raw": {
-              "bat_opp_fip": 4.362544018814184,
+              "bat_opp_fip": 4.362035381082294,
               "bat_opp_win": 0.5297418300653595,
-              "sp_opp_woba": 0.32077801308514914,
+              "sp_opp_woba": 0.32070979834011,
               "sp_opp_win": 0.5136666666666667,
-              "bp_opp_woba": 0.3243606361261474,
+              "bp_opp_woba": 0.32429144128462095,
               "bp_opp_win": 0.5010180995475112
             }
           },
-          "offense_index": 0.0368,
-          "pitching_index": -0.0289,
+          "offense_index": 0.0369,
+          "pitching_index": -0.029,
           "score": 0.0079
         }
       },
       "public_majority": {
         "team": "Los Angeles Angels",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Kc",
+            "pcts": {
+              "Kc": 65.0,
+              "Laa": 35.0
+            }
+          },
           "forum": {
             "pick": "Los Angeles Angels",
             "home": 1,
@@ -6881,15 +6887,15 @@
           },
           "agree": null,
           "forum_lean": 0.0,
-          "consensus_lean": null,
-          "blended_lean": 0.187,
+          "consensus_lean": -0.3,
+          "blended_lean": 0.065,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
-            "home": 0,
+            "home": 8228,
             "away": 2266
           },
-          "wiki_lean": -1.0,
+          "wiki_lean": 0.568,
           "books": {
             "polymarket_bets": {
               "away": 42,
@@ -6912,6 +6918,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "away",
+            "agrees": false
+          },
+          {
             "name": "scoresodds_bets",
             "side": "home",
             "agrees": true
@@ -6929,10 +6940,10 @@
         ],
         "majority_side": "home",
         "agree": 3,
-        "dissent": 0,
+        "dissent": 1,
         "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 3 sources agree on the public side",
+        "verdict": "mostly agrees",
+        "note": "3/4 sources agree (covers differ)",
         "flags": [
           "money sources disagree"
         ],
@@ -7014,7 +7025,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Los Angeles Angels",
+          "consensus_pct": 35.0,
+          "moneyline": "-152"
+        },
+        "non_majority": {
+          "team": "Kansas City Royals",
+          "consensus_pct": 65.0,
+          "moneyline": "+135"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 4,
@@ -7121,8 +7143,8 @@
               "allowed": 6,
               "hits": 6,
               "hits_allowed": 10,
-              "adj_scored": 5.4,
-              "adj_allowed": 5.45,
+              "adj_scored": 5.39,
+              "adj_allowed": 5.46,
               "opp_win_pct": 0.602
             },
             {
@@ -7132,7 +7154,7 @@
               "allowed": 5,
               "hits": 6,
               "hits_allowed": 9,
-              "adj_scored": 4.32,
+              "adj_scored": 4.31,
               "adj_allowed": 4.55,
               "opp_win_pct": 0.602
             },
@@ -7168,17 +7190,17 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.223,
+        "confidence": 0.161,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
             "margin": 0.101,
-            "strength": 0.252,
+            "strength": 0.253,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.187,
-            "strength": 0.187,
+            "blended_lean": 0.065,
+            "strength": 0.049,
             "weight": 0.45
           },
           "consistency": {
@@ -7203,7 +7225,7 @@
         "sp_dog_edge": -0.463,
         "pitching_dog": false,
         "signals_hit": 2,
-        "public_pct_against": 57,
+        "public_pct_against": 53,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -7215,8 +7237,8 @@
           "bet": "Los Angeles Angels",
           "odds": -150,
           "basis": "ticket %",
-          "hold_home": 350000,
-          "hold_away": -374500
+          "hold_home": 863333,
+          "hold_away": -1129100
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -7277,7 +7299,7 @@
       "park_factor": 0.97,
       "statistical_advantage": {
         "team": "Athletics",
-        "home_score": -0.050504999999999974,
+        "home_score": -0.04809999999999998,
         "away_score": -0.099,
         "home": {
           "name": "Athletics",
@@ -7305,22 +7327,22 @@
           "bullpen_fip_last5": 4.725,
           "bullpen_ip_last5": 136.67,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 4.452,
+          "combined_fip_sos_adj": 4.451,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 1.018,
+            "bat_opp_pitching_factor": 1.017,
             "arm_opp_offense_factor": 1.004,
             "raw": {
-              "bat_opp_fip": 4.094711896516388,
+              "bat_opp_fip": 4.100941365410319,
               "bat_opp_win": 0.5278405315614617,
-              "sp_opp_woba": 0.32221429053965867,
+              "sp_opp_woba": 0.322269539733254,
               "sp_opp_win": 0.4991437125748503,
-              "bp_opp_woba": 0.3197830019035118,
+              "bp_opp_woba": 0.3200014254335984,
               "bp_opp_win": 0.5275317073170732
             }
           },
-          "offense_index": -0.0751,
-          "pitching_index": -0.0858,
-          "score": -0.1609
+          "offense_index": -0.0758,
+          "pitching_index": -0.0855,
+          "score": -0.1613
         },
         "away": {
           "name": "Texas Rangers",
@@ -7348,21 +7370,21 @@
           "bullpen_fip_last5": 3.835,
           "bullpen_ip_last5": 118.33,
           "pen_arms_down": 1,
-          "combined_fip_sos_adj": 3.906,
+          "combined_fip_sos_adj": 3.905,
           "strength_of_schedule": {
             "bat_opp_pitching_factor": 0.927,
             "arm_opp_offense_factor": 0.98,
             "raw": {
-              "bat_opp_fip": 4.267576381295952,
+              "bat_opp_fip": 4.268959062955903,
               "bat_opp_win": 0.42655194805194807,
-              "sp_opp_woba": 0.31267467883845146,
+              "sp_opp_woba": 0.3128151632381483,
               "sp_opp_win": 0.49274404761904755,
-              "bp_opp_woba": 0.31506656749217227,
+              "bp_opp_woba": 0.31525672118607867,
               "bp_opp_win": 0.46083661971830997
             }
           },
-          "offense_index": -0.1464,
-          "pitching_index": 0.0474,
+          "offense_index": -0.1466,
+          "pitching_index": 0.0476,
           "score": -0.099
         }
       },
@@ -7372,19 +7394,19 @@
           "consensus": {
             "pick": "Ath",
             "pcts": {
-              "Tex": 49.0,
-              "Ath": 51.0
+              "Tex": 48.0,
+              "Ath": 52.0
             }
           },
           "forum": {
             "pick": "Texas Rangers",
             "home": 0,
-            "away": 5
+            "away": 7
           },
           "agree": false,
           "forum_lean": -1.0,
-          "consensus_lean": 0.02,
-          "blended_lean": -0.486,
+          "consensus_lean": 0.04,
+          "blended_lean": -0.482,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -7449,7 +7471,7 @@
         "line": "with public",
         "money": "with public",
         "money_side": "away",
-        "money_pct": 68
+        "money_pct": 70
       },
       "bvp": {
         "home_eff": 0.805,
@@ -7528,13 +7550,13 @@
       "betting_lines": {
         "majority": {
           "team": "Texas Rangers",
-          "consensus_pct": 49.0,
-          "moneyline": "-163"
+          "consensus_pct": 48.0,
+          "moneyline": "-161"
         },
         "non_majority": {
           "team": "Athletics",
-          "consensus_pct": 51.0,
-          "moneyline": "+138"
+          "consensus_pct": 52.0,
+          "moneyline": "+135"
         }
       },
       "consistency": {
@@ -7560,7 +7582,7 @@
               "allowed": 3,
               "hits": 9,
               "hits_allowed": 6,
-              "adj_scored": 4.36,
+              "adj_scored": 4.37,
               "adj_allowed": 2.95,
               "opp_win_pct": 0.533
             },
@@ -7571,7 +7593,7 @@
               "allowed": 10,
               "hits": 10,
               "hits_allowed": 12,
-              "adj_scored": 6.45,
+              "adj_scored": 6.43,
               "adj_allowed": 9.23,
               "opp_win_pct": 0.612
             },
@@ -7582,7 +7604,7 @@
               "allowed": 12,
               "hits": 8,
               "hits_allowed": 11,
-              "adj_scored": 4.3,
+              "adj_scored": 4.29,
               "adj_allowed": 11.08,
               "opp_win_pct": 0.612
             },
@@ -7593,7 +7615,7 @@
               "allowed": 8,
               "hits": 7,
               "hits_allowed": 15,
-              "adj_scored": 4.3,
+              "adj_scored": 4.29,
               "adj_allowed": 7.39,
               "opp_win_pct": 0.612
             },
@@ -7690,17 +7712,17 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.242,
+        "confidence": 0.244,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.048,
-            "strength": 0.121,
+            "margin": 0.051,
+            "strength": 0.127,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.486,
-            "strength": 0.389,
+            "blended_lean": -0.482,
+            "strength": 0.386,
             "weight": 0.45
           },
           "consistency": {
@@ -7710,7 +7732,7 @@
         },
         "consistency_hits": 2,
         "advantage_moneyline": 145,
-        "opponent_moneyline": -154,
+        "opponent_moneyline": -153,
         "line_check": {
           "open": 113,
           "current": 145,
@@ -7737,8 +7759,8 @@
           "bet": "Athletics",
           "odds": 145,
           "basis": "money %",
-          "hold_home": 1512000,
-          "hold_away": -850909
+          "hold_home": 1855000,
+          "hold_away": -1102614
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -7750,7 +7772,7 @@
           "vs_book": "same"
         },
         "projected": {
-          "win_prob": 51.4,
+          "win_prob": 51.5,
           "fair_american": -106
         },
         "line_vs_money": "with",
@@ -7762,8 +7784,8 @@
       "pick": null,
       "game_datetime": "2026-08-16T01:40:00Z",
       "weather": {
-        "temp_f": 79,
-        "wind_mph": 8,
+        "temp_f": 80,
+        "wind_mph": 9,
         "wind_dir": "SW",
         "precip_pct": 0,
         "roof": "open"
