@@ -29,6 +29,20 @@ output/shadow_<sport>_<date>.json:
                                               p: {away: {...}, home: {...}}}]}}}
 
 Fails soft at every level: a venue outage degrades the record, it never raises.
+
+GRADING IS A SEPARATE PASS, AND HAS TO BE
+Outcomes used to be written inside the reading loop, which meant they were only
+ever captured in the narrow window where a game was already final AND its
+markets were still quoting. They almost never are: once a game ends the Kalshi
+and Polymarket markets settle, no reading attaches, the loop `continue`s, and
+the outcome line is never reached. The logger also only walks TODAY's schedule,
+so it never returned to a past date to finish the job.
+
+The result was a log that captured order books it could never grade - 4 of 18
+WNBA games had an outcome. A shadow ledger that never grades cannot produce the
+sample it exists to produce, and the failure is silent, because the readings
+keep accumulating and the files keep growing. `backfill` walks the existing
+files and settles anything still open, independent of whether a market quotes.
 """
 
 from __future__ import annotations
@@ -227,12 +241,64 @@ def run(sport: str = "wnba", date: str | None = None) -> int:
     return logged
 
 
+# league_api.results_for asks the odds API for daysFrom=3, so a game can only be
+# settled within roughly three days of being played. Older files are past
+# recovery and are skipped rather than burning a call per file. This is why the
+# backfill has to run DAILY to be worth anything - miss a week and that week is
+# permanently ungraded.
+RECOVERY_DAYS = 4
+
+
+def backfill(sport: str, days: int = RECOVERY_DAYS) -> int:
+    """Settle any logged game that still has no outcome. Idempotent.
+
+    Runs over the files rather than over a schedule, so a game that went final
+    while its markets were closed - which is every game - still gets graded."""
+    import glob
+
+    cutoff = (dt.datetime.now(EASTERN).date()
+              - dt.timedelta(days=days)).isoformat()
+    filled = 0
+    for path in sorted(glob.glob(str(OUTPUT_DIR / f"shadow_{sport}_*.json"))):
+        if Path(path).stem.split("_")[-1] < cutoff:
+            continue
+        try:
+            day = json.loads(Path(path).read_text())
+        except (OSError, ValueError):
+            continue
+        games = day.get("games") or {}
+        open_ids = [gid for gid, e in games.items() if not (e.get("outcome") or {}).get("winner")]
+        if not open_ids:
+            continue
+        try:
+            results = league_api.results_for(sport, day.get("date") or "")
+        except Exception as exc:
+            log.warning("backfill results failed for %s: %s", day.get("date"), exc)
+            continue
+        hit = 0
+        for gid in open_ids:
+            res = results.get(gid) or results.get(int(gid) if gid.isdigit() else gid)
+            if res and res.get("final") and res.get("winner"):
+                games[gid]["outcome"] = {"winner": res["winner"],
+                                         "away_score": res.get("away_score"),
+                                         "home_score": res.get("home_score")}
+                hit += 1
+        if hit:
+            Path(path).write_text(json.dumps(day, indent=1))
+            filled += hit
+            log.info("backfilled %d outcome(s) in %s", hit, Path(path).name)
+    return filled
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     import sys
     sport = sys.argv[1] if len(sys.argv) > 1 else "wnba"
     if sports.get(sport).live:
         log.warning("%s is live - shadow logging is for non-live sports", sport)
+    # grade first: a game that ended yesterday is settled now, and waiting for
+    # the reading loop to notice means waiting forever
+    log.info("backfilled %d outcome(s)", backfill(sport))
     run(sport)
 
 
