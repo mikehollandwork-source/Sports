@@ -4,11 +4,11 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **15** · graded: **14**
+- qualifying games: **16** · graded: **15**
 
 ## Running record
 
-- **8-6** (57%) · +0.85u · **+6.1%** ROI
+- **8-7** (53%) · -0.15u · **-1.0%** ROI
 
 For context, and not as a target: the backtest cell returned +3.4% on n=34 with a corrected p of 0.478, and ~663 games would be needed to call a real +10% edge. At roughly 34 qualifying games a quarter this stays inconclusive for years.
 
@@ -30,5 +30,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-08-20 | New York Yankees @ Baltimore Orioles | New York Yankees | -121 | W +0.83u |
 | 2026-08-22 | Chicago Cubs @ Seattle Mariners | Seattle Mariners | -108 | W +0.93u |
 | 2026-08-23 | Chicago Cubs @ Seattle Mariners | Chicago Cubs | -116 | W +0.86u |
+| 2026-08-25 | Kansas City Royals @ Toronto Blue Jays | Toronto Blue Jays | -120 | L -1.00u |
 
 _1 recorded but not yet graded._
