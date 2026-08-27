@@ -75,6 +75,26 @@ TEAMS: dict[str, dict[str, tuple[str, ...]]] = {
 UNMAPPED: dict[str, tuple[str, ...]] = {"wnba": ("COO", "SPN")}
 
 
+def _load_nfl() -> None:
+    """NFL's 32 teams live in nfl_api, which predates this module. Referenced
+    rather than copied - two hand-maintained copies of the same table drift, and
+    a team that maps in one and not the other fails SILENTLY here: name_abbr
+    returns None, _row drops the game, and the log simply stays empty.
+
+    That is not hypothetical. Without this the generic logger mapped zero NFL
+    teams and would have logged nothing all preseason while reporting success -
+    the same shape of silent failure that left the WNBA log ungraded."""
+    try:
+        from . import nfl_api
+    except Exception:
+        return
+    if getattr(nfl_api, "TEAMS", None):
+        TEAMS.setdefault("nfl", dict(nfl_api.TEAMS))
+
+
+_load_nfl()
+
+
 def _key() -> str | None:
     return os.environ.get("THE_ODDS_API_KEY") or None
 
