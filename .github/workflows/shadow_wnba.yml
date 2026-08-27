@@ -37,7 +37,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
-          git add output/shadow_wnba_*.json
+          # -A over the directory, not a glob: on a day with no games the
+          # Record step writes no file and a literal glob makes `git add`
+          # exit 128, failing the run for the most ordinary reason there is.
+          # The staged-diff check below already handles "nothing changed".
+          git add -A output/
           if ! git diff --staged --quiet; then
             git commit -m "WNBA shadow log ($(date -u +%Y-%m-%dT%H:%MZ))"
             for i in 1 2 3 4; do
