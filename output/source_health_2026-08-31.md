@@ -1,13 +1,13 @@
 # Source health — 2026-08-31
 
-- board generated: `2026-08-31T05:23:22.846470+00:00`
-- games on slate: **12** · picks: **1**
+- board generated: `2026-08-31T21:22:28.776182+00:00`
+- games on slate: **12** · picks: **2**
 
 | input | games covered | state |
 |---|---|---|
-| covers tickets | 8/12 (67%) | ✅ ok |
+| covers tickets | 10/12 (83%) | ✅ ok |
 | handle (VSiN) | 12/12 (100%) | ✅ ok |
-| line movement | 11/12 (92%) | ✅ ok |
+| line movement | 12/12 (100%) | ✅ ok |
 | moneylines | 12/12 (100%) | ✅ ok |
 | PM order book | 12/12 (100%) | ✅ ok |
 
