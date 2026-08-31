@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, tune, umpire, weather, wiki
+from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -153,6 +153,16 @@ def run(date: str) -> dict:
     # happened on 2026-08-09: a pick entered 24 min before first pitch was wiped
     # by the lock window that opens 15 min before it, and never reached any board.
     manual_picks.apply(results, date)
+
+    # Road-trip rule: a no-op until its pre-registered bar is met, at which
+    # point it promotes itself and starts adding picks here. Placed after the
+    # lock for the same reason manual picks are, and it never overwrites a game
+    # the consensus rule already picked. Entries carry source="road_trip" so the
+    # two populations stay separable in the ledger.
+    try:
+        road_trip.apply(results, date)
+    except Exception as exc:
+        log.warning("road-trip rule failed (board unaffected): %s", exc)
 
     # Tag each game's live state (upcoming / live / final) for the board.
     try:
