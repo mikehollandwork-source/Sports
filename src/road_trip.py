@@ -86,10 +86,23 @@ def load() -> dict:
         return {"rule": RULE, "entries": [], "promoted": False}
 
 
+def _clean(v):
+    """NaN is not valid JSON. Python emits and re-reads it happily, so this file
+    looked fine while being unreadable to anything else - the bootstrap returns
+    NaN until there are enough games, so an empty ledger shipped a broken file."""
+    if isinstance(v, float) and v != v:
+        return None
+    if isinstance(v, dict):
+        return {k: _clean(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_clean(x) for x in v]
+    return v
+
+
 def save(d: dict) -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
     d["rule"] = RULE
-    LEDGER.write_text(json.dumps(d, indent=1))
+    LEDGER.write_text(json.dumps(_clean(d), indent=1, allow_nan=False))
 
 
 def _streaks() -> dict:
@@ -191,7 +204,7 @@ def evaluate(led: dict) -> dict:
                     for e in done) / n) if n else 0.0
     checks = {
         f"n >= {MIN_N}": n >= MIN_N,
-        "CI lower bound > 0": lo == lo and lo > 0,
+        "CI lower bound > 0": lo is not None and lo == lo and lo > 0,
         "beats fading it (backing home)": roi > home_roi,
         f"holds at >= {ROAD_MIN + 1} too": len(deeper) >= 30 and droi > 0,
     }
