@@ -80,6 +80,12 @@ FEATURES = ["mkt", "margin", "bvp", "pen", "form", "line", "lean"]
 # already absorbed.
 SCHED = ["road_trip", "homestand", "rest_edge"]
 
+# The gradient concentrates at 5-6 road games, and a LINEAR term dilutes a
+# threshold effect across the flat region below it. This is a refinement of
+# functional form for the same hypothesis, not a new search: one extra fit,
+# specified because the shape in schedule_spots called for it.
+DEEP_TRIP = 6
+
 
 def _logit(p: float) -> float:
     p = min(max(p, EPS), 1 - EPS)
@@ -159,6 +165,7 @@ def collect() -> list[dict]:
                     "lean": toward_home(lean, adv),
                     # signed toward home: a tired visitor should help the home side
                     "road_trip": float(sa["road_streak"]),
+                    "deep_trip": 1.0 if sa["road_streak"] >= DEEP_TRIP else 0.0,
                     "homestand": float(sh["home_streak"]),
                     "rest_edge": float((sh["days_rest"] or 0) - (sa["days_rest"] or 0)),
                 },
@@ -242,15 +249,17 @@ def build() -> str:
     if len(train) < 80 or len(hold) < 40:
         return "\n".join(md + ["Split too small to be worth fitting.", ""])
 
-    _standardise(train, recs, FEATURES + SCHED)
+    _standardise(train, recs, FEATURES + SCHED + ["deep_trip"])
     full = fit(train, FEATURES)
     mkt_only = fit(train, ["mkt"])
     sched = fit(train, ["mkt"] + SCHED)
+    deep = fit(train, ["mkt", "deep_trip"])
 
     p_raw = [r["p_mkt"] for r in hold]
     p_mkt = [predict(mkt_only, r) for r in hold]
     p_full = [predict(full, r) for r in hold]
     p_sch = [predict(sched, r) for r in hold]
+    p_deep = [predict(deep, r) for r in hold]
 
     md += ["## Holdout scoring — lower is better", "",
            "| model | log-loss | Brier |", "|---|---|---|",
@@ -261,7 +270,21 @@ def build() -> str:
            f"| **market + our signals** | **{logloss(hold, p_full):.4f}** | "
            f"**{brier(hold, p_full):.4f}** |",
            f"| **market + schedule/travel** | **{logloss(hold, p_sch):.4f}** | "
-           f"**{brier(hold, p_sch):.4f}** |", ""]
+           f"**{brier(hold, p_sch):.4f}** |",
+           f"| **market + deep-trip flag (≥{DEEP_TRIP})** | "
+           f"**{logloss(hold, p_deep):.4f}** | **{brier(hold, p_deep):.4f}** |", ""]
+    dg = logloss(hold, p_mkt) - logloss(hold, p_deep)
+    ddiffs = [(-math.log(a if r["home_won"] else 1 - a))
+              - (-math.log(c if r["home_won"] else 1 - c))
+              for r, a, c in zip(hold, p_mkt, p_deep)]
+    rd = random.Random(223)
+    db = sorted(sum(x) / len(x) for x in
+                ([ddiffs[rd.randrange(len(ddiffs))] for _ in ddiffs]
+                 for _ in range(4000)))
+    md += [f"_Deep-trip flag alone (visitor on {DEEP_TRIP}+ straight road games): "
+           f"log-loss change **{dg:+.4f}**, 95% CI **{db[100]:+.4f} to "
+           f"{db[3899]:+.4f}**, weight `deep_trip` "
+           f"{deep['w']['deep_trip']:+.3f}._", ""]
     sg = logloss(hold, p_mkt) - logloss(hold, p_sch)
     sdiffs = [(-math.log(a if r["home_won"] else 1 - a))
               - (-math.log(c if r["home_won"] else 1 - c))
