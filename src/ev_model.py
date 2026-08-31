@@ -86,6 +86,15 @@ SCHED = ["road_trip", "homestand", "rest_edge"]
 # specified because the shape in schedule_spots called for it.
 DEEP_TRIP = 6
 
+# Signal x price INTERACTIONS. The question "does the closing price change what
+# a signal is worth" is an interaction, and slicing it into buckets is the
+# high-variance way to ask - ~98 cells, and this dataset reliably manufactures a
+# winner at that width. Multiplying each signal by the market logit asks the same
+# thing with one coefficient each: a non-zero weight means the signal is worth
+# more at one end of the price range than the other. Scored by holdout log-loss
+# on every game, so it is powered where the grid is not.
+INTERACTIONS = ["margin", "bvp", "pen", "form", "line", "lean"]
+
 
 def _logit(p: float) -> float:
     p = min(max(p, EPS), 1 - EPS)
@@ -170,6 +179,10 @@ def collect() -> list[dict]:
                     "rest_edge": float((sh["days_rest"] or 0) - (sa["days_rest"] or 0)),
                 },
             })
+    # each signal multiplied by the market's own logit
+    for r in recs:
+        for k in INTERACTIONS:
+            r["x"][f"{k}_x_mkt"] = r["x"][k] * r["x"]["mkt"]
     return recs
 
 
@@ -249,17 +262,20 @@ def build() -> str:
     if len(train) < 80 or len(hold) < 40:
         return "\n".join(md + ["Split too small to be worth fitting.", ""])
 
-    _standardise(train, recs, FEATURES + SCHED + ["deep_trip"])
+    IX = [f"{k}_x_mkt" for k in INTERACTIONS]
+    _standardise(train, recs, FEATURES + SCHED + ["deep_trip"] + IX)
     full = fit(train, FEATURES)
     mkt_only = fit(train, ["mkt"])
     sched = fit(train, ["mkt"] + SCHED)
     deep = fit(train, ["mkt", "deep_trip"])
+    inter = fit(train, FEATURES + IX)
 
     p_raw = [r["p_mkt"] for r in hold]
     p_mkt = [predict(mkt_only, r) for r in hold]
     p_full = [predict(full, r) for r in hold]
     p_sch = [predict(sched, r) for r in hold]
     p_deep = [predict(deep, r) for r in hold]
+    p_int = [predict(inter, r) for r in hold]
 
     md += ["## Holdout scoring — lower is better", "",
            "| model | log-loss | Brier |", "|---|---|---|",
@@ -272,7 +288,30 @@ def build() -> str:
            f"| **market + schedule/travel** | **{logloss(hold, p_sch):.4f}** | "
            f"**{brier(hold, p_sch):.4f}** |",
            f"| **market + deep-trip flag (≥{DEEP_TRIP})** | "
-           f"**{logloss(hold, p_deep):.4f}** | **{brier(hold, p_deep):.4f}** |", ""]
+           f"**{logloss(hold, p_deep):.4f}** | **{brier(hold, p_deep):.4f}** |",
+           f"| **market + signals + price interactions** | "
+           f"**{logloss(hold, p_int):.4f}** | **{brier(hold, p_int):.4f}** |", ""]
+    ig = logloss(hold, p_full) - logloss(hold, p_int)
+    idiffs = [(-math.log(a if r["home_won"] else 1 - a))
+              - (-math.log(c if r["home_won"] else 1 - c))
+              for r, a, c in zip(hold, p_full, p_int)]
+    ri = random.Random(233)
+    ib = sorted(sum(x) / len(x) for x in
+                ([idiffs[ri.randrange(len(idiffs))] for _ in idiffs]
+                 for _ in range(4000)))
+    md += ["### Does the closing price change what a signal is worth?", "",
+           "_Each signal multiplied by the market logit. A non-zero weight means "
+           "the signal pays differently on favourites than on dogs - the same "
+           "question the price grid asks, but with one coefficient instead of "
+           "~98 cells, and scored on every game._", "",
+           f"- interactions change holdout log-loss by **{ig:+.4f}** vs signals "
+           f"alone",
+           f"- 95% CI: **{ib[100]:+.4f} to {ib[3899]:+.4f}**",
+           "- weights: " + ", ".join(f"`{k}` {inter['w'][k]:+.3f}" for k in IX), ""]
+    md += (["**Price changes what the signals are worth.**", ""] if ib[100] > 0 else
+           ["**Price does not rescue any signal.** Interacting every signal with "
+            "the market's own price adds nothing beyond the signals themselves, "
+            "which already add nothing beyond the price.", ""])
     dg = logloss(hold, p_mkt) - logloss(hold, p_deep)
     ddiffs = [(-math.log(a if r["home_won"] else 1 - a))
               - (-math.log(c if r["home_won"] else 1 - c))
