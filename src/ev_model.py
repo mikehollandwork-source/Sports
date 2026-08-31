@@ -71,6 +71,15 @@ LR = 0.15
 # readable: positive means "this raises the home team's chance"
 FEATURES = ["mkt", "margin", "bvp", "pen", "form", "line", "lean"]
 
+# Schedule/travel, tested SEPARATELY from the signals above. `schedule_spots`
+# found a monotone gradient - backing the road team pays more the longer its
+# trip - which is the plateau shape every failed signal lacked. But that came
+# from a 30-cell scan whose max-statistic test does not credit monotonicity
+# (corrected p = 0.160). This is the decisive version: ONE pre-specified test,
+# scored by log-loss, asking whether fatigue adds anything the price has not
+# already absorbed.
+SCHED = ["road_trip", "homestand", "rest_edge"]
+
 
 def _logit(p: float) -> float:
     p = min(max(p, EPS), 1 - EPS)
@@ -85,6 +94,10 @@ def _sig(z: float) -> float:
 
 
 def collect() -> list[dict]:
+    from . import schedule_spots
+    hist, dates = schedule_spots._history()
+    global _sched
+    _sched = schedule_spots._team_spots(hist, dates)
     recs = []
     for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
         date = Path(f).stem.split("picks_")[1]
@@ -126,6 +139,10 @@ def collect() -> list[dict]:
             shift = (pc.get("line_check") or {}).get("implied_shift")
             lean = ((pc.get("components") or {}).get("public_fade") or {}).get("blended_lean")
 
+            sp = _sched.get((date, away)), _sched.get((date, home))
+            if not sp[0] or not sp[1] or not sp[0]["seen_home"] or not sp[1]["seen_home"]:
+                continue
+            sa, sh = sp
             recs.append({
                 "date": date, "matchup": matchup, "home": home, "away": away,
                 "home_won": res["winner"] == home,
@@ -140,6 +157,10 @@ def collect() -> list[dict]:
                              and isinstance(fa, (int, float)) else 0.0),
                     "line": toward_home(shift, adv),
                     "lean": toward_home(lean, adv),
+                    # signed toward home: a tired visitor should help the home side
+                    "road_trip": float(sa["road_streak"]),
+                    "homestand": float(sh["home_streak"]),
+                    "rest_edge": float((sh["days_rest"] or 0) - (sa["days_rest"] or 0)),
                 },
             })
     return recs
@@ -221,13 +242,15 @@ def build() -> str:
     if len(train) < 80 or len(hold) < 40:
         return "\n".join(md + ["Split too small to be worth fitting.", ""])
 
-    _standardise(train, recs, FEATURES)
+    _standardise(train, recs, FEATURES + SCHED)
     full = fit(train, FEATURES)
     mkt_only = fit(train, ["mkt"])
+    sched = fit(train, ["mkt"] + SCHED)
 
     p_raw = [r["p_mkt"] for r in hold]
     p_mkt = [predict(mkt_only, r) for r in hold]
     p_full = [predict(full, r) for r in hold]
+    p_sch = [predict(sched, r) for r in hold]
 
     md += ["## Holdout scoring — lower is better", "",
            "| model | log-loss | Brier |", "|---|---|---|",
@@ -236,7 +259,27 @@ def build() -> str:
            f"| market only, refit | {logloss(hold, p_mkt):.4f} | "
            f"{brier(hold, p_mkt):.4f} |",
            f"| **market + our signals** | **{logloss(hold, p_full):.4f}** | "
-           f"**{brier(hold, p_full):.4f}** |", ""]
+           f"**{brier(hold, p_full):.4f}** |",
+           f"| **market + schedule/travel** | **{logloss(hold, p_sch):.4f}** | "
+           f"**{brier(hold, p_sch):.4f}** |", ""]
+    sg = logloss(hold, p_mkt) - logloss(hold, p_sch)
+    sdiffs = [(-math.log(a if r["home_won"] else 1 - a))
+              - (-math.log(c if r["home_won"] else 1 - c))
+              for r, a, c in zip(hold, p_mkt, p_sch)]
+    rs = random.Random(211)
+    sb = sorted(sum(x) / len(x) for x in
+                ([sdiffs[rs.randrange(len(sdiffs))] for _ in sdiffs]
+                 for _ in range(4000)))
+    md += ["### Schedule/travel, tested on its own", "",
+           f"- schedule features change holdout log-loss by **{sg:+.4f}**",
+           f"- 95% CI: **{sb[100]:+.4f} to {sb[3899]:+.4f}**",
+           f"- fitted weights: " + ", ".join(f"`{k}` {sched['w'][k]:+.3f}"
+                                             for k in SCHED), ""]
+    md += (["**Fatigue carries information the price has not absorbed.**", ""]
+           if sb[100] > 0 else
+           ["**No information beyond the price.** The road-trip gradient in "
+            "`schedule_spots` does not survive being asked whether it adds "
+            "anything the market has not already priced.", ""])
     gain = logloss(hold, p_mkt) - logloss(hold, p_full)
     md += [f"- our signals change holdout log-loss by **{gain:+.4f}** "
            f"({'better' if gain > 0 else 'worse'} than market alone)", ""]
