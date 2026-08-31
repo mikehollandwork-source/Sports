@@ -15,9 +15,18 @@ _The board is stateless and `settle_day` reads only the final committed version,
 | everything ever posted | 191-160 (54%) · -18.55u · **-5.3%** (n=351) |
 
 - the recorded population returns **+0.7%**; everything that actually appeared returns **-5.3%**
-- **bias from silent dropping: +0.1 points**
+- **bias from silent dropping: +6.0 points**
 
-The ledger is FLATTERED by +0.1 points: the picks that quietly vanished did worse than the ones that stayed.
+The ledger is FLATTERED by +6.0 points: the picks that quietly vanished did worse than the ones that stayed.
+
+## Is surviving to the lock actually predictive?
+
+_Permuting the survived/dropped labels keeps every outcome and price fixed and asks only whether the label carries information._
+
+- observed gap: **+13.6 points**
+- **permutation p = 0.0725**
+
+**Not established.** The gap is within what a split this size produces by chance.
 
 ## Price drift on the picks that survived
 
@@ -27,4 +36,4 @@ _The ledger books the frozen closing price; the channel showed the earlier one. 
 - graded at the FIRST posted price: 114-82 (58%) · +1.45u · **+0.7%** (n=196)
 - graded at the FINAL recorded price: 114-82 (58%) · -0.24u · **-0.1%** (n=196)
 
-- difference: **+0.0 points** in favour of the posted price
+- difference: **+0.9 points** in favour of the posted price
