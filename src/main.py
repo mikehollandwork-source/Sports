@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -1310,6 +1310,14 @@ def main() -> None:
     write_outputs(payload, args.date)
     grade.update_ledger(args.date)  # record any games that just went final (idempotent)
     notify.send_telegram(telegram_text(payload))
+    # A new pick gets a board post; a WITHDRAWN one used to get silence, which
+    # is indistinguishable from "the board hasn't refreshed yet" - the common
+    # case, since most scheduled runs are dropped. Runs after the board post so
+    # the channel sees the board first, then what changed on it.
+    try:
+        pick_watch.check(payload.get("games") or [], args.date)
+    except Exception as exc:
+        log.warning("pick watch failed (board unaffected): %s", exc)
     print(json.dumps(payload.get("leans", []), indent=2))
 
 
