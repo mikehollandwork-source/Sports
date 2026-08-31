@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 
-from . import early_lines, grade, main as picks_main, notify
+from . import early_lines, grade, main as picks_main, notify, pick_watch
 
 log = logging.getLogger("pregame")
 
@@ -60,6 +60,17 @@ def run(force_telegram: bool = False) -> bool:
                  else "picks changed")
     else:
         log.info("board refreshed, picks unchanged -> no telegram")
+
+    # Withdrawal alerts belong HERE, not in main.main(): the hourly refresh is
+    # the only path that re-evaluates a slate repeatedly, so it is the only path
+    # where a pick can be withdrawn. main.main() runs once a day and would never
+    # have seen one. Runs unconditionally - a withdrawal is exactly the case
+    # where `changed` is True but the board post above may say nothing useful,
+    # and it is also the case a dropped cron makes invisible.
+    try:
+        pick_watch.check(payload.get("games") or [], date)
+    except Exception as exc:
+        log.warning("pick watch failed (board unaffected): %s", exc)
     return True
 
 
