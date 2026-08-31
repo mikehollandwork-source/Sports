@@ -188,12 +188,41 @@ def build() -> str:
     _, _, _, ra = _roi(rows, "first_odds", "won_first")
     md += [f"- the recorded population returns **{rk:+.1%}**; everything that "
            f"actually appeared returns **{ra:+.1%}**",
-           f"- **bias from silent dropping: {rk - ra:+.1f} points**", ""]
-    md += ([f"The ledger is FLATTERED by {rk-ra:+.1f} points: the picks that "
+           f"- **bias from silent dropping: {(rk - ra) * 100:+.1f} points**", ""]
+    md += ([f"The ledger is FLATTERED by {(rk-ra)*100:+.1f} points: the picks that "
             "quietly vanished did worse than the ones that stayed.", ""]
            if rk > ra else
-           [f"The ledger UNDERSTATES the record by {ra-rk:+.1f} points: the "
+           [f"The ledger UNDERSTATES the record by {(ra-rk)*100:+.1f} points: the "
             "dropped picks did better than the ones that stayed.", ""])
+
+    # Is "still qualifying at its own lock time" actually predictive, or is the
+    # gap the sort of thing a 351-game split throws up? Permuting the
+    # survived/dropped labels holds the outcomes fixed and asks only whether the
+    # LABEL carries information.
+    import random as _rnd
+    rng = _rnd.Random(401)
+    obs = rk - _roi(lost, "first_odds", "won_first")[3]
+    pool = kept + lost
+    k = len(kept)
+    null = []
+    for _ in range(4000):
+        sh = pool[:]
+        rng.shuffle(sh)
+        null.append(_roi(sh[:k], "first_odds", "won_first")[3]
+                    - _roi(sh[k:], "first_odds", "won_first")[3])
+    pv = sum(1 for x in null if x >= obs) / len(null)
+    md += ["## Is surviving to the lock actually predictive?", "",
+           "_Permuting the survived/dropped labels keeps every outcome and price "
+           "fixed and asks only whether the label carries information._", "",
+           f"- observed gap: **{obs * 100:+.1f} points**",
+           f"- **permutation p = {pv:.4f}**", ""]
+    md += ([f"**Real.** A pick that still qualifies at its own lock window is a "
+            "materially better bet than one that has stopped qualifying, and "
+            "that is implementable: check the board ~15 minutes before first "
+            "pitch and skip anything that has fallen out.", ""]
+           if pv <= 0.05 else
+           ["**Not established.** The gap is within what a split this size "
+            "produces by chance.", ""])
 
     # price drift on the survivors
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
@@ -207,7 +236,7 @@ def build() -> str:
            f"- graded at the FINAL recorded price: "
            f"{_fmt(kept, 'final_odds', 'won_final')}", ""]
     _, _, _, rf = _roi(kept, "final_odds", "won_final")
-    md += [f"- difference: **{rk - rf:+.1f} points** in favour of the "
+    md += [f"- difference: **{(rk - rf) * 100:+.1f} points** in favour of the "
            f"{'posted' if rk > rf else 'recorded'} price", ""]
     return "\n".join(md)
 
