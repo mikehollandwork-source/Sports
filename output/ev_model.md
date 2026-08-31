@@ -14,6 +14,9 @@ _Benter's fundamental model alone was not profitable; the change that made it wo
 | market only, refit | 0.6749 | 0.2412 |
 | **market + our signals** | **0.6762** | **0.2418** |
 | **market + schedule/travel** | **0.6745** | **0.2410** |
+| **market + deep-trip flag (≥6)** | **0.6742** | **0.2406** |
+
+_Deep-trip flag alone (visitor on 6+ straight road games): log-loss change **+0.0008**, 95% CI **-0.0119 to +0.0130**, weight `deep_trip` -0.282._
 
 ### Schedule/travel, tested on its own
 
