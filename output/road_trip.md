@@ -2,7 +2,7 @@
 
 _back the road team on its 6th+ straight road game. Recording from 2026-09-01; backtest games can never count._
 
-- forward games graded: **10** · ROI **-40.6%**
+- forward games graded: **13** · ROI **-9.7%**
 
 ## The bar, fixed 2026-08-31
 
