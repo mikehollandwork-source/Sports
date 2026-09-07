@@ -1,6 +1,6 @@
 {
   "date": "2026-09-07",
-  "generated_at": "2026-09-07T06:08:10.911374+00:00",
+  "generated_at": "2026-09-07T07:08:17.006179+00:00",
   "games": [
     {
       "game_pk": 823415,
@@ -104,10 +104,10 @@
         "team": "Atlanta Braves",
         "detail": {
           "consensus": {
-            "pick": "Atl",
+            "pick": "Phi",
             "pcts": {
-              "Atl": 50.0,
-              "Phi": 50.0
+              "Atl": 47.0,
+              "Phi": 53.0
             }
           },
           "forum": {
@@ -115,10 +115,10 @@
             "home": 2,
             "away": 6
           },
-          "agree": null,
+          "agree": false,
           "forum_lean": -0.5,
-          "consensus_lean": 0.0,
-          "blended_lean": -0.158,
+          "consensus_lean": 0.06,
+          "blended_lean": -0.15,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -132,11 +132,6 @@
               "home": 60,
               "lean": 0.2
             },
-            "scoresodds_bets": {
-              "away": 49,
-              "home": 51,
-              "lean": 0.02
-            },
             "vsin_bets": {
               "away": 48,
               "home": 52,
@@ -148,14 +143,14 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": false
+          },
+          {
             "name": "forum",
             "side": "away",
             "agrees": true
-          },
-          {
-            "name": "scoresodds_bets",
-            "side": "home",
-            "agrees": false
           },
           {
             "name": "vsin_bets",
@@ -173,12 +168,12 @@
         "dissent": 3,
         "trusted": false,
         "verdict": "sources split",
-        "note": "sources disagree on the public side (scoresodds_bets, vsin_bets, polymarket_bets differ)",
+        "note": "sources disagree on the public side (covers, vsin_bets, polymarket_bets differ)",
         "flags": [],
         "line": "flat",
         "money": "with public",
         "money_side": "away",
-        "money_pct": 54
+        "money_pct": 57
       },
       "bvp": {
         "home_eff": 0.727,
@@ -197,13 +192,13 @@
         "meaningful": false
       },
       "bvp_pen": {
-        "home_ops": 0.729,
-        "away_ops": 0.878,
-        "home_pa": 417,
-        "away_pa": 676,
-        "total_pa": 1093,
+        "home_ops": 0.717,
+        "away_ops": 0.885,
+        "home_pa": 416,
+        "away_pa": 667,
+        "total_pa": 1083,
         "edge_team": "Atlanta Braves",
-        "gap": 0.149,
+        "gap": 0.168,
         "meaningful": true
       },
       "form": {
@@ -257,13 +252,13 @@
       "betting_lines": {
         "majority": {
           "team": "Atlanta Braves",
-          "consensus_pct": 50.0,
-          "moneyline": "+146"
+          "consensus_pct": 47.0,
+          "moneyline": "+150"
         },
         "non_majority": {
           "team": "Philadelphia Phillies",
-          "consensus_pct": 50.0,
-          "moneyline": "-162"
+          "consensus_pct": 53.0,
+          "moneyline": "-156"
         }
       },
       "consistency": {
@@ -419,7 +414,7 @@
         "public_edge": true,
         "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.375,
+        "confidence": 0.374,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -428,8 +423,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.158,
-            "strength": 0.04,
+            "blended_lean": -0.15,
+            "strength": 0.037,
             "weight": 0.45
           },
           "consistency": {
@@ -465,8 +460,8 @@
           "bet": "Philadelphia Phillies",
           "odds": -160,
           "basis": "money %",
-          "hold_home": 1767500,
-          "hold_away": -2450000
+          "hold_home": 2108750,
+          "hold_away": -2975000
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -491,7 +486,7 @@
       "game_datetime": "2026-09-07T17:05:00Z",
       "weather": {
         "temp_f": 76,
-        "wind_mph": 3,
+        "wind_mph": 4,
         "wind_dir": "N",
         "precip_pct": 0,
         "roof": "open"
@@ -616,8 +611,8 @@
           "consensus": {
             "pick": "Mia",
             "pcts": {
-              "Nym": 36.0,
-              "Mia": 64.0
+              "Nym": 34.0,
+              "Mia": 66.0
             }
           },
           "forum": {
@@ -627,8 +622,8 @@
           },
           "agree": true,
           "forum_lean": 0.2,
-          "consensus_lean": 0.28,
-          "blended_lean": 0.161,
+          "consensus_lean": 0.32,
+          "blended_lean": 0.177,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -638,9 +633,9 @@
           "wiki_lean": -0.146,
           "books": {
             "polymarket_bets": {
-              "away": 48,
-              "home": 52,
-              "lean": 0.04
+              "away": 46,
+              "home": 54,
+              "lean": 0.08
             },
             "vsin_bets": {
               "away": 46,
@@ -764,13 +759,13 @@
       "betting_lines": {
         "majority": {
           "team": "Miami Marlins",
-          "consensus_pct": 64.0,
-          "moneyline": "-125"
+          "consensus_pct": 66.0,
+          "moneyline": "-113"
         },
         "non_majority": {
           "team": "New York Mets",
-          "consensus_pct": 36.0,
-          "moneyline": "-105"
+          "consensus_pct": 34.0,
+          "moneyline": "+111"
         }
       },
       "consistency": {
@@ -935,7 +930,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.161,
+            "blended_lean": 0.177,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -980,10 +975,10 @@
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
-          "pm_pct": 52,
-          "pm_american": -108,
-          "edge_pts": 0.8,
-          "vs_book": "same"
+          "pm_pct": 54,
+          "pm_american": -117,
+          "edge_pts": -1.2,
+          "vs_book": "worse"
         },
         "projected": {
           "win_prob": 54.8,
@@ -1122,8 +1117,8 @@
           "consensus": {
             "pick": "Bos",
             "pcts": {
-              "Laa": 45.0,
-              "Bos": 55.0
+              "Laa": 41.0,
+              "Bos": 59.0
             }
           },
           "forum": {
@@ -1133,8 +1128,8 @@
           },
           "agree": true,
           "forum_lean": 0.5,
-          "consensus_lean": 0.1,
-          "blended_lean": 0.414,
+          "consensus_lean": 0.18,
+          "blended_lean": 0.43,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1189,7 +1184,7 @@
         "line": "flat",
         "money": "with public",
         "money_side": "home",
-        "money_pct": 90
+        "money_pct": 91
       },
       "bvp": null,
       "bvp_pen": {
@@ -1253,13 +1248,13 @@
       "betting_lines": {
         "majority": {
           "team": "Boston Red Sox",
-          "consensus_pct": 55.0,
+          "consensus_pct": 59.0,
           "moneyline": "-175"
         },
         "non_majority": {
           "team": "Los Angeles Angels",
-          "consensus_pct": 45.0,
-          "moneyline": "+147"
+          "consensus_pct": 41.0,
+          "moneyline": "+143"
         }
       },
       "consistency": {
@@ -1424,7 +1419,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.414,
+            "blended_lean": 0.43,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1450,18 +1445,20 @@
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Los Angeles Angels",
+          "against_us": true,
+          "tells": [
+            "line frozen under 70% public"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Los Angeles Angels",
           "odds": 157,
           "basis": "money %",
-          "hold_home": -3050000,
-          "hold_away": 5201000
+          "hold_home": -3161667,
+          "hold_away": 5380900
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -1485,7 +1482,7 @@
       "pick": null,
       "game_datetime": "2026-09-07T17:35:00Z",
       "weather": {
-        "temp_f": 79,
+        "temp_f": 78,
         "wind_mph": 11,
         "wind_dir": "NW",
         "precip_pct": 0,
@@ -1611,8 +1608,8 @@
           "consensus": {
             "pick": "Cle",
             "pcts": {
-              "Cle": 56.0,
-              "Bal": 44.0
+              "Cle": 55.0,
+              "Bal": 45.0
             }
           },
           "forum": {
@@ -1622,8 +1619,8 @@
           },
           "agree": true,
           "forum_lean": -0.2,
-          "consensus_lean": -0.12,
-          "blended_lean": -0.113,
+          "consensus_lean": -0.1,
+          "blended_lean": -0.083,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1638,9 +1635,9 @@
               "lean": 0.08
             },
             "vsin_bets": {
-              "away": 50,
-              "home": 50,
-              "lean": 0.0
+              "away": 49,
+              "home": 51,
+              "lean": 0.02
             }
           }
         }
@@ -1659,8 +1656,8 @@
           },
           {
             "name": "vsin_bets",
-            "side": "away",
-            "agrees": true
+            "side": "home",
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
@@ -1669,11 +1666,11 @@
           }
         ],
         "majority_side": "away",
-        "agree": 3,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/4 sources agree (polymarket_bets differ)",
+        "agree": 2,
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (vsin_bets, polymarket_bets differ)",
         "flags": [
           "money is on the other side from the public tickets"
         ],
@@ -1759,12 +1756,12 @@
       "betting_lines": {
         "majority": {
           "team": "Cleveland Guardians",
-          "consensus_pct": 56.0,
+          "consensus_pct": 55.0,
           "moneyline": "+106"
         },
         "non_majority": {
           "team": "Baltimore Orioles",
-          "consensus_pct": 44.0,
+          "consensus_pct": 45.0,
           "moneyline": "-130"
         }
       },
@@ -1919,7 +1916,7 @@
         "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Cleveland Guardians",
         "public_edge": false,
-        "public_trusted": true,
+        "public_trusted": false,
         "edge_strong": false,
         "confidence": 0.109,
         "edge_threshold": 0.4,
@@ -1930,7 +1927,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.113,
+            "blended_lean": -0.083,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -2024,7 +2021,7 @@
       "park_factor": 1.03,
       "statistical_advantage": {
         "team": "Kansas City Royals",
-        "home_score": 0.19902,
+        "home_score": 0.1965,
         "away_score": -0.02690000000000009,
         "home": {
           "name": "Kansas City Royals",
@@ -2377,12 +2374,12 @@
         "public_edge": false,
         "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.311,
+        "confidence": 0.307,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.226,
-            "strength": 0.565,
+            "margin": 0.223,
+            "strength": 0.559,
             "weight": 0.55
           },
           "public_fade": {
@@ -2396,8 +2393,8 @@
           }
         },
         "consistency_hits": 1,
-        "advantage_moneyline": -110,
-        "opponent_moneyline": -110,
+        "advantage_moneyline": -115,
+        "opponent_moneyline": -102,
         "line_check": {
           "status": "unknown",
           "reason": "no line data"
@@ -2419,10 +2416,10 @@
         },
         "vegas": {
           "bet": "Arizona Diamondbacks",
-          "odds": -110,
+          "odds": -102,
           "basis": "ticket %",
-          "hold_home": -3022727,
-          "hold_away": 3659091
+          "hold_home": -2815217,
+          "hold_away": 3534314
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -2430,11 +2427,11 @@
         "pm_quote": {
           "pm_pct": 50,
           "pm_american": -100,
-          "edge_pts": 2.4,
+          "edge_pts": 3.5,
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 56.8,
+          "win_prob": 56.7,
           "fair_american": -131
         },
         "line_vs_money": "flat",
@@ -2446,7 +2443,7 @@
       "pick": null,
       "game_datetime": "2026-09-07T18:10:00Z",
       "weather": {
-        "temp_f": 91,
+        "temp_f": 90,
         "wind_mph": 8,
         "wind_dir": "SSE",
         "precip_pct": 2,
@@ -2569,13 +2566,7 @@
       "public_majority": {
         "team": "Milwaukee Brewers",
         "detail": {
-          "consensus": {
-            "pick": "Chc",
-            "pcts": {
-              "Chc": 53.0,
-              "Mil": 47.0
-            }
-          },
+          "consensus": null,
           "forum": {
             "pick": "Milwaukee Brewers",
             "home": 2,
@@ -2583,8 +2574,8 @@
           },
           "agree": null,
           "forum_lean": 0.0,
-          "consensus_lean": -0.06,
-          "blended_lean": 0.08,
+          "consensus_lean": null,
+          "blended_lean": 0.15,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -2609,11 +2600,6 @@
       "public_check": {
         "sources": [
           {
-            "name": "covers",
-            "side": "away",
-            "agrees": false
-          },
-          {
             "name": "vsin_bets",
             "side": "home",
             "agrees": true
@@ -2626,15 +2612,15 @@
         ],
         "majority_side": "home",
         "agree": 2,
-        "dissent": 1,
+        "dissent": 0,
         "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "2/3 sources agree (covers differ)",
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
         "flags": [],
         "line": "flat",
         "money": "with public",
         "money_side": "home",
-        "money_pct": 79
+        "money_pct": 78
       },
       "bvp": {
         "home_eff": 0.737,
@@ -2710,18 +2696,7 @@
           ]
         }
       },
-      "betting_lines": {
-        "majority": {
-          "team": "Milwaukee Brewers",
-          "consensus_pct": 47.0,
-          "moneyline": "-125"
-        },
-        "non_majority": {
-          "team": "Chicago Cubs",
-          "consensus_pct": 53.0,
-          "moneyline": "+113"
-        }
-      },
+      "betting_lines": null,
       "consistency": {
         "home": {
           "runs_to_win": 5,
@@ -2870,12 +2845,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "order book does not confirm the consensus side \u2014 no play",
         "advantage_team": "Chicago Cubs",
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.104,
+        "confidence": 0.147,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -2884,8 +2859,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.08,
-            "strength": 0.053,
+            "blended_lean": 0.15,
+            "strength": 0.15,
             "weight": 0.45
           },
           "consistency": {
@@ -2909,7 +2884,7 @@
         "sp_dog_edge": -0.207,
         "pitching_dog": false,
         "signals_hit": 2,
-        "public_pct_against": 53,
+        "public_pct_against": 55,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -2921,8 +2896,8 @@
           "bet": "Chicago Cubs",
           "odds": 110,
           "basis": "money %",
-          "hold_home": -3100248,
-          "hold_away": 3913000
+          "hold_home": -2972397,
+          "hold_away": 3766000
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -3349,8 +3324,8 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -105,
-        "opponent_moneyline": -115,
+        "advantage_moneyline": 110,
+        "opponent_moneyline": -125,
         "line_check": {
           "status": "unknown",
           "reason": "no line data"
@@ -3360,7 +3335,7 @@
         "sharp_money": null,
         "sp_dog_edge": null,
         "pitching_dog": false,
-        "signals_hit": 4,
+        "signals_hit": 3,
         "book_stance": {
           "side": "Detroit Tigers",
           "against_us": true,
@@ -3372,20 +3347,20 @@
         },
         "vegas": {
           "bet": "Detroit Tigers",
-          "odds": -115,
+          "odds": -125,
           "basis": "ticket %",
-          "hold_home": 3401087,
-          "hold_away": -2908333
+          "hold_home": 3535000,
+          "hold_away": -3657500
         },
         "play": "stay_away",
         "starred": [],
         "stance_warning": "book's informed money is on Detroit Tigers",
-        "win_prob": 76,
-        "win_driver": "bvp + consistency + favorite",
+        "win_prob": 75,
+        "win_driver": "bvp + consistency",
         "pm_quote": {
           "pm_pct": 46,
           "pm_american": 117,
-          "edge_pts": 5.2,
+          "edge_pts": 1.6,
           "vs_book": "better"
         },
         "projected": {
@@ -3401,7 +3376,7 @@
       "game_datetime": "2026-09-07T19:10:00Z",
       "weather": {
         "temp_f": 78,
-        "wind_mph": 6,
+        "wind_mph": 7,
         "wind_dir": "ENE",
         "precip_pct": 0,
         "roof": "open"
@@ -3532,7 +3507,7 @@
           "agree": null,
           "forum_lean": -0.6,
           "consensus_lean": null,
-          "blended_lean": -0.108,
+          "blended_lean": -0.103,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -3547,9 +3522,9 @@
               "lean": 0.28
             },
             "vsin_bets": {
-              "away": 22,
-              "home": 78,
-              "lean": 0.56
+              "away": 21,
+              "home": 79,
+              "lean": 0.58
             }
           }
         }
@@ -3584,7 +3559,7 @@
         "line": "flat",
         "money": "against public",
         "money_side": "home",
-        "money_pct": 94
+        "money_pct": 98
       },
       "bvp": {
         "home_eff": 0.694,
@@ -3823,7 +3798,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.108,
+            "blended_lean": -0.103,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -3861,8 +3836,8 @@
           "bet": "Washington Nationals",
           "odds": 176,
           "basis": "money %",
-          "hold_home": -3043158,
-          "hold_away": 5840800
+          "hold_home": -3470526,
+          "hold_away": 6613600
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -4012,8 +3987,8 @@
           "consensus": {
             "pick": "Stl",
             "pcts": {
-              "Stl": 57.0,
-              "Sf": 43.0
+              "Stl": 58.0,
+              "Sf": 42.0
             }
           },
           "forum": {
@@ -4023,8 +3998,8 @@
           },
           "agree": true,
           "forum_lean": -0.667,
-          "consensus_lean": -0.14,
-          "blended_lean": -0.295,
+          "consensus_lean": -0.16,
+          "blended_lean": -0.362,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -4039,9 +4014,9 @@
               "lean": 0.09
             },
             "vsin_bets": {
-              "away": 52,
-              "home": 48,
-              "lean": -0.04
+              "away": 50,
+              "home": 50,
+              "lean": 0.0
             }
           }
         }
@@ -4075,10 +4050,12 @@
         "trusted": true,
         "verdict": "mostly agrees",
         "note": "3/4 sources agree (polymarket_bets differ)",
-        "flags": [],
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
-        "money_side": "away",
+        "money": "against public",
+        "money_side": "home",
         "money_pct": 61
       },
       "bvp": {
@@ -4158,13 +4135,13 @@
       "betting_lines": {
         "majority": {
           "team": "St. Louis Cardinals",
-          "consensus_pct": 57.0,
-          "moneyline": "+107"
+          "consensus_pct": 58.0,
+          "moneyline": "+110"
         },
         "non_majority": {
           "team": "San Francisco Giants",
-          "consensus_pct": 43.0,
-          "moneyline": "-137"
+          "consensus_pct": 42.0,
+          "moneyline": "-130"
         }
       },
       "consistency": {
@@ -4315,12 +4292,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "San Francisco Giants",
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.376,
+        "confidence": 0.399,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -4329,8 +4306,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.295,
-            "strength": 0.221,
+            "blended_lean": -0.362,
+            "strength": 0.271,
             "weight": 0.45
           },
           "consistency": {
@@ -4350,24 +4327,27 @@
         },
         "form_edge": true,
         "form_gap": 0.018,
-        "sharp_money": false,
+        "sharp_money": true,
         "sp_dog_edge": 0.868,
         "pitching_dog": false,
-        "signals_hit": 3,
-        "public_pct_against": 60,
+        "signals_hit": 4,
+        "public_pct_against": 59,
+        "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
-          "side": null,
+          "side": "San Francisco Giants",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
-          "bet": "San Francisco Giants",
-          "odds": -125,
+          "bet": "St. Louis Cardinals",
+          "odds": 120,
           "basis": "money %",
-          "hold_home": 2086000,
-          "hold_away": -2394000
+          "hold_home": -686000,
+          "hold_away": 994000
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -4515,8 +4495,8 @@
           "consensus": {
             "pick": "Lad",
             "pcts": {
-              "Cin": 49.0,
-              "Lad": 51.0
+              "Cin": 43.0,
+              "Lad": 57.0
             }
           },
           "forum": {
@@ -4526,8 +4506,8 @@
           },
           "agree": true,
           "forum_lean": 1.0,
-          "consensus_lean": 0.02,
-          "blended_lean": 0.537,
+          "consensus_lean": 0.14,
+          "blended_lean": 0.564,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -4542,9 +4522,9 @@
               "lean": 0.16
             },
             "vsin_bets": {
-              "away": 28,
-              "home": 72,
-              "lean": 0.44
+              "away": 27,
+              "home": 73,
+              "lean": 0.46
             }
           }
         }
@@ -4578,13 +4558,11 @@
         "trusted": true,
         "verdict": "corroborated",
         "note": "all 4 sources agree on the public side",
-        "flags": [
-          "money is on the other side from the public tickets"
-        ],
+        "flags": [],
         "line": "unknown",
-        "money": "against public",
-        "money_side": "away",
-        "money_pct": 61
+        "money": "with public",
+        "money_side": "home",
+        "money_pct": 53
       },
       "bvp": null,
       "bvp_pen": {
@@ -4648,13 +4626,13 @@
       "betting_lines": {
         "majority": {
           "team": "Los Angeles Dodgers",
-          "consensus_pct": 51.0,
-          "moneyline": "-159"
+          "consensus_pct": 57.0,
+          "moneyline": "-147"
         },
         "non_majority": {
           "team": "Cincinnati Reds",
-          "consensus_pct": 49.0,
-          "moneyline": "+124"
+          "consensus_pct": 43.0,
+          "moneyline": "+138"
         }
       },
       "consistency": {
@@ -4805,7 +4783,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (against public) \u2014 no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "Los Angeles Dodgers",
         "public_edge": false,
         "public_trusted": true,
@@ -4819,7 +4797,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.537,
+            "blended_lean": 0.564,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -4845,18 +4823,17 @@
           "side": "Cincinnati Reds",
           "against_us": true,
           "tells": [
-            "money vs tickets",
-            "line frozen under 70% public"
+            "line frozen under 72% public"
           ],
-          "strength": 2,
+          "strength": 1,
           "fooled": true
         },
         "vegas": {
           "bet": "Los Angeles Dodgers",
           "odds": -140,
           "basis": "money %",
-          "hold_home": 2320000,
-          "hold_away": -2991800
+          "hold_home": 640000,
+          "hold_away": -698600
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -5006,8 +4983,8 @@
           "consensus": {
             "pick": "Tor",
             "pcts": {
-              "Tor": 76.0,
-              "Ath": 24.0
+              "Tor": 77.0,
+              "Ath": 23.0
             }
           },
           "forum": {
@@ -5017,8 +4994,8 @@
           },
           "agree": true,
           "forum_lean": -1.0,
-          "consensus_lean": -0.52,
-          "blended_lean": -0.708,
+          "consensus_lean": -0.54,
+          "blended_lean": -0.712,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -5073,7 +5050,7 @@
         "line": "flat",
         "money": "with public",
         "money_side": "away",
-        "money_pct": 97
+        "money_pct": 98
       },
       "bvp": {
         "home_eff": 0.674,
@@ -5152,13 +5129,13 @@
       "betting_lines": {
         "majority": {
           "team": "Toronto Blue Jays",
-          "consensus_pct": 76.0,
-          "moneyline": "-208"
+          "consensus_pct": 77.0,
+          "moneyline": "-225"
         },
         "non_majority": {
           "team": "Athletics",
-          "consensus_pct": 24.0,
-          "moneyline": "+160"
+          "consensus_pct": 23.0,
+          "moneyline": "+185"
         }
       },
       "consistency": {
@@ -5323,7 +5300,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.708,
+            "blended_lean": -0.712,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -5334,7 +5311,7 @@
         },
         "consistency_hits": 5,
         "advantage_moneyline": -196,
-        "opponent_moneyline": 183,
+        "opponent_moneyline": 190,
         "line_check": {
           "open": -194,
           "current": -196,
@@ -5352,17 +5329,17 @@
           "side": "Athletics",
           "against_us": true,
           "tells": [
-            "line frozen under 81% public"
+            "line frozen under 82% public"
           ],
           "strength": 1,
           "fooled": true
         },
         "vegas": {
           "bet": "Athletics",
-          "odds": 183,
+          "odds": 190,
           "basis": "money %",
-          "hold_home": 6405700,
-          "hold_away": -3254286
+          "hold_home": 6594000,
+          "hold_away": -3360000
         },
         "play": "stay_away",
         "starred": [],
