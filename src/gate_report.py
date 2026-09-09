@@ -36,7 +36,7 @@ import zoneinfo
 from collections import Counter
 from pathlib import Path
 
-from . import consensus as C
+from . import consensus as C, pick_history
 
 log = logging.getLogger("gate_report")
 
@@ -103,6 +103,18 @@ def build(date: str) -> str:
         verdict = "**PICK**" if r["play"] == "pick" else "no play"
         md.append(f"| {i} | {r['matchup']} | {side} | {cells} | {verdict} |")
     md.append("")
+
+    picks = [r for r in rows if r["play"] == "pick"]
+    if picks:
+        md += ["## How picks at these prices have done", "",
+               "_Our own record, by price band. The gap to breakeven is the only "
+               "part that matters - 71% sounds strong until you see that -200 "
+               "needs 71% just to break even. Not a probability for tonight: a "
+               "small-sample history of similar bets, shown with n._", ""]
+        for r in picks:
+            md.append(f"- **{r['side']} {r['odds']:+d}** ({r['matchup']}) — "
+                      f"{pick_history.summary(r['odds'])}")
+        md.append("")
 
     md += ["## Gate definitions", "",
            f"1. **handle=tickets** — the dollars are on the same side as the "

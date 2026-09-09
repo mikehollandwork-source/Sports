@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 
-from . import early_lines, grade, main as picks_main, notify, pick_watch
+from . import early_lines, gate_report, grade, main as picks_main, notify, pick_watch
 
 log = logging.getLogger("pregame")
 
@@ -71,6 +71,14 @@ def run(force_telegram: bool = False) -> bool:
         pick_watch.check(payload.get("games") or [], date)
     except Exception as exc:
         log.warning("pick watch failed (board unaffected): %s", exc)
+
+    # Gate breakdown for the slate. The board reports only the FIRST gate a game
+    # failed, so a near-miss and a game that failed everything read identically.
+    # Written to output/, which the workflow already commits wholesale.
+    try:
+        (OUTPUT_DIR / f"gates_{date}.md").write_text(gate_report.build(date))
+    except Exception as exc:
+        log.warning("gate report failed (board unaffected): %s", exc)
     return True
 
 
