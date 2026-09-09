@@ -2,10 +2,10 @@
 
 _back the road team on its 6th+ straight road game. Recording from 2026-09-01; backtest games can never count._
 
-- forward games graded: **23** · ROI **-41.3%**
-- day-block 95% CI: **-79.1% to +16.7%**
-- backing home instead would return **+50.2%**
-- at ≥7 road games: **-83.8%** (n=11)
+- forward games graded: **25** · ROI **-39.7%**
+- day-block 95% CI: **-74.6% to +12.3%**
+- backing home instead would return **+46.0%**
+- at ≥7 road games: **-74.2%** (n=13)
 
 ## The bar, fixed 2026-08-31
 
