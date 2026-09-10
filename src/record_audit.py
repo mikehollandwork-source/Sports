@@ -100,8 +100,20 @@ def scan_date(date: str) -> dict:
             if not pk or not bet or not isinstance(odds, int):
                 continue
             if pk not in seen:
-                seen[pk] = {"matchup": g.get("matchup"), "first_bet": bet,
-                            "first_odds": odds, "source": pc.get("source", "rule")}
+                # the other side, at ITS real price - fading a -12.9% bet is not
+                # +12.9%, it is the opposite side minus that side's own vig
+                adv = pc.get("advantage_team")
+                m = g.get("matchup") or ""
+                other = other_odds = None
+                if " @ " in m:
+                    away, home = m.split(" @ ")
+                    other = home if bet == away else away
+                    other_odds = (pc.get("opponent_moneyline") if bet == adv
+                                  else pc.get("advantage_moneyline"))
+                seen[pk] = {"matchup": m, "first_bet": bet,
+                            "first_odds": odds, "source": pc.get("source", "rule"),
+                            "other_bet": other,
+                            "other_odds": other_odds if isinstance(other_odds, int) else None}
     # the final committed state decides what the ledger books
     final = _at(shas[-1], rel) or {}
     for g in final.get("games", []):
@@ -131,6 +143,9 @@ def collect() -> list[dict]:
                 continue
             survived = "final_bet" in d
             rows.append({
+                "other_bet": d.get("other_bet"), "other_odds": d.get("other_odds"),
+                "won_other": ((res["winner"] == d["other_bet"])
+                              if d.get("other_bet") else None),
                 "date": date, "game_pk": pk, "matchup": d["matchup"],
                 "survived": survived, "source": d.get("source", "rule"),
                 "first_bet": d["first_bet"], "first_odds": d["first_odds"],
@@ -223,6 +238,50 @@ def build() -> str:
            if pv <= 0.05 else
            ["**Not established.** The gap is within what a split this size "
             "produces by chance.", ""])
+
+    # ---- fading the withdrawn picks, priced honestly ----
+    fadeable = [r for r in lost if isinstance(r.get("other_odds"), int)
+                and r.get("won_other") is not None]
+    md += ["## Fading the picks the rule withdrew", "",
+           "_Backing the OTHER side of every pick that stopped qualifying, at "
+           "that side's own real price. A -12.9% bet does not become +12.9% "
+           "reversed - the fade pays its own vig, which is the whole reason a "
+           "losing cell is not automatically a winning one backwards._", ""]
+    if len(fadeable) < 20:
+        md += [f"Only {len(fadeable)} withdrawn picks carry a priced opposite "
+               "side. Too few to report.", ""]
+    else:
+        w, l, u, roi = _roi(fadeable, "other_odds", "won_other")
+        bw, bl, bu, broi = _roi(fadeable, "first_odds", "won_first")
+        md += [f"- withdrawn picks with a priced other side: **{len(fadeable)}**",
+               f"- backing them (what the rule dropped): {bw}-{bl} · {bu:+.2f}u · "
+               f"**{broi:+.1%}**",
+               f"- **fading them: {w}-{l} · {u:+.2f}u · {roi:+.1%}**",
+               f"- the two do not sum to zero: the gap is the vig paid twice "
+               f"({broi + roi:+.1%} combined)", ""]
+        # is the fade distinguishable from zero, day-blocked?
+        import random as _r
+        from collections import defaultdict as _dd
+        by = _dd(list)
+        for x in fadeable:
+            by[x["date"]].append(x)
+        days = list(by)
+        rng = _r.Random(613)
+        boots = []
+        for _ in range(4000):
+            samp = []
+            for _ in days:
+                samp += by[days[rng.randrange(len(days))]]
+            boots.append(_roi(samp, "other_odds", "won_other")[3])
+        boots.sort()
+        lo, hi = boots[100], boots[3899]
+        md += [f"- day-block 95% CI on the fade: **{lo:+.1%} to {hi:+.1%}**", ""]
+        md += (["**The fade clears zero.** Worth carrying forward as a "
+                "pre-registered forward test, not acting on retrospectively.", ""]
+               if lo > 0 else
+               ["**The fade does not clear zero.** The withdrawn picks lost, but "
+                "not by enough to pay the vig on the other side - which is the "
+                "usual fate of an inverted losing cell.", ""])
 
     # price drift on the survivors
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
