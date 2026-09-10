@@ -1,6 +1,6 @@
 {
   "date": "2026-09-10",
-  "generated_at": "2026-09-10T19:03:53.046826+00:00",
+  "generated_at": "2026-09-10T20:04:12.205288+00:00",
   "games": [
     {
       "game_pk": 824872,
@@ -1039,7 +1039,7 @@
           "losses": 34
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 823088,
@@ -1555,7 +1555,7 @@
           "losses": 42
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 823499,
@@ -1566,50 +1566,50 @@
       "park_factor": 1.02,
       "statistical_advantage": {
         "team": "New York Yankees",
-        "home_score": 0.4182,
-        "away_score": -0.2555,
+        "home_score": 0.4131,
+        "away_score": -0.22520000000000012,
         "home": {
           "name": "New York Yankees",
           "probable_pitcher": "Max Fried",
           "starter_hand": "L",
           "offense": {
-            "avg": 0.256,
-            "obp": 0.321,
-            "slg": 0.395,
-            "ops": 0.716,
-            "iso": 0.138,
-            "woba": 0.317,
-            "bb_pct": 0.083,
-            "k_pct": 0.259,
-            "sb_rate": 0.0121,
-            "pa": 495,
-            "park_factor": 1.002,
-            "woba_neutral": 0.316,
-            "iso_neutral": 0.138
+            "avg": 0.259,
+            "obp": 0.317,
+            "slg": 0.391,
+            "ops": 0.708,
+            "iso": 0.133,
+            "woba": 0.313,
+            "bb_pct": 0.074,
+            "k_pct": 0.261,
+            "sb_rate": 0.0123,
+            "pa": 326,
+            "park_factor": 1.0,
+            "woba_neutral": 0.313,
+            "iso_neutral": 0.133
           },
-          "platoon_factor": 1.001,
+          "platoon_factor": 1.0171,
           "starter_fip_last5": 3.15,
           "starter_fip_season": 2.661,
           "starter_ip_last5": 48.33,
           "bullpen_fip_last5": 4.073,
           "bullpen_ip_last5": 170.67,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 3.462,
+          "combined_fip_sos_adj": 3.461,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.971,
+            "bat_opp_pitching_factor": 0.965,
             "arm_opp_offense_factor": 1.021,
             "raw": {
-              "bat_opp_fip": 4.198857762470041,
-              "bat_opp_win": 0.47943232323232315,
+              "bat_opp_fip": 4.228079562704163,
+              "bat_opp_win": 0.4789325153374233,
               "sp_opp_woba": 0.3205310179635325,
               "sp_opp_win": 0.5334689655172414,
-              "bp_opp_woba": 0.31508436706602866,
-              "bp_opp_win": 0.482998046875
+              "bp_opp_woba": 0.31511944592447577,
+              "bp_opp_win": 0.483279296875
             }
           },
-          "offense_index": -0.0575,
-          "pitching_index": 0.1557,
-          "score": 0.0982
+          "offense_index": -0.0627,
+          "pitching_index": 0.1558,
+          "score": 0.0931
         },
         "away": {
           "name": "Colorado Rockies",
@@ -1644,15 +1644,15 @@
             "raw": {
               "bat_opp_fip": 4.050235857392985,
               "bat_opp_win": 0.5173033707865168,
-              "sp_opp_woba": 0.3200514101539424,
+              "sp_opp_woba": 0.3200327069197539,
               "sp_opp_win": 0.510937062937063,
-              "bp_opp_woba": 0.31752269242288406,
+              "bp_opp_woba": 0.31750055007548095,
               "bp_opp_win": 0.5075407407407408
             }
           },
           "offense_index": -0.0631,
-          "pitching_index": -0.1924,
-          "score": -0.2555
+          "pitching_index": -0.1925,
+          "score": -0.2556
         }
       },
       "public_majority": {
@@ -1666,14 +1666,14 @@
             }
           },
           "forum": {
-            "pick": "New York Yankees",
-            "home": 3,
-            "away": 1
+            "pick": "Colorado Rockies",
+            "home": 1,
+            "away": 2
           },
-          "agree": true,
-          "forum_lean": 0.5,
+          "agree": false,
+          "forum_lean": -0.333,
           "consensus_lean": 0.44,
-          "blended_lean": 0.535,
+          "blended_lean": 0.188,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1704,8 +1704,8 @@
           },
           {
             "name": "forum",
-            "side": "home",
-            "agrees": true
+            "side": "away",
+            "agrees": false
           },
           {
             "name": "vsin_bets",
@@ -1719,64 +1719,66 @@
           }
         ],
         "majority_side": "home",
-        "agree": 4,
-        "dissent": 0,
+        "agree": 3,
+        "dissent": 1,
         "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 4 sources agree on the public side",
-        "flags": [],
-        "line": "flat",
+        "verdict": "mostly agrees",
+        "note": "3/4 sources agree (forum differ)",
+        "flags": [
+          "reverse line move \u2014 money went against the public %"
+        ],
+        "line": "against public",
         "money": "with public",
         "money_side": "home",
         "money_pct": 89
       },
       "bvp": {
-        "home_eff": 0.589,
+        "home_eff": 0.694,
         "away_eff": 0.645,
-        "home_ops": 0.416,
+        "home_ops": 0.5,
         "away_ops": 0.555,
-        "home_pa": 35,
+        "home_pa": 4,
         "away_pa": 31,
         "home_hand_ops": 0.71,
         "away_hand_ops": 0.701,
         "home_hand_pa": 3575,
         "away_hand_pa": 1724,
-        "total_pa": 5365,
-        "edge_team": "Colorado Rockies",
-        "gap": 0.056,
-        "meaningful": true
+        "total_pa": 5334,
+        "edge_team": "New York Yankees",
+        "gap": 0.049,
+        "meaningful": false
       },
       "bvp_pen": {
-        "home_ops": 0.965,
+        "home_ops": 0.905,
         "away_ops": 0.378,
-        "home_pa": 112,
+        "home_pa": 67,
         "away_pa": 63,
-        "total_pa": 175,
+        "total_pa": 130,
         "edge_team": "New York Yankees",
-        "gap": 0.587,
+        "gap": 0.527,
         "meaningful": true
       },
       "form": {
         "home": {
-          "delta": -0.001,
+          "delta": -0.006,
           "hot": [
-            {
-              "name": "Heliot Ramos",
-              "delta": 0.131
-            },
             {
               "name": "Spencer Jones",
               "delta": 0.107
+            },
+            {
+              "name": "Austin Wells",
+              "delta": 0.058
             }
           ],
           "cold": [
             {
-              "name": "George Lombard Jr.",
-              "delta": -0.058
+              "name": "Ryan McMahon",
+              "delta": -0.057
             },
             {
-              "name": "Aaron Judge",
-              "delta": -0.072
+              "name": "George Lombard Jr.",
+              "delta": -0.058
             }
           ]
         },
@@ -1808,12 +1810,12 @@
         "majority": {
           "team": "New York Yankees",
           "consensus_pct": 72.0,
-          "moneyline": "-312"
+          "moneyline": "-275"
         },
         "non_majority": {
           "team": "Colorado Rockies",
           "consensus_pct": 28.0,
-          "moneyline": "+235"
+          "moneyline": "+225"
         }
       },
       "consistency": {
@@ -1973,12 +1975,12 @@
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.674,
+            "margin": 0.638,
             "strength": 1.0,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.535,
+            "blended_lean": 0.188,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1988,37 +1990,37 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": -295,
-        "opponent_moneyline": 250,
+        "advantage_moneyline": -265,
+        "opponent_moneyline": 240,
         "line_check": {
           "open": -318,
-          "current": -295,
-          "implied_shift": -0.014,
+          "current": -265,
+          "implied_shift": -0.035,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-318\u2192-295, -1.4%)",
+          "reason": "line moved away from the pick (-318\u2192-265, -3.5%)",
           "pinny_morning": -274
         },
         "form_edge": true,
-        "form_gap": 0.024,
+        "form_gap": 0.019,
         "sharp_money": false,
         "sp_dog_edge": 2.614,
         "pitching_dog": false,
-        "signals_hit": 4,
+        "signals_hit": 5,
         "book_stance": {
           "side": "Colorado Rockies",
           "against_us": true,
           "tells": [
-            "line frozen under 77% public"
+            "reverse line move"
           ],
           "strength": 1,
           "fooled": true
         },
         "vegas": {
           "bet": "Colorado Rockies",
-          "odds": 250,
+          "odds": 240,
           "basis": "money %",
-          "hold_home": -1341864,
-          "hold_away": 4305000
+          "hold_home": -1580943,
+          "hold_away": 4382000
         },
         "play": "pick",
         "starred": [],
@@ -2028,19 +2030,19 @@
         "pm_quote": {
           "pm_pct": 72,
           "pm_american": -257,
-          "edge_pts": 2.7,
-          "vs_book": "better"
+          "edge_pts": 0.6,
+          "vs_book": "same"
         },
         "projected": {
-          "win_prob": 70.2,
-          "fair_american": -236
+          "win_prob": 69.1,
+          "fair_american": -224
         },
         "line_vs_money": "against",
         "bet_team": "New York Yankees",
-        "bet_moneyline": -295,
+        "bet_moneyline": -265,
         "consensus": {
           "drift": -0.015,
-          "imbalance": 0.423,
+          "imbalance": 0.435,
           "line": "against"
         },
         "prop": {
@@ -2062,8 +2064,14 @@
         "precip_pct": 0,
         "roof": "open"
       },
-      "umpire_hp": null,
-      "ump_tend": null,
+      "umpire_hp": "Ryan Additon",
+      "ump_tend": {
+        "games": 17,
+        "k_pg": 19.0,
+        "bb_pg": 6.94,
+        "r_pg": 9.06,
+        "k_extra": 2.29
+      },
       "situational": {
         "home": {
           "abbr": "NYY",
@@ -2087,8 +2095,8 @@
       "park_factor": 1.01,
       "statistical_advantage": {
         "team": "Pittsburgh Pirates",
-        "home_score": 0.008392000000000004,
-        "away_score": 0.2424311111111111,
+        "home_score": 0.009292000000000002,
+        "away_score": 0.24025333333333326,
         "home": {
           "name": "Chicago White Sox",
           "probable_pitcher": "Hagen Smith",
@@ -2115,22 +2123,22 @@
           "bullpen_fip_last5": 4.754,
           "bullpen_ip_last5": 181.0,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 4.134,
+          "combined_fip_sos_adj": 4.133,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.963,
+            "bat_opp_pitching_factor": 0.964,
             "arm_opp_offense_factor": 0.983,
             "raw": {
-              "bat_opp_fip": 4.28883175734757,
-              "bat_opp_win": 0.49265263157894734,
+              "bat_opp_fip": 4.286151035975877,
+              "bat_opp_win": 0.49357473684210523,
               "sp_opp_woba": 0.3162163942710724,
               "sp_opp_win": 0.48583333333333334,
-              "bp_opp_woba": 0.3206372104411189,
-              "bp_opp_win": 0.4967090239410682
+              "bp_opp_woba": 0.3207026737497003,
+              "bp_opp_win": 0.49723388581952116
             }
           },
-          "offense_index": -0.0886,
-          "pitching_index": -0.0083,
-          "score": -0.0969
+          "offense_index": -0.0879,
+          "pitching_index": -0.0081,
+          "score": -0.096
         },
         "away": {
           "name": "Pittsburgh Pirates",
@@ -2163,17 +2171,17 @@
             "bat_opp_pitching_factor": 0.968,
             "arm_opp_offense_factor": 1.013,
             "raw": {
-              "bat_opp_fip": 4.1596044124704585,
-              "bat_opp_win": 0.46358846918489066,
+              "bat_opp_fip": 4.159778101868692,
+              "bat_opp_win": 0.4635168986083499,
               "sp_opp_woba": 0.31874627225359853,
               "sp_opp_win": 0.5263422818791946,
               "bp_opp_woba": 0.3166050112019922,
               "bp_opp_win": 0.4857182795698927
             }
           },
-          "offense_index": 0.0219,
+          "offense_index": 0.0218,
           "pitching_index": 0.0856,
-          "score": 0.1075
+          "score": 0.1074
         }
       },
       "public_majority": {
@@ -2188,7 +2196,7 @@
           "agree": null,
           "forum_lean": -0.1,
           "consensus_lean": null,
-          "blended_lean": -0.003,
+          "blended_lean": -0.008,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -2203,9 +2211,9 @@
               "lean": 0.0
             },
             "scoresodds_bets": {
-              "away": 47,
-              "home": 53,
-              "lean": 0.06
+              "away": 48,
+              "home": 52,
+              "lean": 0.04
             },
             "vsin_bets": {
               "away": 43,
@@ -2250,7 +2258,7 @@
         "line": "flat",
         "money": "against public",
         "money_side": "home",
-        "money_pct": 68
+        "money_pct": 66
       },
       "bvp": {
         "home_eff": 0.675,
@@ -2269,13 +2277,13 @@
         "meaningful": false
       },
       "bvp_pen": {
-        "home_ops": 0.646,
-        "away_ops": 0.916,
-        "home_pa": 116,
-        "away_pa": 80,
+        "home_ops": 0.651,
+        "away_ops": 0.917,
+        "home_pa": 115,
+        "away_pa": 81,
         "total_pa": 196,
         "edge_team": "Pittsburgh Pirates",
-        "gap": 0.27,
+        "gap": 0.266,
         "meaningful": true
       },
       "form": {
@@ -2480,16 +2488,16 @@
         "public_edge": false,
         "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.322,
+        "confidence": 0.318,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.234,
-            "strength": 0.585,
+            "margin": 0.231,
+            "strength": 0.577,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.003,
+            "blended_lean": -0.008,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -2499,14 +2507,14 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -108,
+        "advantage_moneyline": -107,
         "opponent_moneyline": -108,
         "line_check": {
           "open": -105,
-          "current": -108,
-          "implied_shift": 0.007,
+          "current": -107,
+          "implied_shift": 0.005,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-105\u2192-108, +0.7%)",
+          "reason": "only a slight move our way, below the 2% signal floor (-105\u2192-107, +0.5%)",
           "pinny_morning": -104
         },
         "form_edge": true,
@@ -2526,10 +2534,10 @@
         },
         "vegas": {
           "bet": "Pittsburgh Pirates",
-          "odds": -108,
+          "odds": -107,
           "basis": "money %",
-          "hold_home": -2167407,
-          "hold_away": 2685926
+          "hold_home": -1897778,
+          "hold_away": 2395701
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -2537,12 +2545,12 @@
         "pm_quote": {
           "pm_pct": 50,
           "pm_american": -100,
-          "edge_pts": 1.9,
+          "edge_pts": 1.7,
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 57.0,
-          "fair_american": -133
+          "win_prob": 56.9,
+          "fair_american": -132
         },
         "line_vs_money": "flat",
         "bet_team": null,
