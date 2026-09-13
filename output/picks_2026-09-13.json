@@ -1,6 +1,6 @@
 {
   "date": "2026-09-13",
-  "generated_at": "2026-09-13T21:24:42.019902+00:00",
+  "generated_at": "2026-09-13T22:11:29.982578+00:00",
   "games": [
     {
       "game_pk": 824225,
@@ -7177,7 +7177,7 @@
       "statistical_advantage": {
         "team": "San Diego Padres",
         "home_score": 0.0208,
-        "away_score": 0.45475488888888893,
+        "away_score": 0.45643888888888895,
         "home": {
           "name": "San Francisco Giants",
           "probable_pitcher": "Logan Webb",
@@ -7209,11 +7209,11 @@
             "bat_opp_pitching_factor": 1.007,
             "arm_opp_offense_factor": 0.978,
             "raw": {
-              "bat_opp_fip": 4.060453942809509,
+              "bat_opp_fip": 4.060334274248483,
               "bat_opp_win": 0.5008605577689244,
-              "sp_opp_woba": 0.3167341001604432,
+              "sp_opp_woba": 0.31680953654987193,
               "sp_opp_win": 0.47443373493975893,
-              "bp_opp_woba": 0.3159176827514709,
+              "bp_opp_woba": 0.31589790056813716,
               "bp_opp_win": 0.49898491379310317
             }
           },
@@ -7252,7 +7252,7 @@
             "bat_opp_pitching_factor": 0.948,
             "arm_opp_offense_factor": 0.976,
             "raw": {
-              "bat_opp_fip": 4.3500508902403245,
+              "bat_opp_fip": 4.35001998817364,
               "bat_opp_win": 0.484179012345679,
               "sp_opp_woba": 0.3229497327807855,
               "sp_opp_win": 0.4484285714285715,
@@ -7260,9 +7260,9 @@
               "bp_opp_win": 0.49888372093023237
             }
           },
-          "offense_index": 0.1139,
+          "offense_index": 0.114,
           "pitching_index": 0.2419,
-          "score": 0.3558
+          "score": 0.3559
         }
       },
       "public_majority": {
@@ -7271,19 +7271,19 @@
           "consensus": {
             "pick": "Sd",
             "pcts": {
-              "Sd": 60.0,
-              "Sf": 40.0
+              "Sd": 59.0,
+              "Sf": 41.0
             }
           },
           "forum": {
             "pick": "San Diego Padres",
-            "home": 1,
-            "away": 5
+            "home": 3,
+            "away": 7
           },
           "agree": true,
-          "forum_lean": -0.667,
-          "consensus_lean": -0.2,
-          "blended_lean": -0.438,
+          "forum_lean": -0.4,
+          "consensus_lean": -0.18,
+          "blended_lean": -0.341,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -7344,11 +7344,12 @@
         "trusted": true,
         "verdict": "corroborated",
         "note": "all 5 sources agree on the public side",
-        "flags": [],
-        "line": "flat",
-        "money": "with public",
-        "money_side": "away",
-        "money_pct": 66
+        "flags": [
+          "money sources disagree"
+        ],
+        "line": "with public",
+        "money": "sources split",
+        "money_side": null
       },
       "bvp": {
         "home_eff": 0.82,
@@ -7427,12 +7428,12 @@
       "betting_lines": {
         "majority": {
           "team": "San Diego Padres",
-          "consensus_pct": 60.0,
-          "moneyline": "-133"
+          "consensus_pct": 59.0,
+          "moneyline": "-130"
         },
         "non_majority": {
           "team": "San Francisco Giants",
-          "consensus_pct": 40.0,
+          "consensus_pct": 41.0,
           "moneyline": "+127"
         }
       },
@@ -7584,7 +7585,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved with the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (sources split) \u2014 no play",
         "advantage_team": "San Diego Padres",
         "public_edge": false,
         "public_trusted": true,
@@ -7593,12 +7594,12 @@
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.434,
+            "margin": 0.436,
             "strength": 1.0,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.438,
+            "blended_lean": -0.341,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -7608,22 +7609,23 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": -130,
-        "opponent_moneyline": 126,
+        "advantage_moneyline": -140,
+        "opponent_moneyline": 122,
         "line_check": {
           "open": -125,
-          "current": -130,
-          "implied_shift": 0.01,
-          "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-125\u2192-130, +1.0%)",
+          "current": -140,
+          "implied_shift": 0.028,
+          "status": "confirms",
+          "tier": "moderate",
+          "reason": "moderate sharp move toward the pick (-125\u2192-140, +2.8%)",
           "pinny_morning": -121
         },
         "form_edge": true,
         "form_gap": 0.054,
-        "sharp_money": false,
+        "sharp_money": null,
         "sp_dog_edge": 1.972,
         "pitching_dog": false,
-        "signals_hit": 3,
+        "signals_hit": 4,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -7633,24 +7635,24 @@
         },
         "vegas": {
           "bet": "San Francisco Giants",
-          "odds": 126,
-          "basis": "money %",
-          "hold_home": 1621200,
-          "hold_away": -1173846
+          "odds": 122,
+          "basis": "ticket %",
+          "hold_home": 1778560,
+          "hold_away": -968000
         },
         "play": "stay_away",
         "starred": [],
         "win_prob": 68,
-        "win_driver": "consistency",
+        "win_driver": "line",
         "pm_quote": {
           "pm_pct": 56,
           "pm_american": -127,
-          "edge_pts": 0.5,
-          "vs_book": "same"
+          "edge_pts": 2.3,
+          "vs_book": "better"
         },
         "projected": {
-          "win_prob": 63.0,
-          "fair_american": -170
+          "win_prob": 63.1,
+          "fair_american": -171
         },
         "line_vs_money": "with",
         "bet_team": null,
@@ -7660,9 +7662,9 @@
       "pick": null,
       "game_datetime": "2026-09-13T23:20:00Z",
       "weather": {
-        "temp_f": 68,
-        "wind_mph": 17,
-        "wind_dir": "W",
+        "temp_f": 70,
+        "wind_mph": 16,
+        "wind_dir": "WNW",
         "precip_pct": 0,
         "roof": "open"
       },
