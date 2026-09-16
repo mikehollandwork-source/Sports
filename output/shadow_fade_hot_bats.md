@@ -4,7 +4,7 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **35** · graded: **35**
+- qualifying games: **36** · graded: **35**
 
 ## Running record
 
@@ -51,3 +51,5 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-09-09 | Arizona Diamondbacks @ Kansas City Royals | Arizona Diamondbacks | -120 | L -1.00u |
 | 2026-09-10 | Pittsburgh Pirates @ Chicago White Sox | Chicago White Sox | -112 | L -1.00u |
 | 2026-09-14 | Seattle Mariners @ Los Angeles Angels | Los Angeles Angels | -105 | W +0.95u |
+
+_1 recorded but not yet graded._
