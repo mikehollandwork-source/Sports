@@ -32,6 +32,17 @@ _Every feature is signed TOWARD the side the fade backs, so "favours the fade" m
 
 _ROI on a subset is dominated by which coin flips landed. Log-loss scores the probability assigned to what actually happened on every fade, so it is informative at this sample._
 
-- train: **0** · holdout: **143**
+- trained on fades before **2026-08-24** (**85**), scored on **58** after
 
-Split too small to fit.
+_Every fade postdates the MLB holdout date, since the consensus rule went live after it. So this splits the fade population on its own median date instead._
+
+| model | holdout log-loss |
+|---|---|
+| price only | 0.6997 |
+| price + all stats | **0.7482** |
+
+- stats change holdout log-loss by **-0.0485**
+- 95% CI: **-0.1264 to +0.0301**
+- weights: `bvp` -0.236, `pen` +0.013, `margin` -0.051, `form` +0.599, `consistency` -0.275, `park` -0.163, `record` -0.002
+
+**No information beyond the price.** On the fade population too, everything we track is already in the number.
