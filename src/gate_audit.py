@@ -145,7 +145,7 @@ def build() -> str:
             md.append(f"| `{gate}` | 0 | — | — | — |")
             continue
         md.append(f"| `{gate}` | {len(sub)} | **{_roi(sub):+.1%}** | "
-                  f"{_roi(picks):+.1%} | **{_roi(picks)-_roi(sub):+.1f} pts** |")
+                  f"{_roi(picks):+.1%} | **{(_roi(picks)-_roi(sub))*100:+.1f} pts** |")
     md.append("")
 
     # ---- per month ----
@@ -166,7 +166,7 @@ def build() -> str:
                 continue
             worth = _roi(p) - _roi(r) if p else None
             per_gate[gate].append(worth if worth is not None else 0.0)
-            cells.append(f"{worth:+.0f}pts ({len(r)})" if worth is not None else "—")
+            cells.append(f"{worth*100:+.0f}pts ({len(r)})" if worth is not None else "—")
         md.append(f"| {name} | {len(sub)} | {_rec(p)} {_roi(p):+.0%} | "
                   + " | ".join(cells) + " |")
     md.append("")
