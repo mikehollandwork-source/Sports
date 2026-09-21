@@ -44,24 +44,33 @@ MAX_SPREAD = 0.15      # wider than this is not a real two-sided market
 MIN_READINGS = 2       # need a run-up, not a single snapshot
 IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 
-# CONFIRMATION: require BOTH signals, not either (changed 2026-09-21, user's call).
-# near_miss showed the gates are not equal. Games failing ONLY this gate returned
-# -12.6%, and held at -12.4% / -12.7% across halves - the most stable cell in the
-# repo. Games failing ONLY the line gate were near-neutral at +1.0% over 312.
-# So the book gate carries the work and deserves tightening; the line gate does
-# not and is loosened below to give the volume back.
+# CONFIRMATION: EITHER signal. Reverted 2026-09-21, the same day it was changed,
+# because the change did not survive the test it should have been given first.
 #
-#   either / >=1.0%   99 picks   67-32  67.7%  +17.6%  +17.40u   (the old rule)
-#   BOTH   / >=0.5%   67 picks   48-19  71.6%  +30.0%  +20.08u   (this one)
+# The tightening (require BOTH the drift and the size lean, and loosen the line
+# gate to 0.5% to give the volume back) was chosen on data that includes August,
+# and August was the hot month. The holdout it was validated against begins
+# 2026-07-23, so August sits INSIDE it - a holdout that contains the month you
+# are worried about does not answer the worry. Run month by month
+# (`src/change_check.py`, output/change_check.md):
 #
-# Better win rate, better ROI and more total units on 32% fewer picks. Tested on
-# its own rather than picked from the grid: permutation p = 0.028, holdout gain
-# +10.2 points. Expect nearer +10 than +12 - a configuration chosen for looking
-# best regresses toward the pool it was chosen from.
+#                   old: EITHER / >=1.0%        new: BOTH / >=0.5%
+#   2026-07          12-7   (19)  +14.8%        10-6   (16)  +17.9%
+#   2026-08          38-17  (55)  +20.1%        25-4   (29)  +59.5%
+#   2026-09          17-8   (25)  +14.1%        13-9   (22)   -0.2%
+#   all             67-32   (99)  +17.6%        48-19  (67)  +30.0%
+#   excluding Aug   29-15   (44)  +14.4%        23-15  (38)   +7.4%
 #
-# Set REQUIRE_BOTH_CONFIRMATIONS = False to revert; LINE_MOVE_MIN goes back to
-# 0.01 with it, since the pair was measured together.
-REQUIRE_BOTH_CONFIRMATIONS = True
+# The entire +12.4-point improvement is August. Outside it the change is worth
+# -7.0 points. The old setting is also the more consistent of the two: +14.8 /
+# +20.1 / +14.1 across three months, against +17.9 / +59.5 / -0.2. One of those
+# is a rule and the other is a month, and it carries 99 picks against 67.
+#
+# The near_miss finding that motivated the change is not withdrawn - games
+# failing only the book gate really did return -12.6%, stable across halves.
+# What is withdrawn is the conclusion that tightening the gate on that basis
+# improves the rule. It does not, outside the month it was measured in.
+REQUIRE_BOTH_CONFIRMATIONS = False
 
 # PRICE-DISCOUNT FILTER (added 2026-07-29, user's call, knowingly on thin data).
 # The money side wins ~62% whether or not the line moves with it - what changes
@@ -72,7 +81,7 @@ REQUIRE_BOTH_CONFIRMATIONS = True
 # CI (-10.7% to +44.0%) includes zero. Set REQUIRE_LINE_AGAINST = False to revert
 # to plain consensus; the line tag is recorded either way so both buckets stay
 # measurable from the snapshots.
-LINE_MOVE_MIN = 0.005      # loosened with the book gate tightened (see above)
+LINE_MOVE_MIN = 0.01       # back to 0.01 with the book gate (measured as a pair)
 REQUIRE_LINE_AGAINST = True
 
 
