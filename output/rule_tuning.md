@@ -75,3 +75,25 @@ _Both are SINGLE-parameter moves, a far smaller search than the grid. Each is sp
 - gap **+30.0 points**, permutation **p = 0.028**
 - kept in-sample +87.9% (n=4) · holdout **+26.4%** (n=47)
 - volume cost: 99 picks → 51 (48% fewer)
+
+## What to expect from confirm=BOTH
+
+_A backtest ROI is an upper bound. The configuration was chosen because it looked best, so its realised return regresses toward the pool it was picked from - the same reason a 300-hitter picked for hitting .400 in April finishes nearer .300._
+
+| | live (either) | confirm BOTH |
+|---|---|---|
+| picks | 99 | **51** |
+| ROI | +17.6% | **+31.2%** |
+| total units | +17.40u | **+15.93u** |
+
+- ROI improves by **+13.7 points**
+- but total units change by **-1.47u** over the same period, because volume falls 48%
+
+**Higher ROI, fewer units.** At a flat stake this change makes LESS money in total while making each bet better. Which one matters depends on whether the stake is capped by bankroll or by opportunity.
+
+- day-block 95% CI on the ROI gain: **+8.0 to +49.6 points**
+- share of resamples where BOTH beats live: **100%**
+
+- holdout only: live **+16.3%** (n=92) → BOTH **+26.4%** (n=47), gain **+10.2 points**
+
+_The holdout gain is the number to plan around. The full-period gain includes the games the threshold was chosen on._
