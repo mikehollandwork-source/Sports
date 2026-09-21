@@ -1,6 +1,6 @@
 {
   "date": "2026-09-21",
-  "generated_at": "2026-09-21T04:40:58.444542+00:00",
+  "generated_at": "2026-09-21T05:04:21.574830+00:00",
   "games": [
     {
       "game_pk": 824787,
@@ -103,16 +103,22 @@
       "public_majority": {
         "team": "Baltimore Orioles",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Bal",
+            "pcts": {
+              "Tor": 49.0,
+              "Bal": 51.0
+            }
+          },
           "forum": {
             "pick": "Baltimore Orioles",
             "home": 1,
             "away": 0
           },
-          "agree": null,
+          "agree": true,
           "forum_lean": 1.0,
-          "consensus_lean": null,
-          "blended_lean": 1.0,
+          "consensus_lean": 0.02,
+          "blended_lean": 0.688,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -132,6 +138,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "forum",
             "side": "home",
             "agrees": true
@@ -143,11 +154,11 @@
           }
         ],
         "majority_side": "home",
-        "agree": 1,
+        "agree": 2,
         "dissent": 1,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (polymarket_bets differ)",
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "2/3 sources agree (polymarket_bets differ)",
         "flags": [],
         "line": "flat",
         "money": "unknown",
@@ -227,7 +238,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Baltimore Orioles",
+          "consensus_pct": 51.0,
+          "moneyline": "-105"
+        },
+        "non_majority": {
+          "team": "Toronto Blue Jays",
+          "consensus_pct": 49.0,
+          "moneyline": "-101"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 3,
@@ -379,7 +401,7 @@
         "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Baltimore Orioles",
         "public_edge": false,
-        "public_trusted": false,
+        "public_trusted": true,
         "edge_strong": false,
         "confidence": 0.334,
         "edge_threshold": 0.4,
@@ -390,7 +412,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 1.0,
+            "blended_lean": 0.688,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -416,24 +438,21 @@
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
-          "side": "Toronto Blue Jays",
-          "against_us": true,
-          "tells": [
-            "line frozen under 75% public"
-          ],
-          "strength": 1,
-          "fooled": true
+          "side": null,
+          "against_us": false,
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Toronto Blue Jays",
           "odds": -104,
           "basis": "ticket %",
-          "hold_home": -3202830,
-          "hold_away": 3567308
+          "hold_home": -2114528,
+          "hold_away": 2468846
         },
         "play": "stay_away",
         "starred": [],
-        "stance_warning": "book's informed money is on Toronto Blue Jays",
         "win_prob": 76,
         "win_driver": "bvp + consistency + favorite",
         "pm_quote": {
@@ -457,7 +476,7 @@
         "temp_f": 70,
         "wind_mph": 9,
         "wind_dir": "NE",
-        "precip_pct": 19,
+        "precip_pct": 30,
         "roof": "open"
       },
       "umpire_hp": null,
@@ -1054,15 +1073,15 @@
           "consensus": {
             "pick": "Min",
             "pcts": {
-              "Min": 65.0,
-              "Sf": 35.0
+              "Min": 61.0,
+              "Sf": 39.0
             }
           },
           "forum": null,
           "agree": null,
           "forum_lean": null,
-          "consensus_lean": -0.3,
-          "blended_lean": -0.17,
+          "consensus_lean": -0.22,
+          "blended_lean": -0.13,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1180,12 +1199,12 @@
       "betting_lines": {
         "majority": {
           "team": "Minnesota Twins",
-          "consensus_pct": 65.0,
-          "moneyline": "-120"
+          "consensus_pct": 61.0,
+          "moneyline": "-115"
         },
         "non_majority": {
           "team": "San Francisco Giants",
-          "consensus_pct": 35.0,
+          "consensus_pct": 39.0,
           "moneyline": "-105"
         }
       },
@@ -1342,7 +1361,7 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.09,
+        "confidence": 0.072,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1351,8 +1370,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.17,
-            "strength": 0.17,
+            "blended_lean": -0.13,
+            "strength": 0.13,
             "weight": 0.45
           },
           "consistency": {
@@ -1376,7 +1395,7 @@
         "sp_dog_edge": 0.057,
         "pitching_dog": false,
         "signals_hit": 2,
-        "public_pct_against": 58,
+        "public_pct_against": 56,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -1388,8 +1407,8 @@
           "bet": "San Francisco Giants",
           "odds": 102,
           "basis": "ticket %",
-          "hold_home": 1131900,
-          "hold_away": -751250
+          "hold_home": 849100,
+          "hold_away": -486250
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -1416,7 +1435,7 @@
         "temp_f": 58,
         "wind_mph": 9,
         "wind_dir": "W",
-        "precip_pct": 0,
+        "precip_pct": 1,
         "roof": "open"
       },
       "umpire_hp": null,
