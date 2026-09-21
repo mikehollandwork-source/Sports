@@ -259,14 +259,24 @@ def build() -> str:
     md += (["**Clears.**", ""] if pv <= 0.05 else ["**Does not clear.**", ""])
 
     # ---- the powered version ----
-    train = [r for r in rows if r["date"] < HOLDOUT_FROM]
-    hold = [r for r in rows if r["date"] >= HOLDOUT_FROM]
+    # HOLDOUT_FROM is 2026-07-23 but the consensus rule only went live on 07-28,
+    # so every fade postdates it and that split leaves an empty training set -
+    # the fit silently did not run the first time. The fade population is
+    # out-of-sample by construction, so it is split on its own median date.
+    dates = sorted({r["date"] for r in rows})
+    mid = dates[len(dates) // 2]
+    train = [r for r in rows if r["date"] < mid]
+    hold = [r for r in rows if r["date"] >= mid]
     md += ["## The powered version — log-loss on every fade", "",
            "_ROI on a subset is dominated by which coin flips landed. Log-loss "
            "scores the probability assigned to what actually happened on every "
            "fade, so it is informative at this sample._", "",
-           f"- train: **{len(train)}** · holdout: **{len(hold)}**", ""]
-    if len(train) < 40 or len(hold) < 30:
+           f"- trained on fades before **{mid}** (**{len(train)}**), scored on "
+           f"**{len(hold)}** after", "",
+           "_Every fade postdates the MLB holdout date, since the consensus rule "
+           "went live after it. So this splits the fade population on its own "
+           "median date instead._", ""]
+    if len(train) < 30 or len(hold) < 30:
         md += ["Split too small to fit.", ""]
         return "\n".join(md)
     stats = {}
