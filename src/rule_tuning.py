@@ -282,6 +282,66 @@ def build() -> str:
                f"holdout **{_roi(ah):+.1%}** (n={len(ah)})",
                f"- volume cost: {len(b)} picks → {len(a)} "
                f"({1-len(a)/len(b):.0%} fewer)", ""]
+    # ---- what to actually expect from the confirm=BOTH change ----
+    both_sel = picks_for(rows, (LIVE[0], LIVE[1], LIVE[2], LIVE[3], True))
+    live_sel = base
+    md += ["## What to expect from confirm=BOTH", "",
+           "_A backtest ROI is an upper bound. The configuration was chosen "
+           "because it looked best, so its realised return regresses toward the "
+           "pool it was picked from - the same reason a 300-hitter picked for "
+           "hitting .400 in April finishes nearer .300._", ""]
+
+    def _u(rs):
+        return sum(grade.american_profit(r["odds"]) if r["won"] else -1 for r in rs)
+
+    lu, bu = _u(live_sel), _u(both_sel)
+    md += ["| | live (either) | confirm BOTH |", "|---|---|---|",
+           f"| picks | {len(live_sel)} | **{len(both_sel)}** |",
+           f"| ROI | {_roi(live_sel):+.1%} | **{_roi(both_sel):+.1%}** |",
+           f"| total units | {lu:+.2f}u | **{bu:+.2f}u** |", ""]
+    md += [f"- ROI improves by **{(_roi(both_sel)-_roi(live_sel))*100:+.1f} points**",
+           f"- but total units change by **{bu-lu:+.2f}u** over the same period, "
+           f"because volume falls {1-len(both_sel)/len(live_sel):.0%}", ""]
+    if bu < lu:
+        md += ["**Higher ROI, fewer units.** At a flat stake this change makes "
+               "LESS money in total while making each bet better. Which one "
+               "matters depends on whether the stake is capped by bankroll or "
+               "by opportunity.", ""]
+
+    # paired bootstrap on the ROI difference, resampling whole days
+    from collections import defaultdict as _dd2
+    byd = _dd2(lambda: {"live": [], "both": []})
+    bkeep = {id(r) for r in both_sel}
+    for r in live_sel:
+        byd[r["date"]]["live"].append(r)
+        if id(r) in bkeep:
+            byd[r["date"]]["both"].append(r)
+    days = list(byd)
+    rg = random.Random(1009)
+    diffs = []
+    for _ in range(4000):
+        L, B = [], []
+        for _ in days:
+            d = byd[days[rg.randrange(len(days))]]
+            L += d["live"]
+            B += d["both"]
+        if L and B:
+            diffs.append(_roi(B) - _roi(L))
+    diffs.sort()
+    md += [f"- day-block 95% CI on the ROI gain: "
+           f"**{diffs[int(.025*len(diffs))]*100:+.1f} to "
+           f"{diffs[int(.975*len(diffs))]*100:+.1f} points**",
+           f"- share of resamples where BOTH beats live: "
+           f"**{sum(1 for x in diffs if x > 0)/len(diffs):.0%}**", ""]
+
+    # holdout-only view: the least contaminated estimate available
+    lh = [r for r in live_sel if r["date"] >= HOLDOUT_FROM]
+    bh = [r for r in both_sel if r["date"] >= HOLDOUT_FROM]
+    md += [f"- holdout only: live **{_roi(lh):+.1%}** (n={len(lh)}) → "
+           f"BOTH **{_roi(bh):+.1%}** (n={len(bh)}), "
+           f"gain **{(_roi(bh)-_roi(lh))*100:+.1f} points**",
+           "", "_The holdout gain is the number to plan around. The full-period "
+           "gain includes the games the threshold was chosen on._", ""]
     return "\n".join(md)
 
 
