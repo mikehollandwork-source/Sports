@@ -341,6 +341,59 @@ def build() -> str:
                    f"**{st.median(nm):+.1%}**",
                    f"- **corrected p = {pv:.3f}**", ""]
 
+        # ---- reason x price ----
+        PB = [("≤-150", lambda o: o <= -150), ("-149..-120", lambda o: -149 <= o <= -120),
+              ("-119..-101", lambda o: -119 <= o <= -101), ("+100..+139", lambda o: 100 <= o <= 139),
+              ("≥+140", lambda o: o >= 140)]
+        md += ["### Fade by reason AND price of the side we would back", "",
+               "_The grid asked for. Cells below n=15 are italic and excluded "
+               "from the correction - at 20 cells this dataset has manufactured "
+               "a winner every time, so the corrected p below is the number that "
+               "decides, not the greenest box._", "",
+               "| why dropped | " + " | ".join(l for l, _ in PB) + " |",
+               "|---" * (len(PB) + 1) + "|"]
+        grid = {}
+        for lbl, rs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+            cells_row = []
+            for pl, pt in PB:
+                sub = [x for x in rs if pt(x["other_odds"])]
+                if not sub:
+                    cells_row.append("—")
+                    continue
+                _w, _l, _u, r_ = _roi(sub, "other_odds", "won_other")
+                if len(sub) >= 15:
+                    grid[f"{lbl} @ {pl}"] = sub
+                    cells_row.append(f"**{r_:+.0%}** ({len(sub)})")
+                else:
+                    cells_row.append(f"_{r_:+.0%} ({len(sub)})_")
+            md.append(f"| {lbl} | " + " | ".join(cells_row) + " |")
+        md.append("")
+        if grid:
+            bk = max(grid, key=lambda k: _roi(grid[k], "other_odds", "won_other")[3])
+            bv = _roi(grid[bk], "other_odds", "won_other")[3]
+            rng3 = random.Random(1117)
+            nm2 = []
+            for _ in range(4000):
+                lab = fadeable[:]
+                rng3.shuffle(lab)
+                i, sc = 0, []
+                for k, v in grid.items():
+                    sc.append(_roi(lab[i:i + len(v)], "other_odds", "won_other")[3])
+                    i = (i + len(v)) % max(1, len(lab) - 1)
+                nm2.append(max(sc))
+            pv2 = sum(1 for x in nm2 if x >= bv) / len(nm2)
+            md += [f"- cells at n≥15: **{len(grid)}**",
+                   f"- best: `{bk}` at **{bv:+.1%}** (n={len(grid[bk])})",
+                   f"- median best-in-noise: **{st.median(nm2):+.1%}**",
+                   f"- **corrected p = {pv2:.3f}**", ""]
+            md += (["**Clears.**", ""] if pv2 <= 0.05 else
+                   ["**Does not clear.** Slicing further did not find a pocket - "
+                    "it found what a 20-cell grid always finds here.", ""])
+            md += ["_If the fade is added, the POOLED version is the "
+                   "statistically safer one: it selects nothing, so there is no "
+                   "selection to be wrong about. Picking the best cell of twenty "
+                   "is the move that has failed sixteen times in this repo._", ""]
+
     # price drift on the survivors
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
              and r["final_odds"] != r["first_odds"]]
