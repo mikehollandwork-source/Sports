@@ -56,6 +56,26 @@ _A pick the order book turned against is a different event from one whose discou
 - median best-in-noise across 4 reasons: **+28.6%**
 - **corrected p = 0.984**
 
+### Fade by reason AND price of the side we would back
+
+_The grid asked for. Cells below n=15 are italic and excluded from the correction - at 20 cells this dataset has manufactured a winner every time, so the corrected p below is the number that decides, not the greenest box._
+
+| why dropped | ≤-150 | -149..-120 | -119..-101 | +100..+139 | ≥+140 |
+|---|---|---|---|---|---|
+| price discount evaporated | — | _+14% (3)_ | _+96% (3)_ | **+2%** (39) | **+13%** (30) |
+| other | _+60% (1)_ | _-4% (11)_ | _+19% (13)_ | **+28%** (17) | _+5% (3)_ |
+| book turned against it | — | _+79% (3)_ | _+12% (7)_ | **-1%** (18) | **+16%** (16) |
+| handle/tickets stopped agreeing | — | _+22% (3)_ | _-19% (7)_ | **+20%** (18) | _+26% (4)_ |
+
+- cells at n≥15: **6**
+- best: `other @ +100..+139` at **+27.7%** (n=17)
+- median best-in-noise: **+42.6%**
+- **corrected p = 0.901**
+
+**Does not clear.** Slicing further did not find a pocket - it found what a 20-cell grid always finds here.
+
+_If the fade is added, the POOLED version is the statistically safer one: it selects nothing, so there is no selection to be wrong about. Picking the best cell of twenty is the move that has failed sixteen times in this repo._
+
 ## Price drift on the picks that survived
 
 _The ledger books the frozen closing price; the channel showed the earlier one. If they differ, the recorded ROI is not the ROI a reader would have got._
