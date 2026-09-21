@@ -350,7 +350,8 @@ def build() -> str:
            "returned -12.6%, stable at -12.4% and -12.7% across halves - that "
            "gate is carrying the work. So tighten what works and relax what does "
            "not, instead of tightening both._", "",
-           "| confirm | line move | picks | ROI | units |", "|---|---|---|---|---|"]
+           "| confirm | line move | picks | W-L | win rate | ROI | units |",
+           "|---|---|---|---|---|---|---|"]
     def _u2(rs):
         return sum(grade.american_profit(r["odds"]) if r["won"] else -1 for r in rs)
     grid2 = {}
@@ -361,8 +362,10 @@ def build() -> str:
                 continue
             grid2[(both, mv)] = sel
             live_mark = " ← live" if (both, mv) == (False, LIVE[3]) else ""
+            w = sum(1 for r in sel if r["won"])
             md.append(f"| {'BOTH' if both else 'either'}{live_mark} | "
-                      f"≥{mv:.1%} | {len(sel)} | **{_roi(sel):+.1%}** | "
+                      f"≥{mv:.1%} | {len(sel)} | {w}-{len(sel)-w} | "
+                      f"**{w/len(sel):.1%}** | {_roi(sel):+.1%} | "
                       f"{_u2(sel):+.2f}u |")
     md.append("")
     liveu = _u2(base)
