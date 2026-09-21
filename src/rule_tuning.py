@@ -342,6 +342,40 @@ def build() -> str:
            f"gain **{(_roi(bh)-_roi(lh))*100:+.1f} points**",
            "", "_The holdout gain is the number to plan around. The full-period "
            "gain includes the games the threshold was chosen on._", ""]
+    # ---- the volume-preserving combination near_miss pointed at ----
+    md += ["## Tighten the book gate, loosen the line gate", "",
+           "_`near_miss` found the gates are not equal. Games failing ONLY the "
+           "line gate returned +1.0% over 312 games - near-neutral, so those "
+           "rejections cost volume for little. Games failing ONLY the book gate "
+           "returned -12.6%, stable at -12.4% and -12.7% across halves - that "
+           "gate is carrying the work. So tighten what works and relax what does "
+           "not, instead of tightening both._", "",
+           "| confirm | line move | picks | ROI | units |", "|---|---|---|---|---|"]
+    def _u2(rs):
+        return sum(grade.american_profit(r["odds"]) if r["won"] else -1 for r in rs)
+    grid2 = {}
+    for both in (False, True):
+        for mv in (0.0, 0.005, 0.01, 0.02):
+            sel = picks_for(rows, (LIVE[0], LIVE[1], LIVE[2], mv, both))
+            if not sel:
+                continue
+            grid2[(both, mv)] = sel
+            live_mark = " ← live" if (both, mv) == (False, LIVE[3]) else ""
+            md.append(f"| {'BOTH' if both else 'either'}{live_mark} | "
+                      f"≥{mv:.1%} | {len(sel)} | **{_roi(sel):+.1%}** | "
+                      f"{_u2(sel):+.2f}u |")
+    md.append("")
+    liveu = _u2(base)
+    better = [(k, v) for k, v in grid2.items()
+              if _u2(v) > liveu and len(v) >= len(base)]
+    if better:
+        k, v = max(better, key=lambda kv: _u2(kv[1]))
+        md += [f"**Both more volume AND more units**: confirm="
+               f"{'BOTH' if k[0] else 'either'}, move ≥{k[1]:.1%} → "
+               f"{len(v)} picks, {_roi(v):+.1%}, {_u2(v):+.2f}u "
+               f"(live: {len(base)} picks, {_roi(base):+.1%}, {liveu:+.2f}u)", ""]
+    else:
+        md += ["_No combination beats live on BOTH volume and total units._", ""]
     return "\n".join(md)
 
 
