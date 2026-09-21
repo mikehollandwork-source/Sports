@@ -57,3 +57,21 @@ _A single threshold moved in isolation is a far smaller search than the grid, an
 | line move min | 0.03 | 22 | +31.4% |
 | confirm | either ← live | 99 | +17.6% |
 | confirm | BOTH | 51 | +31.2% |
+
+## The two candidates, tested properly
+
+_Both are SINGLE-parameter moves, a far smaller search than the grid. Each is split by holdout and permuted: labels shuffled, outcomes and prices fixed, asking only whether the threshold carries information._
+
+### line move ≥2.0% vs live ≥1.0%
+
+- kept: **+27.1%** (n=54) · dropped: **+6.1%** (n=45)
+- gap **+21.0 points**, permutation **p = 0.104**
+- kept in-sample -34.3% (n=3) · holdout **+30.7%** (n=51)
+- volume cost: 99 picks → 54 (45% fewer)
+
+### confirm BOTH vs live either
+
+- kept: **+31.2%** (n=51) · dropped: **+1.2%** (n=64)
+- gap **+30.0 points**, permutation **p = 0.028**
+- kept in-sample +87.9% (n=4) · holdout **+26.4%** (n=47)
+- volume cost: 99 picks → 51 (48% fewer)
