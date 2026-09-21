@@ -241,6 +241,47 @@ def build() -> str:
             md.append(f"| {names[i]} | {shown}{mark} | {len(sel)} | "
                       f"{_roi(sel):+.1%} |")
     md.append("")
+
+    # ---- the two candidates, tested on their own ----
+    md += ["## The two candidates, tested properly", "",
+           "_Both are SINGLE-parameter moves, a far smaller search than the "
+           "grid. Each is split by holdout and permuted: labels shuffled, "
+           "outcomes and prices fixed, asking only whether the threshold "
+           "carries information._", ""]
+    for label, tight, loose in (
+        ("line move ≥2.0% vs live ≥1.0%",
+         (LIVE[0], LIVE[1], LIVE[2], 0.02, LIVE[4]), LIVE),
+        ("confirm BOTH vs live either",
+         (LIVE[0], LIVE[1], LIVE[2], LIVE[3], True), LIVE),
+    ):
+        a, b = picks_for(rows, tight), picks_for(rows, loose)
+        # the tighter set is a SUBSET, so the honest comparison is the picks it
+        # keeps against the ones it drops - not against the whole looser set
+        keep = {id(r) for r in a}
+        dropped = [r for r in b if id(r) not in keep]
+        if len(a) < 20 or len(dropped) < 20:
+            md.append(f"- **{label}**: too thin to test")
+            continue
+        obs = _roi(a) - _roi(dropped)
+        pool = a + dropped
+        na = len(a)
+        rg = random.Random(907)
+        nl = []
+        for _ in range(4000):
+            sh = pool[:]
+            rg.shuffle(sh)
+            nl.append(_roi(sh[:na]) - _roi(sh[na:]))
+        pv = sum(1 for x in nl if x >= obs) / len(nl)
+        ap, ah = ([r for r in a if r["date"] < HOLDOUT_FROM],
+                  [r for r in a if r["date"] >= HOLDOUT_FROM])
+        md += [f"### {label}", "",
+               f"- kept: **{_roi(a):+.1%}** (n={len(a)}) · "
+               f"dropped: **{_roi(dropped):+.1%}** (n={len(dropped)})",
+               f"- gap **{obs*100:+.1f} points**, permutation **p = {pv:.3f}**",
+               f"- kept in-sample {_roi(ap):+.1%} (n={len(ap)}) · "
+               f"holdout **{_roi(ah):+.1%}** (n={len(ah)})",
+               f"- volume cost: {len(b)} picks → {len(a)} "
+               f"({1-len(a)/len(b):.0%} fewer)", ""]
     return "\n".join(md)
 
 
