@@ -1,6 +1,6 @@
 {
   "date": "2026-09-21",
-  "generated_at": "2026-09-21T09:04:38.979277+00:00",
+  "generated_at": "2026-09-21T10:39:01.109186+00:00",
   "games": [
     {
       "game_pk": 824787,
@@ -11,8 +11,8 @@
       "park_factor": 1.02,
       "statistical_advantage": {
         "team": "Baltimore Orioles",
-        "home_score": 0.11900000000000001,
-        "away_score": -0.11962,
+        "home_score": 0.11972000000000001,
+        "away_score": -0.1213,
         "home": {
           "name": "Baltimore Orioles",
           "probable_pitcher": "Shane Baz",
@@ -106,8 +106,8 @@
           "consensus": {
             "pick": "Tor",
             "pcts": {
-              "Tor": 52.0,
-              "Bal": 48.0
+              "Tor": 51.0,
+              "Bal": 49.0
             }
           },
           "forum": {
@@ -117,8 +117,8 @@
           },
           "agree": false,
           "forum_lean": 1.0,
-          "consensus_lean": -0.04,
-          "blended_lean": 0.669,
+          "consensus_lean": -0.02,
+          "blended_lean": 0.675,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -241,13 +241,13 @@
       "betting_lines": {
         "majority": {
           "team": "Baltimore Orioles",
-          "consensus_pct": 48.0,
-          "moneyline": "-104"
+          "consensus_pct": 49.0,
+          "moneyline": "-115"
         },
         "non_majority": {
           "team": "Toronto Blue Jays",
-          "consensus_pct": 52.0,
-          "moneyline": "-104"
+          "consensus_pct": 51.0,
+          "moneyline": "-105"
         }
       },
       "consistency": {
@@ -403,16 +403,16 @@
         "public_edge": false,
         "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.328,
+        "confidence": 0.331,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.239,
-            "strength": 0.597,
+            "margin": 0.241,
+            "strength": 0.603,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.669,
+            "blended_lean": 0.675,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -422,14 +422,14 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -106,
+        "advantage_moneyline": -109,
         "opponent_moneyline": -104,
         "line_check": {
           "open": -106,
-          "current": -106,
-          "implied_shift": 0.0,
-          "status": "flat",
-          "reason": "line hasn't moved (-106\u2192-106)",
+          "current": -109,
+          "implied_shift": 0.007,
+          "status": "soft",
+          "reason": "only a slight move our way, below the 2% signal floor (-106\u2192-109, +0.7%)",
           "pinny_morning": -106
         },
         "form_edge": null,
@@ -449,8 +449,8 @@
           "bet": "Toronto Blue Jays",
           "odds": -104,
           "basis": "ticket %",
-          "hold_home": -1978491,
-          "hold_away": 2331538
+          "hold_home": -1903272,
+          "hold_away": 2377308
         },
         "play": "stay_away",
         "starred": [],
@@ -459,14 +459,14 @@
         "pm_quote": {
           "pm_pct": 50,
           "pm_american": -100,
-          "edge_pts": 1.5,
+          "edge_pts": 2.2,
           "vs_book": "better"
         },
         "projected": {
           "win_prob": 57.2,
-          "fair_american": -133
+          "fair_american": -134
         },
-        "line_vs_money": "flat",
+        "line_vs_money": "with",
         "bet_team": null,
         "bet_moneyline": null
       },
@@ -475,9 +475,9 @@
       "game_datetime": "2026-09-21T22:35:00Z",
       "weather": {
         "temp_f": 69,
-        "wind_mph": 8,
+        "wind_mph": 9,
         "wind_dir": "NNE",
-        "precip_pct": 29,
+        "precip_pct": 18,
         "roof": "open"
       },
       "umpire_hp": null,
@@ -642,8 +642,10 @@
         "trusted": true,
         "verdict": "corroborated",
         "note": "all 2 sources agree on the public side",
-        "flags": [],
-        "line": "flat",
+        "flags": [
+          "reverse line move \u2014 money went against the public %"
+        ],
+        "line": "against public",
         "money": "unknown",
         "money_side": null
       },
@@ -894,15 +896,15 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -151,
-        "opponent_moneyline": 136,
+        "advantage_moneyline": -137,
+        "opponent_moneyline": 130,
         "line_check": {
           "open": -151,
-          "current": -151,
-          "implied_shift": 0.0,
-          "status": "flat",
-          "reason": "line hasn't moved (-151\u2192-151)",
-          "pinny_morning": -148
+          "current": -137,
+          "implied_shift": -0.024,
+          "status": "contradicts",
+          "reason": "line moved away from the pick (-151\u2192-137, -2.4%)",
+          "pinny_morning": -147
         },
         "form_edge": true,
         "form_gap": 0.048,
@@ -914,17 +916,18 @@
           "side": "Washington Nationals",
           "against_us": true,
           "tells": [
+            "reverse line move",
             "line frozen under 79% public"
           ],
-          "strength": 1,
+          "strength": 2,
           "fooled": true
         },
         "vegas": {
           "bet": "Washington Nationals",
-          "odds": 136,
+          "odds": 130,
           "basis": "ticket %",
-          "hold_home": -2192252,
-          "hold_away": 3530800
+          "hold_home": -2566496,
+          "hold_away": 3619000
         },
         "play": "stay_away",
         "starred": [],
@@ -934,14 +937,14 @@
         "pm_quote": {
           "pm_pct": 58,
           "pm_american": -138,
-          "edge_pts": 2.2,
-          "vs_book": "better"
+          "edge_pts": -0.2,
+          "vs_book": "same"
         },
         "projected": {
           "win_prob": 53.2,
           "fair_american": -114
         },
-        "line_vs_money": "flat",
+        "line_vs_money": "against",
         "bet_team": null,
         "bet_moneyline": null
       },
@@ -949,10 +952,10 @@
       "pick": null,
       "game_datetime": "2026-09-21T22:40:00Z",
       "weather": {
-        "temp_f": 59,
-        "wind_mph": 13,
+        "temp_f": 60,
+        "wind_mph": 10,
         "wind_dir": "NNE",
-        "precip_pct": 0,
+        "precip_pct": 5,
         "roof": "open"
       },
       "umpire_hp": null,
@@ -1075,15 +1078,15 @@
           "consensus": {
             "pick": "Min",
             "pcts": {
-              "Min": 58.0,
-              "Sf": 42.0
+              "Min": 56.0,
+              "Sf": 44.0
             }
           },
           "forum": null,
           "agree": null,
           "forum_lean": null,
-          "consensus_lean": -0.16,
-          "blended_lean": -0.1,
+          "consensus_lean": -0.12,
+          "blended_lean": -0.08,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1201,13 +1204,13 @@
       "betting_lines": {
         "majority": {
           "team": "Minnesota Twins",
-          "consensus_pct": 58.0,
+          "consensus_pct": 56.0,
           "moneyline": "-120"
         },
         "non_majority": {
           "team": "San Francisco Giants",
-          "consensus_pct": 42.0,
-          "moneyline": "+100"
+          "consensus_pct": 44.0,
+          "moneyline": "-105"
         }
       },
       "consistency": {
@@ -1363,7 +1366,7 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.058,
+        "confidence": 0.049,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1372,8 +1375,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.1,
-            "strength": 0.1,
+            "blended_lean": -0.08,
+            "strength": 0.08,
             "weight": 0.45
           },
           "consistency": {
@@ -1382,14 +1385,14 @@
           }
         },
         "consistency_hits": 2,
-        "advantage_moneyline": 102,
-        "opponent_moneyline": -112,
+        "advantage_moneyline": 104,
+        "opponent_moneyline": -115,
         "line_check": {
           "open": 102,
-          "current": 102,
-          "implied_shift": 0.0,
-          "status": "flat",
-          "reason": "line hasn't moved (+102\u2192+102)",
+          "current": 104,
+          "implied_shift": -0.005,
+          "status": "contradicts",
+          "reason": "line moved away from the pick (+102\u2192+104, -0.5%)",
           "pinny_morning": 102
         },
         "form_edge": true,
@@ -1398,7 +1401,7 @@
         "sp_dog_edge": 0.057,
         "pitching_dog": false,
         "signals_hit": 2,
-        "public_pct_against": 55,
+        "public_pct_against": 54,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -1408,10 +1411,10 @@
         },
         "vegas": {
           "bet": "San Francisco Giants",
-          "odds": 102,
+          "odds": 104,
           "basis": "ticket %",
-          "hold_home": 637000,
-          "hold_away": -287500
+          "hold_home": 431200,
+          "hold_away": -66957
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -1419,14 +1422,14 @@
         "pm_quote": {
           "pm_pct": 48,
           "pm_american": 108,
-          "edge_pts": 1.5,
+          "edge_pts": 1.0,
           "vs_book": "better"
         },
         "projected": {
           "win_prob": 50.3,
           "fair_american": -101
         },
-        "line_vs_money": "flat",
+        "line_vs_money": "with",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": []
@@ -1435,10 +1438,10 @@
       "pick": null,
       "game_datetime": "2026-09-22T01:45:00Z",
       "weather": {
-        "temp_f": 57,
-        "wind_mph": 9,
-        "wind_dir": "W",
-        "precip_pct": 1,
+        "temp_f": 60,
+        "wind_mph": 10,
+        "wind_dir": "WSW",
+        "precip_pct": 0,
         "roof": "open"
       },
       "umpire_hp": null,
