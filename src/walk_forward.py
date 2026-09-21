@@ -47,8 +47,8 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 MOVES = [0.0, 0.005, 0.01, 0.015, 0.02]
 GRID = [{"both": b, "move": m} for b in (False, True) for m in MOVES]
 
-OLD = {"both": False, "move": 0.01}     # the rule before 2026-09-21
-NEW = {"both": True, "move": 0.005}     # the rule now live
+LIVE = {"both": False, "move": 0.01}       # the live rule (restored 2026-09-21)
+TRIED = {"both": True, "move": 0.005}      # shipped and reverted the same day
 
 MIN_TRAIN = 60          # games of history before the policy is allowed to tune
 
@@ -129,14 +129,15 @@ def build() -> str:
            f"_from **{start}** onward_", "",
            "| policy | record |", "|---|---|",
            f"| **adaptive** (retune daily on all prior games) | {_line(picked)} |",
-           f"| frozen old rule ({_name(OLD)}) | {_line(_sel(same, OLD))} |",
-           f"| frozen new rule ({_name(NEW)}) | {_line(_sel(same, NEW))} |", ""]
+           f"| frozen live rule ({_name(LIVE)}) | {_line(_sel(same, LIVE))} |",
+           f"| frozen tried-and-reverted ({_name(TRIED)}) | "
+           f"{_line(_sel(same, TRIED))} |", ""]
 
     a_roi = _units(picked) / len(picked) if picked else 0.0
-    o_roi = (_units(_sel(same, OLD)) / len(_sel(same, OLD))
-             if _sel(same, OLD) else 0.0)
-    n_roi = (_units(_sel(same, NEW)) / len(_sel(same, NEW))
-             if _sel(same, NEW) else 0.0)
+    o_roi = (_units(_sel(same, LIVE)) / len(_sel(same, LIVE))
+             if _sel(same, LIVE) else 0.0)
+    n_roi = (_units(_sel(same, TRIED)) / len(_sel(same, TRIED))
+             if _sel(same, TRIED) else 0.0)
     better = a_roi > max(o_roi, n_roi)
     md += [("**Retuning beat standing pat.** On this data the habit of picking "
             f"the best-so-far configuration earned {(a_roi-max(o_roi,n_roi))*100:+.1f} "
@@ -150,7 +151,14 @@ def build() -> str:
             "grid's cells differ by noise: you chase whichever cell got lucky "
             "and it reverts. This is the measurement that applies to the change "
             "just shipped, because that change was produced by exactly this "
-            "procedure."), ""]
+            "procedure."), "",
+           f"_Stated against itself: the adaptive policy bet only "
+           f"{len(picked)} games, because tuning keeps steering it into the "
+           "tightest cells, so its ROI carries a wide interval and the gap "
+           "above is not significant on its own. What is not a sample-size "
+           "artifact is the table below - the configuration it chose changed "
+           "repeatedly, and for most of the season it was not the cell that "
+           "looks best in hindsight._", ""]
 
     # --- how stable was the choice? ----------------------------------------
     flips = sum(1 for i in range(1, len(choices)) if choices[i][1] != choices[i-1][1])
@@ -176,10 +184,10 @@ def build() -> str:
     for cfg in ranked:
         s = _sel(rows, cfg)
         mark = ""
-        if cfg == OLD:
-            mark = " ← old"
-        if cfg == NEW:
+        if cfg == LIVE:
             mark = " ← **live now**"
+        if cfg == TRIED:
+            mark = " ← shipped 2026-09-21, reverted the same day"
         md.append(f"| {_name(cfg)}{mark} | {_line(s)} |")
     md += ["", "_The best cell in hindsight is not a forecast. The walk-forward "
            "number above is the one that includes the cost of having chosen "
