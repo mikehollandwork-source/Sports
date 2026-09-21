@@ -97,3 +97,20 @@ _A backtest ROI is an upper bound. The configuration was chosen because it looke
 - holdout only: live **+16.3%** (n=92) → BOTH **+26.4%** (n=47), gain **+10.2 points**
 
 _The holdout gain is the number to plan around. The full-period gain includes the games the threshold was chosen on._
+
+## Tighten the book gate, loosen the line gate
+
+_`near_miss` found the gates are not equal. Games failing ONLY the line gate returned +1.0% over 312 games - near-neutral, so those rejections cost volume for little. Games failing ONLY the book gate returned -12.6%, stable at -12.4% and -12.7% across halves - that gate is carrying the work. So tighten what works and relax what does not, instead of tightening both._
+
+| confirm | line move | picks | ROI | units |
+|---|---|---|---|---|
+| either | ≥0.0% | 225 | **+6.8%** | +15.32u |
+| either | ≥0.5% | 139 | **+9.7%** | +13.43u |
+| either ← live | ≥1.0% | 99 | **+17.6%** | +17.40u |
+| either | ≥2.0% | 54 | **+27.1%** | +14.64u |
+| BOTH | ≥0.0% | 127 | **+13.2%** | +16.80u |
+| BOTH | ≥0.5% | 67 | **+30.0%** | +20.08u |
+| BOTH | ≥1.0% | 51 | **+31.2%** | +15.93u |
+| BOTH | ≥2.0% | 31 | **+32.6%** | +10.12u |
+
+_No combination beats live on BOTH volume and total units._
