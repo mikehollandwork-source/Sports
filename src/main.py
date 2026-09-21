@@ -21,7 +21,7 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -163,6 +163,15 @@ def run(date: str) -> dict:
         road_trip.apply(results, date)
     except Exception as exc:
         log.warning("road-trip rule failed (board unaffected): %s", exc)
+
+    # Fade: back the other side of any pick the rule has withdrawn. Last, so it
+    # only ever touches games nothing else is picking - a game being backed now
+    # is not a game that was withdrawn. Tagged source="fade" so the consensus
+    # rule's own record stays readable separately.
+    try:
+        fade_rule.apply(results, date)
+    except Exception as exc:
+        log.warning("fade rule failed (board unaffected): %s", exc)
 
     # Tag each game's live state (upcoming / live / final) for the board.
     try:
