@@ -43,6 +43,7 @@ from __future__ import annotations
 import glob
 import json
 import logging
+import random
 import statistics as st
 import subprocess
 from pathlib import Path
@@ -269,13 +270,12 @@ def build() -> str:
                f"- the two do not sum to zero: the gap is the vig paid twice "
                f"({broi + roi:+.1%} combined)", ""]
         # is the fade distinguishable from zero, day-blocked?
-        import random as _r
         from collections import defaultdict as _dd
         by = _dd(list)
         for x in fadeable:
             by[x["date"]].append(x)
         days = list(by)
-        rng = _r.Random(613)
+        rng = random.Random(613)
         boots = []
         for _ in range(4000):
             samp = []
