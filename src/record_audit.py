@@ -43,6 +43,7 @@ from __future__ import annotations
 import glob
 import json
 import logging
+import statistics as st
 import subprocess
 from pathlib import Path
 
@@ -119,10 +120,17 @@ def scan_date(date: str) -> dict:
     for g in final.get("games", []):
         pc = g.get("pick_criteria") or {}
         pk = g.get("game_pk")
-        if pk in seen and pc.get("play") == "pick":
+        if pk not in seen:
+            continue
+        if pc.get("play") == "pick":
             seen[pk]["final_bet"] = pc.get("bet_team") or pc.get("advantage_team")
             o = pc.get("bet_moneyline")
             seen[pk]["final_odds"] = o if isinstance(o, int) else pc.get("advantage_moneyline")
+        else:
+            # WHY it was dropped. A pick the order book turned against is a
+            # different event from one whose price discount simply evaporated,
+            # and lumping them hides whichever one carries the information.
+            seen[pk]["why"] = (pc.get("reason") or "unknown")
     return seen
 
 
@@ -143,6 +151,7 @@ def collect() -> list[dict]:
                 continue
             survived = "final_bet" in d
             rows.append({
+                "why": d.get("why", "unknown"),
                 "other_bet": d.get("other_bet"), "other_odds": d.get("other_odds"),
                 "won_other": ((res["winner"] == d["other_bet"])
                               if d.get("other_bet") else None),
@@ -282,6 +291,55 @@ def build() -> str:
                ["**The fade does not clear zero.** The withdrawn picks lost, but "
                 "not by enough to pay the vig on the other side - which is the "
                 "usual fate of an inverted losing cell.", ""])
+
+        # which KIND of withdrawal carries the information?
+        def _short(w):
+            w = (w or "").lower()
+            if "order book" in w:
+                return "book turned against it"
+            if "line moved" in w or "discount" in w:
+                return "price discount evaporated"
+            if "handle" in w or "ticket" in w:
+                return "handle/tickets stopped agreeing"
+            if "order-book read" in w:
+                return "book read disappeared"
+            return "other"
+        groups = {}
+        for x in fadeable:
+            groups.setdefault(_short(x["why"]), []).append(x)
+        md += ["### Which kind of withdrawal is worth fading?", "",
+               "_A pick the order book turned against is a different event from "
+               "one whose discount simply evaporated. Lumping them hides "
+               "whichever carries the information._", "",
+               "| why it was dropped | n | backing it | fading it |",
+               "|---|---|---|---|"]
+        for lbl, rs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+            bw, bl, _, br = _roi(rs, "first_odds", "won_first")
+            fw, fl, _, fr = _roi(rs, "other_odds", "won_other")
+            md.append(f"| {lbl} | {len(rs)} | {br:+.1%} | **{fr:+.1%}** |")
+        md.append("")
+        # corrected for having looked at several reasons
+        big = {k: v for k, v in groups.items() if len(v) >= 25}
+        if big:
+            bestk = max(big, key=lambda k: _roi(big[k], "other_odds", "won_other")[3])
+            bestv = _roi(big[bestk], "other_odds", "won_other")[3]
+            rng2 = random.Random(769)
+            nm = []
+            for _ in range(4000):
+                lab = [x for x in fadeable]
+                rng2.shuffle(lab)
+                i = 0
+                sc = []
+                for k, v in big.items():
+                    sc.append(_roi(lab[i:i + len(v)], "other_odds", "won_other")[3])
+                    i += len(v)
+                nm.append(max(sc))
+            pv = sum(1 for x in nm if x >= bestv) / len(nm)
+            md += [f"- best reason: `{bestk}` fading at **{bestv:+.1%}** "
+                   f"(n={len(big[bestk])})",
+                   f"- median best-in-noise across {len(big)} reasons: "
+                   f"**{st.median(nm):+.1%}**",
+                   f"- **corrected p = {pv:.3f}**", ""]
 
     # price drift on the survivors
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
