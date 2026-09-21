@@ -123,8 +123,9 @@ def build(date: str) -> str:
            "3. **price** — a moneyline exists for the side the consensus names",
            f"4. **book read** — ≥{C.MIN_READINGS} Polymarket quotes with spread "
            f"≤{C.MAX_SPREAD}",
-           f"5. **book confirms** — mid drifted up on that side, or resting bid "
-           f"lean >{C.IMBALANCE_MIN}",
+           f"5. **book confirms** — mid drifted up on that side "
+           f"{'AND' if C.REQUIRE_BOTH_CONFIRMATIONS else 'or'} resting bid lean "
+           f">{C.IMBALANCE_MIN}",
            f"6. **line against** — implied probability moved AWAY from that side "
            f"by ≥{C.LINE_MOVE_MIN:.0%} (the price discount)", "",
            "_Gate 5 shows `—` when gate 4 gave nothing to read: no data and data "

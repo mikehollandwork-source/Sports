@@ -44,6 +44,25 @@ MAX_SPREAD = 0.15      # wider than this is not a real two-sided market
 MIN_READINGS = 2       # need a run-up, not a single snapshot
 IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 
+# CONFIRMATION: require BOTH signals, not either (changed 2026-09-21, user's call).
+# near_miss showed the gates are not equal. Games failing ONLY this gate returned
+# -12.6%, and held at -12.4% / -12.7% across halves - the most stable cell in the
+# repo. Games failing ONLY the line gate were near-neutral at +1.0% over 312.
+# So the book gate carries the work and deserves tightening; the line gate does
+# not and is loosened below to give the volume back.
+#
+#   either / >=1.0%   99 picks   67-32  67.7%  +17.6%  +17.40u   (the old rule)
+#   BOTH   / >=0.5%   67 picks   48-19  71.6%  +30.0%  +20.08u   (this one)
+#
+# Better win rate, better ROI and more total units on 32% fewer picks. Tested on
+# its own rather than picked from the grid: permutation p = 0.028, holdout gain
+# +10.2 points. Expect nearer +10 than +12 - a configuration chosen for looking
+# best regresses toward the pool it was chosen from.
+#
+# Set REQUIRE_BOTH_CONFIRMATIONS = False to revert; LINE_MOVE_MIN goes back to
+# 0.01 with it, since the pair was measured together.
+REQUIRE_BOTH_CONFIRMATIONS = True
+
 # PRICE-DISCOUNT FILTER (added 2026-07-29, user's call, knowingly on thin data).
 # The money side wins ~62% whether or not the line moves with it - what changes
 # is the PRICE. When the line moves AWAY from the money, the same 62% is bought
@@ -53,7 +72,7 @@ IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 # CI (-10.7% to +44.0%) includes zero. Set REQUIRE_LINE_AGAINST = False to revert
 # to plain consensus; the line tag is recorded either way so both buckets stay
 # measurable from the snapshots.
-LINE_MOVE_MIN = 0.01       # implied-probability move that counts as a real move
+LINE_MOVE_MIN = 0.005      # loosened with the book gate tightened (see above)
 REQUIRE_LINE_AGAINST = True
 
 
@@ -110,7 +129,8 @@ def book_metrics(date: str) -> dict:
 def _confirms(m: dict, consensus_is_adv: bool) -> bool:
     """Does the order book lean toward the consensus side? The log is written
     from the ADVANTAGE side's token, so invert when consensus is the other team."""
-    toward_adv = m["drift"] > 0 or m["imbalance"] > IMBALANCE_MIN
+    drift_ok, size_ok = m["drift"] > 0, m["imbalance"] > IMBALANCE_MIN
+    toward_adv = (drift_ok and size_ok) if REQUIRE_BOTH_CONFIRMATIONS else (drift_ok or size_ok)
     return toward_adv if consensus_is_adv else (not toward_adv)
 
 
