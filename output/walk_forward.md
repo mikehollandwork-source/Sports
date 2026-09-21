@@ -13,10 +13,12 @@ _from **2026-07-23** onward_
 | policy | record |
 |---|---|
 | **adaptive** (retune daily on all prior games) | 24-15 · +5.39u · **+13.8%** (n=39) |
-| frozen old rule (EITHER / ≥1.0%) | 62-30 · +14.96u · **+16.3%** (n=92) |
-| frozen new rule (BOTH / ≥0.5%) | 43-18 · +16.58u · **+27.2%** (n=61) |
+| frozen live rule (EITHER / ≥1.0%) | 62-30 · +14.96u · **+16.3%** (n=92) |
+| frozen tried-and-reverted (BOTH / ≥0.5%) | 43-18 · +16.58u · **+27.2%** (n=61) |
 
 **Retuning lost to standing pat.** Picking the best-so-far configuration earned -13.4 points against the better frozen rule, which is what happens when the grid's cells differ by noise: you chase whichever cell got lucky and it reverts. This is the measurement that applies to the change just shipped, because that change was produced by exactly this procedure.
+
+_Stated against itself: the adaptive policy bet only 39 games, because tuning keeps steering it into the tightest cells, so its ROI carries a wide interval and the gap above is not significant on its own. What is not a sample-size artifact is the table below - the configuration it chose changed repeatedly, and for most of the season it was not the cell that looks best in hindsight._
 
 ## How often did it change its mind?
 
@@ -41,11 +43,11 @@ _Every cell over all games. This is the view that produced the change, and the s
 |---|---|
 | BOTH / ≥2.0% | 22-9 · +10.12u · **+32.6%** (n=31) |
 | BOTH / ≥1.0% | 37-14 · +15.93u · **+31.2%** (n=51) |
-| BOTH / ≥0.5% ← **live now** | 48-19 · +20.08u · **+30.0%** (n=67) |
+| BOTH / ≥0.5% ← shipped 2026-09-21, reverted the same day | 48-19 · +20.08u · **+30.0%** (n=67) |
 | EITHER / ≥2.0% | 39-15 · +14.64u · **+27.1%** (n=54) |
 | BOTH / ≥1.5% | 24-11 · +9.32u · **+26.6%** (n=35) |
 | EITHER / ≥1.5% | 49-21 · +15.09u · **+21.6%** (n=70) |
-| EITHER / ≥1.0% ← old | 67-32 · +17.40u · **+17.6%** (n=99) |
+| EITHER / ≥1.0% ← **live now** | 67-32 · +17.40u · **+17.6%** (n=99) |
 | BOTH / ≥0.0% | 82-45 · +16.80u · **+13.2%** (n=127) |
 | EITHER / ≥0.5% | 88-51 · +13.43u · **+9.7%** (n=139) |
 | EITHER / ≥0.0% | 141-85 · +14.32u · **+6.3%** (n=226) |
