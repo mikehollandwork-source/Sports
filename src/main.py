@@ -1275,7 +1275,13 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
+    # Fades are a SEPARATE book and never counted toward the record (user's
+    # call). Shown underneath with their own ROI so both can be judged on their
+    # own evidence rather than blended into one unreadable number.
     books = [("Plays", ledger["plays"])]
+    fb = ledger.get("fades")
+    if fb and fb.get("entries"):
+        books.append(("Fades (separate — not in the record)", fb))
     for name, book in books:
         rec = grade.windowed_records(book, today)
         if not rec:
@@ -1285,7 +1291,8 @@ def _telegram_records_lines() -> list[str]:
         for label, (w, l, u) in rec:
             out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
         w, l, u = grade._tally(book["entries"])
-        out.append(f"   • All-time: {w}-{l} ({u:+.2f}u)")
+        roi = f" · {u/(w+l):+.1%} ROI" if (w + l) else ""
+        out.append(f"   • All-time: {w}-{l} ({u:+.2f}u){roi}")
     return out
 
 

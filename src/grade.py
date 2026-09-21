@@ -89,7 +89,13 @@ def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
-            "plays": _empty_book(), "leans_faded": _empty_book()}
+            "plays": _empty_book(), "leans_faded": _empty_book(),
+            # Fades are tracked but NEVER counted toward the main record (user's
+            # call). They are a different bet - the other side of a pick the rule
+            # withdrew - with their own evidence, and every direct test of them
+            # came back null. Mixing them in would make the consensus rule's own
+            # number unreadable, which is the mistake the prop parlays made.
+            "fades": _empty_book()}
 
 
 def load_ledger() -> dict:
@@ -173,6 +179,8 @@ def _settle(date, g, res, bet, won, odds) -> dict:
         "score": f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}",
         "odds": odds, "odds_source": "pre-game moneyline",
         "profit": round(american_profit(odds) if won else -STAKE, 2),
+        # which rule produced it: "rule" (consensus), "fade", "manual", ...
+        "source": (g.get("pick_criteria") or {}).get("source", "rule"),
     }
 
 
@@ -425,12 +433,19 @@ def update_ledger(date: str) -> dict:
         save_ledger(ledger)
         return ledger
     pe = grade_date(date)
-    added = _add(ledger["plays"], pe)
-    if added:
+    # Fades go to their own book and are NOT part of the main record.
+    ledger.setdefault("fades", _empty_book())
+    fades = [e for e in pe if e.get("source") == "fade"]
+    plays = [e for e in pe if e.get("source") != "fade"]
+    added = _add(ledger["plays"], plays)
+    added_f = _add(ledger["fades"], fades)
+    if added or added_f:
         ledger["review"] = review(ledger["plays"])
-        log.info("graded %s: plays %+.2f (%d-%d)",
+        log.info("graded %s: plays %+.2f (%d-%d) · fades %+.2f (%d-%d)",
                  date, ledger["plays"]["bankroll"], ledger["plays"]["record"]["wins"],
-                 ledger["plays"]["record"]["losses"])
+                 ledger["plays"]["record"]["losses"],
+                 ledger["fades"]["bankroll"], ledger["fades"]["record"]["wins"],
+                 ledger["fades"]["record"]["losses"])
     else:
         log.info("nothing new to settle for %s", date)
     # Always persist so the ledger artifact exists from the first grade onward
@@ -480,11 +495,11 @@ def combined_book(ledger: dict) -> dict:
 def bankroll_line(ledger: dict | None = None) -> str:
     """One-line summary of the books for the daily issue."""
     ledger = ledger or load_ledger()
-    comb = combined_book(ledger)
-    w, l, u = _tally(comb["entries"])
-    return (_book_line("Plays", ledger["plays"]) + "  ·  "
-            + f"**All plays: {u:+.2f}u** ({w}-{l})"
-            + "  _($1/bet at pre-game moneyline)_")
+    out = _book_line("Plays", ledger["plays"])
+    fb = ledger.get("fades") or _empty_book()
+    if fb["entries"]:
+        out += "  ·  " + _book_line("Fades (separate)", fb)
+    return out + "  _($1/bet at pre-game moneyline · fades excluded from the record)_"
 
 
 # --- windowed records (Day / Week / Month / YTD) ------------------------------
