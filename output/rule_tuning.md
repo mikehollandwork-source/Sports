@@ -1,0 +1,59 @@
+# Tuning the live rule's own thresholds
+
+_Sixteen signal hunts found nothing, and every one asked what ELSE could select a bet. None asked whether the gates already doing the selecting are tuned. These four constants were set early, some on thin data, and have never been swept._
+
+- games reaching the book gate (handle+tickets already agree): **623**
+
+- parameter combinations tried: **288** (225 produced ≥25 picks)
+- **live configuration**: readings≥2, spread≤0.15, imbalance>0.2, move≥1.0%, confirm=either
+- live result: **+17.6%** over **99** picks
+
+## Top ten configurations
+
+| readings | spread | imbalance | move | confirm | picks | ROI | vs live |
+|---|---|---|---|---|---|---|---|
+| ≥2 | ≤0.1 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥2 | ≤0.15 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥2 | ≤0.25 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥3 | ≤0.1 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥3 | ≤0.15 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥3 | ≤0.25 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥5 | ≤0.1 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥5 | ≤0.15 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥5 | ≤0.25 | >0.4 | ≥2.0% | BOTH | 31 | **+34.7%** | +0.2pts |
+| ≥2 | ≤0.1 | >0.0 | ≥2.0% | BOTH | 32 | **+34.2%** | +0.2pts |
+
+## Does the best configuration beat the sweep itself?
+
+- best gain over live: **+0.2 points**
+- median best-gain from redrawn outcomes: **+13.5 points**
+- 95th percentile: **+33.7 points**
+- **corrected p = 0.370**
+
+**Does not clear.** Sweeping this many combinations produces a gain this large from noise more often than 5% of the time, so the current settings are not demonstrably wrong.
+
+- best config in-sample: **+105.0%** (n=2) · holdout: **+29.8%** (n=29)
+- live in-sample: **+34.9%** · holdout: **+16.3%**
+
+## One parameter at a time (others held at live values)
+
+_A single threshold moved in isolation is a far smaller search than the grid, and a real effect should show up as a trend rather than a spike._
+
+| parameter | value | picks | ROI |
+|---|---|---|---|
+| min readings | 2 ← live | 99 | +17.6% |
+| min readings | 3 | 98 | +17.0% |
+| min readings | 5 | 98 | +17.0% |
+| max spread | 0.1 | 98 | +17.0% |
+| max spread | 0.15 ← live | 99 | +17.6% |
+| max spread | 0.25 | 101 | +18.6% |
+| imbalance min | 0.0 | 103 | +13.2% |
+| imbalance min | 0.2 ← live | 99 | +17.6% |
+| imbalance min | 0.4 | 97 | +14.0% |
+| imbalance min | 0.6 | 95 | +14.4% |
+| line move min | 0.005 | 139 | +9.7% |
+| line move min | 0.01 ← live | 99 | +17.6% |
+| line move min | 0.02 | 54 | +27.1% |
+| line move min | 0.03 | 22 | +31.4% |
+| confirm | either ← live | 99 | +17.6% |
+| confirm | BOTH | 51 | +31.2% |
