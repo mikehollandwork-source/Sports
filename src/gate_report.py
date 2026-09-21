@@ -127,7 +127,7 @@ def build(date: str) -> str:
            f"{'AND' if C.REQUIRE_BOTH_CONFIRMATIONS else 'or'} resting bid lean "
            f">{C.IMBALANCE_MIN}",
            f"6. **line against** — implied probability moved AWAY from that side "
-           f"by ≥{C.LINE_MOVE_MIN:.0%} (the price discount)", "",
+           f"by ≥{C.LINE_MOVE_MIN:.1%} (the price discount)", "",
            "_Gate 5 shows `—` when gate 4 gave nothing to read: no data and data "
            "pointing the wrong way are different problems._", ""]
 
