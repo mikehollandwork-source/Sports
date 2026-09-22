@@ -1260,12 +1260,19 @@ def _pick_line(g: dict) -> str:
     bet_team, ml = _bet_side(pc)
     adv_ab, opp_ab = (ha, aa) if bet_team == home else (aa, ha)
     mls = f" {ml:+d}" if isinstance(ml, int) else ""
-    mark = "⭐" if _star(pc) else "✅"
+    # A fade backs the other side of a withdrawn pick and settles into a
+    # SEPARATE book. Giving it the same tick as a rule pick reads as "bet this
+    # the same way", which is wrong on both counts - it did not pass the gates
+    # and it does not count toward the record.
+    is_fade = pc.get("source") == "fade"
+    mark = "🔁" if is_fade else ("⭐" if _star(pc) else "✅")
     live = "🔴 " if g.get("state") == "live" else ""
     line = f"{mark} {live}{adv_ab}{mls} vs {opp_ab}"
     st = _start_time(g)
     if st:
         line += f" · {st}"
+    if is_fade:
+        line += " · FADE (separate book)"
     return line
 
 

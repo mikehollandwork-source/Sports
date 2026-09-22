@@ -97,6 +97,7 @@ def check(results: list[dict], date: str, send=None) -> list[str]:
         if pc.get("play") == "pick" and pc.get("bet_team"):
             current[pk] = {"bet": pc["bet_team"],
                            "odds": pc.get("bet_moneyline"),
+                           "source": pc.get("source") or "rule",
                            "matchup": r.get("matchup")}
 
     for pk, was in known.items():
@@ -114,10 +115,23 @@ def check(results: list[dict], date: str, send=None) -> list[str]:
                 f"{was.get('bet')} {was.get('odds'):+d} is no longer a play. "
                 "The rule re-evaluated and it no longer qualifies.")
         elif now_pick["bet"] != was.get("bet"):
-            alerts.append(
-                f"🔄 SIDE FLIPPED — {was.get('matchup')}\n"
-                f"was {was.get('bet')} {was.get('odds'):+d}, now "
-                f"{now_pick['bet']} {now_pick['odds']:+d}.")
+            # A pick withdrawn and immediately replaced by the FADE rule is not
+            # the rule changing its mind - it is the pick dying and a separate
+            # book taking the other side. "SIDE FLIPPED" told the channel to
+            # back the new team as a play, which is wrong twice over: it never
+            # passed the gates, and it does not count toward the record.
+            if now_pick["source"] == "fade" and was.get("source") != "fade":
+                alerts.append(
+                    f"❌ WITHDRAWN — {was.get('matchup')}\n"
+                    f"{was.get('bet')} {was.get('odds'):+d} is no longer a "
+                    f"play.\n🔁 The FADE book now backs "
+                    f"{now_pick['bet']} {now_pick['odds']:+d} — separate book, "
+                    "not part of the main record.")
+            else:
+                alerts.append(
+                    f"🔄 SIDE FLIPPED — {was.get('matchup')}\n"
+                    f"was {was.get('bet')} {was.get('odds'):+d}, now "
+                    f"{now_pick['bet']} {now_pick['odds']:+d}.")
 
     # Keep withdrawn picks in the file, flagged, so the alert fires ONCE. The
     # first version re-announced every withdrawal on every rebuild - hourly spam
