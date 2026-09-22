@@ -1,0 +1,46 @@
+name: Margin form
+
+# Margin and form together, read as continuous strengths rather than binary
+# flags, with price held fixed by stratification - a big index gap and hot bats
+# both push a team toward being a favourite, so "both favour" is partly a price
+# bucket in a stat costume. Corrected for the tier x form-reading scan and
+# checked for split-half repeatability.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.margin_form
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Margin form $(date -u +%Y-%m-%d)" \
+            --body-file output/margin_form.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/margin_form.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Margin form ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
