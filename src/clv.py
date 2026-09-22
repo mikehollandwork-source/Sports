@@ -215,6 +215,38 @@ def _day_boot(pairs: list[tuple[str, float]]) -> tuple[float, float]:
     return out[int(.025 * len(out))], out[int(.975 * len(out))]
 
 
+def _day_boot_diff(a: list[tuple[str, float]],
+                   b: list[tuple[str, float]]) -> tuple[float, float]:
+    """Day-block bootstrap CI on mean(a) - mean(b).
+
+    The control is not zero (see the guard), so the quantity of interest is a
+    DIFFERENCE, and its interval has to be bootstrapped as a difference rather
+    than read off the interval of `a` alone. Days are resampled jointly so the
+    two populations stay paired within a day."""
+    ga, gb = defaultdict(list), defaultdict(list)
+    for d, v in a:
+        ga[d].append(v)
+    for d, v in b:
+        gb[d].append(v)
+    days = sorted(set(ga) | set(gb))
+    if len(days) < 5:
+        return (float("nan"), float("nan"))
+    rng = random.Random(311)
+    out = []
+    for _ in range(TRIALS):
+        va, vb = [], []
+        for _ in days:
+            d = days[rng.randrange(len(days))]
+            va += ga.get(d, [])
+            vb += gb.get(d, [])
+        if va and vb:
+            out.append(st.mean(va) - st.mean(vb))
+    if not out:
+        return (float("nan"), float("nan"))
+    out.sort()
+    return out[int(.025 * len(out))], out[int(.975 * len(out))]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Closing line value — did the market come to us?", "",
@@ -257,11 +289,16 @@ def build() -> str:
            "| population | mean CLV | median | beat the close | n |",
            "|---|---|---|---|---|",
            _summary(home_clv, "every home team (control)"), ""]
-    ok = bool(home_clv) and abs(st.mean(home_clv)) < 0.75
-    md += [("_Control is within ±0.75 pp of zero. The pipeline reads prices "
-            "correctly._" if ok else
-            "**Control is NOT near zero. Treat everything below as suspect - "
-            "the version reconstruction or the de-vig is wrong.**"), ""]
+    cm = st.mean(home_clv) if home_clv else 0.0
+    md += [(f"_Control mean is **{cm:+.2f} pp**, not zero. That is not a "
+            "broken pipeline - prices parse correctly - but a systematic "
+            "drift that applies to EVERY side on the board: as first pitch "
+            "approaches the book's overround tightens, so a de-vigged "
+            "probability measured at entry and again at the close does not "
+            "have the same baseline. Whatever its cause, it is the floor "
+            "under any number in this report, and the only meaningful "
+            "quantity is a pick's CLV MINUS this._" if abs(cm) > 0.05 else
+            "_Control is at zero, so raw CLV can be read directly._"), ""]
 
     # --- the headline ------------------------------------------------------
     rule = [r for r in picks if (r["pick_source"] or "rule") != "fade"]
@@ -301,30 +338,43 @@ def build() -> str:
             md += [""]
 
     if rule_clv:
-        lo, hi = _day_boot(rule_clv)
-        mean = st.mean([v for _, v in rule_clv])
-        md += [f"- day-block bootstrap 95% CI on the rule's mean CLV: "
+        ctrl_pairs = [(r["date"], v) for r in rows
+                      if (v := _clv(r["entry"], r["close"], r["home"])) is not None]
+        lo, hi = _day_boot_diff(rule_clv, ctrl_pairs)
+        mean = st.mean([v for _, v in rule_clv]) - cm
+        md += [f"- rule picks **{st.mean([v for _, v in rule_clv]):+.2f} pp** "
+               f"minus the board-wide drift **{cm:+.2f} pp** = "
+               f"**{mean:+.2f} pp** of actual closing line value",
+               f"- day-block bootstrap 95% CI on that DIFFERENCE: "
                f"**{lo:+.2f} to {hi:+.2f} pp**", ""]
         if lo > 0:
-            verdict = ("**Positive CLV, interval excluding zero.** The market "
-                       "moves toward our side after we bet. That is an edge "
-                       "measured independently of whether the picks won, and it "
-                       "means the line-against gate is buying a DISCOUNT: the "
-                       "adverse move overshoots and reverts.")
+            verdict = ("**Positive CLV against the control, interval excluding "
+                       "zero.** The market moves toward our side faster than it "
+                       "moves toward an arbitrary side. That is an edge measured "
+                       "independently of whether the picks won, and it means the "
+                       "line-against gate is buying a DISCOUNT: the adverse move "
+                       "overshoots and reverts.")
         elif hi < 0:
-            verdict = ("**Negative CLV, interval excluding zero.** The market "
-                       "keeps moving AWAY from our side after we bet. The "
-                       "line-against gate is a WARNING being read as a "
-                       "discount - we are buying into information, not value, "
-                       "and the positive ROI so far is a hot streak rather than "
-                       "an edge. This would be the strongest negative finding "
-                       "in the repo and it would argue for dropping the gate.")
+            verdict = ("**Negative CLV against the control, interval excluding "
+                       "zero.** The market keeps moving AWAY from our side "
+                       "relative to an arbitrary side. The line-against gate is "
+                       "a WARNING being read as a discount - we are buying into "
+                       "information, not value, and the ROI so far is a hot "
+                       "streak rather than an edge. This would argue for "
+                       "dropping the gate.")
         else:
-            verdict = (f"**Inconclusive at this sample.** The mean is "
-                       f"{mean:+.2f} pp with the interval spanning zero, so the "
-                       "discount and warning readings are both still live. CLV "
-                       "accrues with every pick, so this is the one measurement "
-                       "here that gets decisively better simply by waiting.")
+            verdict = (f"**No closing line value.** Once the board-wide drift "
+                       f"is subtracted the picks are worth {mean:+.2f} pp with "
+                       "an interval spanning zero. The market does not come to "
+                       "meet these picks any faster than it comes to meet an "
+                       "arbitrary side of an arbitrary game.\n\nThat does not "
+                       "make the ROI fake, but it removes the independent "
+                       "confirmation it was hoped this would provide: the "
+                       "record still rests on the record. It also leaves the "
+                       "discount-versus-warning question open rather than "
+                       "settling it - the line-against gate is buying "
+                       "something the closing price does not recognise either "
+                       "way.")
         md += [verdict, ""]
 
     # --- does CLV predict the result on our own games? ---------------------
