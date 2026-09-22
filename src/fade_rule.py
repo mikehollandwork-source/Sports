@@ -73,6 +73,19 @@ def _other_side(g: dict, bet: str) -> tuple[str, int] | None:
     return (other, odds) if isinstance(odds, int) else None
 
 
+def _same_side(g: dict, bet: str) -> tuple[str, int] | None:
+    """`bet` and ITS current price - used to re-assert a fade that is already
+    standing, rather than flipping it."""
+    m = g.get("matchup") or ""
+    if " @ " not in m or bet not in m.split(" @ "):
+        return None
+    pc = g.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    odds = (pc.get("advantage_moneyline") if bet == adv
+            else pc.get("opponent_moneyline"))
+    return (bet, odds) if isinstance(odds, int) else None
+
+
 def apply(results: list[dict], date: str) -> int:
     """Add a fade for every announced pick that no longer qualifies.
 
@@ -101,6 +114,24 @@ def apply(results: list[dict], date: str) -> int:
             continue                      # still a play; nothing was withdrawn
         if _started(r, now):
             continue                      # locked: the fade was never available
+        # A fade is triggered by the CONSENSUS rule withdrawing. If the posted
+        # pick is itself a fade, taking "the other side" flips the bet back to
+        # the team the rule withdrew - and because pick_watch then records THAT
+        # as the posted pick, the game flips again an hour later, forever. On
+        # 2026-09-22 one game was posted as Seattle -137, then Houston +120,
+        # then Seattle -130: both sides of the same game, both into the record.
+        # A standing fade is re-asserted at its current price instead.
+        if was.get("source") == "fade":
+            side = _same_side(r, was.get("bet"))
+            if not side:
+                continue
+            team, odds = side
+            pc.update({"play": "pick", "status": "PICK", "bet_team": team,
+                       "bet_moneyline": odds, "source": "fade",
+                       "reason": was.get("reason")
+                       or f"fade — standing bet on {team}"})
+            added += 1
+            continue
         side = _other_side(r, was.get("bet"))
         if not side:
             continue
