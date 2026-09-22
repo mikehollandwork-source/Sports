@@ -66,6 +66,9 @@ def evaluate_gates(g: dict, metrics: dict) -> dict:
         "money": chk.get("money") or "no money read",
         "start": g.get("game_datetime"),
         "play": pc.get("play"),
+        # fades do not come from these gates at all - see the verdict column
+        "source": pc.get("source") or "rule",
+        "bet": pc.get("bet_team"), "bet_odds": pc.get("bet_moneyline"),
         "gates": [
             chk.get("money") == "with public",
             bool(maj),
@@ -100,11 +103,28 @@ def build(date: str) -> str:
         if isinstance(r["odds"], int):
             side += f" {r['odds']:+d}"
         cells = " | ".join(_mark(v) for v in r["gates"])
-        verdict = "**PICK**" if r["play"] == "pick" else "no play"
+        # A fade backs the other side of a withdrawn pick and never passes
+        # through these gates, so labelling it "PICK" in this column reads as
+        # though the gates approved it - which is exactly backwards, and makes
+        # a correct board look broken.
+        if r["play"] == "pick" and r["source"] == "fade":
+            verdict = "**FADE** _(separate book)_"
+        elif r["play"] == "pick":
+            verdict = "**PICK**"
+        else:
+            verdict = "no play"
         md.append(f"| {i} | {r['matchup']} | {side} | {cells} | {verdict} |")
     md.append("")
 
-    picks = [r for r in rows if r["play"] == "pick"]
+    picks = [r for r in rows if r["play"] == "pick" and r["source"] != "fade"]
+    fades = [r for r in rows if r["play"] == "pick" and r["source"] == "fade"]
+    if fades:
+        md += ["_Rows marked **FADE** back the other side of a pick that was "
+               "withdrawn from an earlier board. They do not go through the "
+               "gates above - the gate cells on those rows evaluate that "
+               "game's consensus side, which is not the team the fade backs - "
+               "and they settle into a separate book that does not count "
+               "toward the main record._", ""]
     if picks:
         md += ["## How picks at these prices have done", "",
                "_Our own record, by price band. The gap to breakeven is the only "
@@ -114,6 +134,13 @@ def build(date: str) -> str:
         for r in picks:
             md.append(f"- **{r['side']} {r['odds']:+d}** ({r['matchup']}) — "
                       f"{pick_history.summary(r['odds'])}")
+        md.append("")
+    if fades:
+        md += ["## Fades on this board (separate book)", ""]
+        for r in fades:
+            if isinstance(r.get("bet_odds"), int):
+                md.append(f"- **{r['bet']} {r['bet_odds']:+d}** "
+                          f"({r['matchup']}) — {pick_history.summary(r['bet_odds'])}")
         md.append("")
 
     md += ["## Gate definitions", "",
