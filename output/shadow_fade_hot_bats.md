@@ -4,11 +4,11 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **43** · graded: **43**
+- qualifying games: **46** · graded: **45**
 
 ## Running record
 
-- **21-22** (49%) · -3.53u · **-8.2%** ROI
+- **21-24** (47%) · -5.53u · **-12.3%** ROI
 
 For context, and not as a target: the backtest cell returned +3.4% on n=34 with a corrected p of 0.478, and ~663 games would be needed to call a real +10% edge. At roughly 34 qualifying games a quarter this stays inconclusive for years.
 
@@ -16,8 +16,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 
 | date | matchup | bet | odds | result |
 |---|---|---|---|---|
-| 2026-08-15 | Texas Rangers @ Athletics | Texas Rangers | -125 | W +0.80u |
-| 2026-08-16 | New York Yankees @ Toronto Blue Jays | Toronto Blue Jays | -122 | L -1.00u |
 | 2026-08-16 | Seattle Mariners @ Houston Astros | Houston Astros | -130 | L -1.00u |
 | 2026-08-16 | Chicago White Sox @ Detroit Tigers | Detroit Tigers | -110 | L -1.00u |
 | 2026-08-18 | San Diego Padres @ New York Mets | San Diego Padres | -110 | W +0.91u |
@@ -56,3 +54,7 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-09-19 | Atlanta Braves @ Houston Astros | Houston Astros | -129 | L -1.00u |
 | 2026-09-20 | Minnesota Twins @ Los Angeles Angels | Minnesota Twins | -120 | W +0.83u |
 | 2026-09-20 | New York Yankees @ Arizona Diamondbacks | Arizona Diamondbacks | -113 | W +0.89u |
+| 2026-09-21 | Minnesota Twins @ San Francisco Giants | Minnesota Twins | -125 | L -1.00u |
+| 2026-09-21 | Toronto Blue Jays @ Baltimore Orioles | Toronto Blue Jays | -108 | L -1.00u |
+
+_1 recorded but not yet graded._
