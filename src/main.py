@@ -1251,29 +1251,30 @@ def _ml_str(pc: dict) -> str:
 
 
 def _pick_line(g: dict) -> str:
-    """Minimal board line: '✅ BOS +115 vs TOR · 7:10 PM ET' — the side we bet,
-    its moneyline, the opponent, and first pitch. Consensus picks bet the
-    ticket/handle side, which is often NOT the statistical favourite."""
+    """One board entry, written as an instruction rather than a notation.
+
+    'BET Texas Rangers -125' leaves nothing to work out; the old
+    '✅ TEX -125 vs NYM' made the reader decode an abbreviation and a tick to
+    find the team. The opponent, venue and first pitch go on a second,
+    indented line so the team and the price are never competing for attention.
+
+    Fades are tagged in words - they count in the record like anything else, so
+    the tag says where the pick came from and nothing more."""
     pc = g["pick_criteria"]
     aa, ha = _abbrs(g)
     away, home = g["matchup"].split(" @ ")
     bet_team, ml = _bet_side(pc)
-    adv_ab, opp_ab = (ha, aa) if bet_team == home else (aa, ha)
+    at_home = bet_team == home
+    opp_ab = aa if at_home else ha
     mls = f" {ml:+d}" if isinstance(ml, int) else ""
-    # A fade backs the other side of a withdrawn pick. It counts in the record
-    # like any other play, but it did not come through the gates, so it carries
-    # its own mark - the label is what tells the two apart now that the tally
-    # does not.
-    is_fade = pc.get("source") == "fade"
-    mark = "🔁" if is_fade else ("⭐" if _star(pc) else "✅")
-    live = "🔴 " if g.get("state") == "live" else ""
-    line = f"{mark} {live}{adv_ab}{mls} vs {opp_ab}"
+    star = " ⭐" if _star(pc) else ""
+    tag = "  ·  fade" if pc.get("source") == "fade" else ""
+    head = f"✅ BET {bet_team}{mls}{star}{tag}"
+    where = f"{'vs' if at_home else 'at'} {opp_ab}"
+    live = "🔴 LIVE · " if g.get("state") == "live" else ""
     st = _start_time(g)
-    if st:
-        line += f" · {st}"
-    if is_fade:
-        line += " · FADE"
-    return line
+    sub = f"     {live}{where}" + (f" · {st}" if st else "")
+    return f"{head}\n{sub}"
 
 
 def _telegram_records_lines() -> list[str]:
@@ -1313,7 +1314,12 @@ def telegram_text(payload: dict) -> str:
     # No-plays stay recorded in the picks JSON (backend); they're not shown.
     L = [f"⚾ MLB BOARD — {date}", ""]
     if picks:
-        L += [_pick_line(g) for g in picks]
+        L.append(f"{len(picks)} play{'s' if len(picks) != 1 else ''} today:")
+        L.append("")
+        for g in picks:
+            L.append(_pick_line(g))
+            L.append("")
+        L.pop()          # no trailing blank before the divider
     else:
         L.append("No plays on the board.")
 

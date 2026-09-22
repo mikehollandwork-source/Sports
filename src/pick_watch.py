@@ -111,25 +111,22 @@ def check(results: list[dict], date: str, send=None) -> list[str]:
             if was.get("withdrawn"):
                 continue          # already announced; do not re-fire every hour
             alerts.append(
-                f"❌ WITHDRAWN — {was.get('matchup')}\n"
-                f"{was.get('bet')} {was.get('odds'):+d} is no longer a play. "
-                "The rule re-evaluated and it no longer qualifies.")
+                f"❌ PICK REMOVED — {was.get('matchup')}\n"
+                f"DO NOT BET {was.get('bet')} {was.get('odds'):+d}.\n"
+                "No play on this game any more.")
         elif now_pick["bet"] != was.get("bet"):
-            # A pick withdrawn and immediately replaced by the FADE rule is
-            # not the rule changing its mind - it is the pick dying and the
-            # fade rule taking the other side. "SIDE FLIPPED" implied the
-            # consensus rule had re-picked, which it had not.
-            if now_pick["source"] == "fade" and was.get("source") != "fade":
-                alerts.append(
-                    f"❌ WITHDRAWN — {was.get('matchup')}\n"
-                    f"{was.get('bet')} {was.get('odds'):+d} is no longer a "
-                    f"play.\n🔁 FADE — now backing "
-                    f"{now_pick['bet']} {now_pick['odds']:+d} instead.")
-            else:
-                alerts.append(
-                    f"🔄 SIDE FLIPPED — {was.get('matchup')}\n"
-                    f"was {was.get('bet')} {was.get('odds'):+d}, now "
-                    f"{now_pick['bet']} {now_pick['odds']:+d}.")
+            # Whatever produced the change - the rule re-picking, or the pick
+            # dying and the fade rule taking the other side - the reader needs
+            # exactly two things: which team is off, and which team is on.
+            # "SIDE FLIPPED" and "FADE" named the mechanism instead, which left
+            # the actual instruction to be inferred.
+            why = ("  (fade — it replaced a pick that was removed)"
+                   if now_pick["source"] == "fade" and was.get("source") != "fade"
+                   else "")
+            alerts.append(
+                f"🔄 PICK CHANGED — {was.get('matchup')}\n"
+                f"❌ DO NOT BET {was.get('bet')} {was.get('odds'):+d}\n"
+                f"✅ BET {now_pick['bet']} {now_pick['odds']:+d}{why}")
 
     # Keep withdrawn picks in the file, flagged, so the alert fires ONCE. The
     # first version re-announced every withdrawal on every rebuild - hourly spam
