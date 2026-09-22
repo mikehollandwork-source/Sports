@@ -331,8 +331,11 @@ def build() -> str:
     graded = [r for r in rule if r["winner"]
               and _clv(r["pick_entry"], r["close"], r["pick"]) is not None]
     if len(graded) >= 40:
-        vals = sorted((_clv(r["pick_entry"], r["close"], r["pick"]), r)
-                      for r in graded)
+        # key= is required, not stylistic: exact-zero CLVs are common (the
+        # price simply did not move), and on a tie Python falls back to
+        # comparing the dicts, which raises. The 4-pick dry-run never tied.
+        vals = sorted(((_clv(r["pick_entry"], r["close"], r["pick"]), r)
+                       for r in graded), key=lambda t: t[0])
         third = len(vals) // 3
         groups = [("worst CLV third", vals[:third]),
                   ("middle third", vals[third:2 * third]),
