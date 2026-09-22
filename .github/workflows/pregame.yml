@@ -83,8 +83,15 @@ jobs:
           END=$(( $(date +%s) + 285*60 ))   # loop for ~4.75h, then the job ends
           while [ "$(date +%s)" -lt "$END" ]; do
             git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
-            # --telegram forces the board to the phone every hour, on the hour
-            python -m src.pregame --telegram || echo "pregame errored this tick, continuing"
+            # POST the board on the hour; rebuild SILENTLY at a lock wake, so
+            # a game freezes on fresh data without putting an extra eight
+            # boards on the phone. pick_watch still announces withdrawals and
+            # changes on every rebuild, including the silent ones.
+            if [ "${WAKE_KIND:-hour}" = "lock" ]; then
+              python -m src.pregame || echo "pregame errored this tick, continuing"
+            else
+              python -m src.pregame --telegram || echo "pregame errored this tick, continuing"
+            fi
             git add output/
             if ! git diff --staged --quiet; then
               git commit -m "Pre-game refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
@@ -94,10 +101,22 @@ jobs:
                 echo "push retry $i"; sleep 5
               done
             fi
-            # sleep to the NEXT top of the hour, so the next post lands on the hour
-            NOW=$(date +%s); NEXT=$(( (NOW/3600 + 1)*3600 ))
-            SLEEP=$(( NEXT - NOW ))
+            # Sleep to whichever comes first: the next top of the hour, or two
+            # minutes before the next game FREEZES (first pitch - 15 min). A
+            # game locks on whatever the last board computed, and on the hourly
+            # cadence alone that read was 20-55 minutes old - stale on exactly
+            # the two inputs the rule uses, the order book and the line.
+            WAKE=$(python -m src.next_wake 2>/dev/null) || WAKE=""
+            NEXT=$(echo "$WAKE" | cut -d" " -f1)
+            WAKE_KIND=$(echo "$WAKE" | cut -d" " -f2)
+            case "$NEXT" in
+              ''|*[!0-9]*)      # unreadable: fall back to the top of the hour
+                NOW=$(date +%s); NEXT=$(( (NOW/3600 + 1)*3600 )); WAKE_KIND=hour ;;
+            esac
+            export WAKE_KIND
+            NOW=$(date +%s); SLEEP=$(( NEXT - NOW ))
+            [ "$SLEEP" -gt 0 ] || SLEEP=60
             [ "$(( NEXT ))" -lt "$END" ] || break   # don't nap past the job's end
-            echo "next board at $(date -u -d @${NEXT} +%H:%MZ) (sleeping ${SLEEP}s)"
+            echo "next board at $(date -u -d @${NEXT} +%H:%MZ) (${WAKE_KIND}, sleeping ${SLEEP}s)"
             sleep "$SLEEP"
           done
