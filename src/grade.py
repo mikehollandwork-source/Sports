@@ -433,19 +433,29 @@ def update_ledger(date: str) -> dict:
         save_ledger(ledger)
         return ledger
     pe = grade_date(date)
-    # Fades go to their own book and are NOT part of the main record.
+    # Fades count in the MAIN record (user's call, 2026-09-22, reversing the
+    # separate-book split of the day before). They stay tagged `source: fade`
+    # on the entry and labelled on the board, so they remain identifiable -
+    # what changed is only where they are tallied.
+    #
+    # Nothing is restated: the fades book was still empty when this changed, so
+    # no settled bet moved between books and the all-time record was untouched.
+    # The migration below exists only so a fade settled by a run between the
+    # decision and this deploy is not stranded in the old book.
     ledger.setdefault("fades", _empty_book())
-    fades = [e for e in pe if e.get("source") == "fade"]
-    plays = [e for e in pe if e.get("source") != "fade"]
-    added = _add(ledger["plays"], plays)
-    added_f = _add(ledger["fades"], fades)
-    if added or added_f:
+    stranded = ledger["fades"]["entries"]
+    if stranded:
+        moved = _add(ledger["plays"], stranded)
+        log.info("migrated %d fade(s) from the separate book into plays", moved)
+        ledger["fades"] = _empty_book()
+    added = _add(ledger["plays"], pe)
+    if added:
         ledger["review"] = review(ledger["plays"])
-        log.info("graded %s: plays %+.2f (%d-%d) · fades %+.2f (%d-%d)",
-                 date, ledger["plays"]["bankroll"], ledger["plays"]["record"]["wins"],
-                 ledger["plays"]["record"]["losses"],
-                 ledger["fades"]["bankroll"], ledger["fades"]["record"]["wins"],
-                 ledger["fades"]["record"]["losses"])
+        nf = sum(1 for e in pe if e.get("source") == "fade")
+        log.info("graded %s: plays %+.2f (%d-%d), of which %d fade(s)",
+                 date, ledger["plays"]["bankroll"],
+                 ledger["plays"]["record"]["wins"],
+                 ledger["plays"]["record"]["losses"], nf)
     else:
         log.info("nothing new to settle for %s", date)
     # Always persist so the ledger artifact exists from the first grade onward
@@ -496,10 +506,9 @@ def bankroll_line(ledger: dict | None = None) -> str:
     """One-line summary of the books for the daily issue."""
     ledger = ledger or load_ledger()
     out = _book_line("Plays", ledger["plays"])
-    fb = ledger.get("fades") or _empty_book()
-    if fb["entries"]:
-        out += "  ·  " + _book_line("Fades (separate)", fb)
-    return out + "  _($1/bet at pre-game moneyline · fades excluded from the record)_"
+    nf = sum(1 for e in ledger["plays"]["entries"] if e.get("source") == "fade")
+    suffix = f" · incl. {nf} fade{'s' if nf != 1 else ''}" if nf else ""
+    return out + f"  _($1/bet at pre-game moneyline{suffix})_"
 
 
 # --- windowed records (Day / Week / Month / YTD) ------------------------------

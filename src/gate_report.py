@@ -108,7 +108,7 @@ def build(date: str) -> str:
         # though the gates approved it - which is exactly backwards, and makes
         # a correct board look broken.
         if r["play"] == "pick" and r["source"] == "fade":
-            verdict = "**FADE** _(separate book)_"
+            verdict = "**FADE**"
         elif r["play"] == "pick":
             verdict = "**PICK**"
         else:
@@ -122,9 +122,9 @@ def build(date: str) -> str:
         md += ["_Rows marked **FADE** back the other side of a pick that was "
                "withdrawn from an earlier board. They do not go through the "
                "gates above - the gate cells on those rows evaluate that "
-               "game's consensus side, which is not the team the fade backs - "
-               "and they settle into a separate book that does not count "
-               "toward the main record._", ""]
+               "game's consensus side, which is not the team the fade backs. "
+               "They DO count in the record like any other play; the label is "
+               "there so you can tell which is which._", ""]
     if picks:
         md += ["## How picks at these prices have done", "",
                "_Our own record, by price band. The gap to breakeven is the only "
@@ -136,7 +136,7 @@ def build(date: str) -> str:
                       f"{pick_history.summary(r['odds'])}")
         md.append("")
     if fades:
-        md += ["## Fades on this board (separate book)", ""]
+        md += ["## Fades on this board", ""]
         for r in fades:
             if isinstance(r.get("bet_odds"), int):
                 md.append(f"- **{r['bet']} {r['bet_odds']:+d}** "

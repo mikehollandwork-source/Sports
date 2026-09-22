@@ -115,18 +115,16 @@ def check(results: list[dict], date: str, send=None) -> list[str]:
                 f"{was.get('bet')} {was.get('odds'):+d} is no longer a play. "
                 "The rule re-evaluated and it no longer qualifies.")
         elif now_pick["bet"] != was.get("bet"):
-            # A pick withdrawn and immediately replaced by the FADE rule is not
-            # the rule changing its mind - it is the pick dying and a separate
-            # book taking the other side. "SIDE FLIPPED" told the channel to
-            # back the new team as a play, which is wrong twice over: it never
-            # passed the gates, and it does not count toward the record.
+            # A pick withdrawn and immediately replaced by the FADE rule is
+            # not the rule changing its mind - it is the pick dying and the
+            # fade rule taking the other side. "SIDE FLIPPED" implied the
+            # consensus rule had re-picked, which it had not.
             if now_pick["source"] == "fade" and was.get("source") != "fade":
                 alerts.append(
                     f"❌ WITHDRAWN — {was.get('matchup')}\n"
                     f"{was.get('bet')} {was.get('odds'):+d} is no longer a "
-                    f"play.\n🔁 The FADE book now backs "
-                    f"{now_pick['bet']} {now_pick['odds']:+d} — separate book, "
-                    "not part of the main record.")
+                    f"play.\n🔁 FADE — now backing "
+                    f"{now_pick['bet']} {now_pick['odds']:+d} instead.")
             else:
                 alerts.append(
                     f"🔄 SIDE FLIPPED — {was.get('matchup')}\n"

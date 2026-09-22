@@ -1260,10 +1260,10 @@ def _pick_line(g: dict) -> str:
     bet_team, ml = _bet_side(pc)
     adv_ab, opp_ab = (ha, aa) if bet_team == home else (aa, ha)
     mls = f" {ml:+d}" if isinstance(ml, int) else ""
-    # A fade backs the other side of a withdrawn pick and settles into a
-    # SEPARATE book. Giving it the same tick as a rule pick reads as "bet this
-    # the same way", which is wrong on both counts - it did not pass the gates
-    # and it does not count toward the record.
+    # A fade backs the other side of a withdrawn pick. It counts in the record
+    # like any other play, but it did not come through the gates, so it carries
+    # its own mark - the label is what tells the two apart now that the tally
+    # does not.
     is_fade = pc.get("source") == "fade"
     mark = "🔁" if is_fade else ("⭐" if _star(pc) else "✅")
     live = "🔴 " if g.get("state") == "live" else ""
@@ -1272,7 +1272,7 @@ def _pick_line(g: dict) -> str:
     if st:
         line += f" · {st}"
     if is_fade:
-        line += " · FADE (separate book)"
+        line += " · FADE"
     return line
 
 
@@ -1282,13 +1282,11 @@ def _telegram_records_lines() -> list[str]:
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
-    # Fades are a SEPARATE book and never counted toward the record (user's
-    # call). Shown underneath with their own ROI so both can be judged on their
-    # own evidence rather than blended into one unreadable number.
+    # Fades count in the MAIN record (user's call, 2026-09-22). They stay
+    # tagged on the entry and labelled 🔁 FADE on the board, so they are still
+    # identifiable game by game - they are simply tallied here with everything
+    # else rather than held apart.
     books = [("Plays", ledger["plays"])]
-    fb = ledger.get("fades")
-    if fb and fb.get("entries"):
-        books.append(("Fades (separate — not in the record)", fb))
     for name, book in books:
         rec = grade.windowed_records(book, today)
         if not rec:
