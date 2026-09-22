@@ -121,7 +121,8 @@ def collect() -> list[dict]:
             if tot <= 0:
                 continue
             recs.append({
-                "date": date, "odds": a_ml, "won": res["winner"] == adv,
+                "date": date, "odds": a_ml, "opp_odds": o_ml,
+                "won": res["winner"] == adv,
                 "margin": margin, "team delta": team_gap, "hot bats": hot_gap,
                 "either": max(team_gap, hot_gap),
                 "p": _implied(a_ml) / tot,
@@ -239,10 +240,10 @@ def build() -> str:
             if per_band:
                 plans.append(per_band)
     rng = random.Random(404)
-    null = []
+    null, null_min = [], []
     for _ in range(TRIALS):
         flips = [rng.random() < p for p in probs]
-        best = None
+        best = worst = None
         for per_band in plans:
             num = den = 0.0
             for h, m in per_band:
@@ -252,8 +253,10 @@ def build() -> str:
                 den += len(h)
             v = (num / den * 100) if den else 0.0
             best = v if best is None else max(best, v)
+            worst = v if worst is None else min(worst, v)
         if best is not None:
             null.append(best)
+            null_min.append(worst)
     p = (sum(1 for x in null if x >= bd) + 1) / (len(null) + 1) if null else 1.0
     md += ["## Does the best corner beat the search that found it?", "",
            f"- best: **{bt} / {bf}**, price-stratified delta **{bd:+.1f} pts**",
@@ -263,6 +266,35 @@ def build() -> str:
            f"- **corrected p = {p:.3f}**", "",
            ("**Clears the scan.**" if p < 0.05
             else "**Does not clear the scan.**"), ""]
+
+    # --- the other direction, paid for separately ---------------------------
+    # Every cell above came out negative, so the honest follow-up is whether
+    # FADING the strong corner is a play. Choosing that direction after seeing
+    # the signs is exactly how the underdog scan's "fade the losing cell" error
+    # happened, so it gets its own correction: the MOST NEGATIVE delta a redraw
+    # manufactures across the same nine cells. Same scan, other tail.
+    wt, wf, wh, wd = min(live, key=lambda x: x[3])
+    p_fade = ((sum(1 for x in null_min if x <= wd) + 1) / (len(null_min) + 1)
+              if null_min else 1.0)
+    fade_rows = [{"odds": r["opp_odds"], "won": not r["won"], "date": r["date"],
+                  "toward": r["toward"]} for r in wh]
+    md += ["## The other direction - is fading the strong corner a play?", "",
+           f"- worst cell: **{wt} / {wf}**, price-stratified delta "
+           f"**{wd:+.1f} pts** on n={len(wh)}",
+           f"- backing the OTHER team in those games: {_fmt(fade_rows)}",
+           f"- most negative delta a redraw manufactures: median "
+           f"**{st.median(null_min):+.1f}**, 5th pct "
+           f"**{sorted(null_min)[int(.05*len(null_min))]:+.1f}**",
+           f"- **corrected p (min-statistic) = {p_fade:.3f}**", "",
+           ("**The fade clears its own scan.** Worth a shadow ledger, not a "
+            "board change - and note the direction was chosen after seeing the "
+            "signs, which the correction accounts for but a forward record "
+            "would settle properly."
+            if p_fade < 0.05 and _roi(fade_rows) > 0 else
+            "**The fade does not clear.** Nine cells scanned on redrawn "
+            "outcomes produce a cell this bad often enough that its badness is "
+            "the width of the search - and picking the direction after seeing "
+            "the signs is the error the underdog scan already made once."), ""]
 
     # --- split-half on the tier ladder -------------------------------------
     rh = random.Random(31)
