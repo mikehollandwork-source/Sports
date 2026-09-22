@@ -31,6 +31,15 @@ _Baseline for comparison: backing the stat side in every game is 528-437 · -17.
 
 **Does not clear the scan.**
 
+## The other direction - is fading the strong corner a play?
+
+- worst cell: **both top third / hot bats**, price-stratified delta **-18.6 pts** on n=140
+- backing the OTHER team in those games: 72-68 · +14.8u · **+10.6%** (n=140)
+- most negative delta a redraw manufactures: median **-6.9**, 5th pct **-20.0**
+- **corrected p (min-statistic) = 0.069**
+
+**The fade does not clear.** Nine cells scanned on redrawn outcomes produce a cell this bad often enough that its badness is the width of the search - and picking the direction after seeing the signs is the error the underdog scan already made once.
+
 ## Does the ladder repeat? (split-half)
 
 | tier / form | half A | half B |
