@@ -39,13 +39,26 @@ moneylines are stored, so every price is de-vigged before comparison:
 
 Positive CLV means the side shortened after we bought it.
 
-THE GUARD THAT MATTERS
-A reconstruction like this can silently produce nonsense, so a control that MUST
-come out near zero is computed alongside: the same measurement applied to every
-home team on the board, picked or not. The market does not systematically drift
-toward home teams, so if that control is not ~0 the pipeline is broken and no
-other number in this report can be trusted. Games whose first and last version
-are the same commit are excluded, since their CLV is mechanically zero.
+THE BASELINE, WHICH IS WHY THE FIRST VERSION OF THIS WAS WRONG
+A control is computed alongside: the same measurement on every home team on the
+board, picked or not. It was built as a pass/fail guard against a broken
+reconstruction, on the assumption that the market does not systematically drift
+toward home teams and the control would therefore sit at zero.
+
+It does not sit at zero - it comes out around +0.25 pp - and prices parse
+correctly, so this is not a broken pipeline. As first pitch approaches the
+book's overround tightens, so a de-vigged probability measured at entry and
+again at the close does not share a baseline. Every side of every game inherits
+that drift.
+
+That makes the control a BASELINE TO SUBTRACT, not a threshold to clear, and it
+is the whole finding: the first version of this file compared the picks' +0.32
+pp against zero, called the interval clear, and reported closing line value that
+does not exist. The real quantity is the difference, and its interval has to be
+bootstrapped as a difference.
+
+Games whose first and last version are the same commit are excluded, since their
+CLV is mechanically zero.
 
 Writes output/clv.md.
 """
@@ -281,11 +294,13 @@ def build() -> str:
     # --- the guard, first, because nothing else counts if it fails ---------
     home_clv = [v for r in rows
                 if (v := _clv(r["entry"], r["close"], r["home"])) is not None]
-    md += ["## The guard (read this before anything else)", "",
+    md += ["## The baseline (read this before anything else)", "",
            "_The same measurement applied to every home team, picked or not. "
-           "The market does not systematically drift toward home teams, so this "
-           "MUST come out near zero. If it does not, the reconstruction is "
-           "broken and no number below can be trusted._", "",
+           "It was built as a pass/fail guard on the assumption it would come "
+           "out at zero. It does not, and that turned out to be the important "
+           "result rather than a failure: whatever the board-wide drift is, "
+           "every pick inherits it, so it is a baseline to subtract and not a "
+           "threshold to clear._", "",
            "| population | mean CLV | median | beat the close | n |",
            "|---|---|---|---|---|",
            _summary(home_clv, "every home team (control)"), ""]
