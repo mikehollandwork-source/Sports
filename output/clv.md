@@ -17,7 +17,7 @@ _The same measurement applied to every home team, picked or not. The market does
 |---|---|---|---|---|
 | every home team (control) | **+0.25 pp** | +0.03 pp | 51% | 1167 |
 
-_Control is within ±0.75 pp of zero. The pipeline reads prices correctly._
+_Control mean is **+0.25 pp**, not zero. That is not a broken pipeline - prices parse correctly - but a systematic drift that applies to EVERY side on the board: as first pitch approaches the book's overround tightens, so a de-vigged probability measured at entry and again at the close does not have the same baseline. Whatever its cause, it is the floor under any number in this report, and the only meaningful quantity is a pick's CLV MINUS this._
 
 ## Our picks
 
@@ -29,9 +29,12 @@ _Control is within ±0.75 pp of zero. The pipeline reads prices correctly._
 
 - picks whose price did not move at all between entry and close: **34/233** (15%)
 
-- day-block bootstrap 95% CI on the rule's mean CLV: **+0.12 to +0.52 pp**
+- rule picks **+0.32 pp** minus the board-wide drift **+0.25 pp** = **+0.07 pp** of actual closing line value
+- day-block bootstrap 95% CI on that DIFFERENCE: **-0.18 to +0.29 pp**
 
-**Positive CLV, interval excluding zero.** The market moves toward our side after we bet. That is an edge measured independently of whether the picks won, and it means the line-against gate is buying a DISCOUNT: the adverse move overshoots and reverts.
+**No closing line value.** Once the board-wide drift is subtracted the picks are worth +0.07 pp with an interval spanning zero. The market does not come to meet these picks any faster than it comes to meet an arbitrary side of an arbitrary game.
+
+That does not make the ROI fake, but it removes the independent confirmation it was hoped this would provide: the record still rests on the record. It also leaves the discount-versus-warning question open rather than settling it - the line-against gate is buying something the closing price does not recognise either way.
 
 ## Does CLV predict the result on our own picks?
 
