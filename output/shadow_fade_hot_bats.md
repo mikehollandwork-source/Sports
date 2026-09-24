@@ -4,11 +4,11 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **50** · graded: **47**
+- qualifying games: **50** · graded: **50**
 
 ## Running record
 
-- **22-25** (47%) · -5.73u · **-12.2%** ROI
+- **23-27** (46%) · -6.96u · **-13.9%** ROI
 
 For context, and not as a target: the backtest cell returned +3.4% on n=34 with a corrected p of 0.478, and ~663 games would be needed to call a real +10% edge. At roughly 34 qualifying games a quarter this stays inconclusive for years.
 
@@ -16,9 +16,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 
 | date | matchup | bet | odds | result |
 |---|---|---|---|---|
-| 2026-08-18 | San Diego Padres @ New York Mets | San Diego Padres | -110 | W +0.91u |
-| 2026-08-18 | New York Yankees @ Baltimore Orioles | New York Yankees | -110 | W +0.91u |
-| 2026-08-19 | San Diego Padres @ New York Mets | San Diego Padres | -128 | L -1.00u |
 | 2026-08-19 | Atlanta Braves @ Minnesota Twins | Atlanta Braves | -104 | L -1.00u |
 | 2026-08-20 | New York Yankees @ Baltimore Orioles | New York Yankees | -121 | W +0.83u |
 | 2026-08-22 | Chicago Cubs @ Seattle Mariners | Seattle Mariners | -108 | W +0.93u |
@@ -56,5 +53,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-09-21 | Toronto Blue Jays @ Baltimore Orioles | Toronto Blue Jays | -108 | L -1.00u |
 | 2026-09-22 | San Diego Padres @ Los Angeles Dodgers | Los Angeles Dodgers | -124 | W +0.81u |
 | 2026-09-22 | Los Angeles Angels @ Athletics | Los Angeles Angels | -107 | L -1.00u |
-
-_3 recorded but not yet graded._
+| 2026-09-23 | Chicago White Sox @ Kansas City Royals | Chicago White Sox | -115 | L -1.00u |
+| 2026-09-23 | Cleveland Guardians @ Boston Red Sox | Boston Red Sox | -130 | W +0.77u |
+| 2026-09-23 | Los Angeles Angels @ Athletics | Los Angeles Angels | -129 | L -1.00u |
