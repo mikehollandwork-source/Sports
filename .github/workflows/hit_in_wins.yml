@@ -5,6 +5,15 @@ name: Hit in wins
 # live MLB Stats API, which the dev sandbox firewalls.
 on:
   workflow_dispatch:
+    inputs:
+      team:
+        description: "Team name as the board writes it (e.g. New York Yankees)"
+        required: false
+        default: "Cleveland Guardians"
+      date:
+        description: "Board date (YYYY-MM-DD); blank = today, US/Eastern"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -22,7 +31,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run
-        run: python -m src.hit_in_wins
+        env:
+          TEAM: ${{ inputs.team }}
+          BOARD_DATE: ${{ inputs.date }}
+        run: |
+          if [ -n "$BOARD_DATE" ]; then
+            python -m src.hit_in_wins --team "$TEAM" --date "$BOARD_DATE"
+          else
+            python -m src.hit_in_wins --team "$TEAM"
+          fi
       - name: Post results issue
         env:
           GH_TOKEN: ${{ github.token }}
