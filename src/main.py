@@ -173,6 +173,13 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("fade rule failed (board unaffected): %s", exc)
 
+    # Last of all: collapse a market that arrived under two game ids, so the
+    # board cannot post the same bet twice (see _dedupe_same_market).
+    try:
+        _dedupe_same_market(results)
+    except Exception as exc:
+        log.warning("duplicate-market dedupe failed (board unaffected): %s", exc)
+
     # Tag each game's live state (upcoming / live / final) for the board.
     try:
         states = results_for(date)
@@ -227,6 +234,58 @@ def _parse_iso(s: str | None) -> dt.datetime | None:
         return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+# HOTFIX 2026-09-25: one market, two game ids.
+# Baltimore @ NY Yankees arrived as game_pk 823489 and 823491, five minutes
+# apart (4:05 and 4:10 PM). They are not a doubleheader - the order-book log
+# shows both tracking OPPOSITE SIDES of a single Polymarket market: identical
+# reading timestamps, and bid/ask sizes that are exact mirrors (52.36/2891.84
+# against 2891.84/52.36). Because the readings mirror, so does everything
+# derived from them (drift -0.055/+0.055, imbalance -0.702/+0.702), and the
+# rule resolved both ids to the same bet. The board posted "BET New York
+# Yankees -115" twice, which is two units of exposure to one outcome and would
+# have booked into the ledger twice.
+#
+# A real doubleheader is hours apart (Cubs @ Boston, 1:05 and 5:35 PM), so a
+# 30-minute window separates the two cases without touching legitimate ones.
+# This is the narrow fix; deduping on market identity belongs in the schedule
+# layer where the ids are read, not here.
+DUP_WINDOW = dt.timedelta(minutes=30)
+
+
+def _dedupe_same_market(results: list) -> int:
+    """Drop a pick that repeats another pick's matchup within DUP_WINDOW."""
+    by_matchup: dict = {}
+    for r in results:
+        if (r.get("pick_criteria") or {}).get("play") != "pick":
+            continue
+        by_matchup.setdefault(r.get("matchup") or "", []).append(r)
+
+    dropped = 0
+    for games in by_matchup.values():
+        if len(games) < 2:
+            continue
+        games.sort(key=lambda g: (g.get("game_datetime") or "", g.get("game_pk") or 0))
+        kept, kept_start = games[0], _parse_iso(games[0].get("game_datetime"))
+        for g in games[1:]:
+            st = _parse_iso(g.get("game_datetime"))
+            if (kept_start and st
+                    and abs(st - kept_start) <= DUP_WINDOW):
+                pc = g["pick_criteria"]
+                pc["play"] = "stay_away"
+                pc["status"] = "NO PLAY"
+                pc["reason"] = (
+                    f"duplicate market — same matchup as game "
+                    f"{kept.get('game_pk')} starting within 30 minutes; one "
+                    "market listed under two game ids, so this would double "
+                    "the same bet")
+                dropped += 1
+            else:
+                kept, kept_start = g, st        # a real doubleheader
+    if dropped:
+        log.warning("dropped %d duplicate-market pick(s)", dropped)
+    return dropped
 
 
 def _lock_started_games(date: str, results: list) -> list:
