@@ -125,6 +125,41 @@ def build() -> str:
             md.append(f"| ↳ sample | `{r.get('away_abbr')}` money "
                       f"{r.get('away_money')} / `{r.get('home_abbr')}` money "
                       f"{r.get('home_money')} | | | | |")
+    # --- why does the parser find so few games? ------------------------------
+    # The first run returned ONE row from a 361 KB page carrying 201 percent
+    # tokens, on a 13-game slate. That is not decay at the fetch layer - the
+    # data is in the HTML and the parser is not reaching it. These counters
+    # localise the failure: how many team names it recognises, how many ML
+    # price tokens it sees, how many (team, handle, bets) entries it collects,
+    # and how many survive the today/tomorrow dedupe.
+    soup, text, _ = PS._fetch(PS.VSIN_URL)
+    md += ["", "## Why the VSIN parser finds so few games", ""]
+    if soup is None:
+        md += ["_Fetch failed on the diagnostic pass._", ""]
+    else:
+        toks = [t for t in soup.stripped_strings]
+        abbrs = [t for t in toks if PS._name_abbr(t)]
+        mls = [t for t in toks if PS._VSIN_ML.fullmatch(t)]
+        pcts = [t for t in toks if PS._VSIN_PCT.fullmatch(t)]
+        rows = PS._parse_vsin(soup)
+        md += ["| measure | count |", "|---|---|",
+               f"| text tokens on the page | {len(toks):,} |",
+               f"| tokens recognised as a team | **{len(abbrs)}** |",
+               f"| distinct teams recognised | {len(set(PS._name_abbr(t) for t in abbrs))} |",
+               f"| moneyline price tokens | **{len(mls)}** |",
+               f"| percent tokens the parser's regex accepts | {len(pcts)} |",
+               f"| rows the parser returns | **{len(rows)}** |", "",
+               "_A slate has ~13 games, so ~26 team tokens and ~26 ML prices "
+               "are expected. Team tokens far below that means `_name_abbr` is "
+               "not matching the page's team spelling; ML tokens far below it "
+               "means the price format changed. Both are one-line fixes once "
+               "seen - guessing which, without looking, is how the covers "
+               "parsers rotted._", "",
+               "### First team-like tokens, as the page writes them", "",
+               "```", ", ".join(abbrs[:12]) or "(none)", "```", "",
+               "### First 40 tokens verbatim", "", "```",
+               " | ".join(t[:18] for t in toks[:40]), "```", ""]
+
     md += ["", "_A view that parses rows with the EXISTING parser is the "
            "cheapest third source available: no new selectors, no new decay "
            "surface. Note the redirect check — several book views may serve "
