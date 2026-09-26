@@ -38,13 +38,26 @@ _The first pass printed only the first of these, which hid whatever the other el
 
 | variant | status | bytes | has ml_*_money | has 'value' bets |
 |---|---|---|---|---|
-| v1 scoreboard | 200 | 449,281 | **yes** | no |
+| v1 scoreboard | 200 | 449,319 | **yes** | no |
 | v1 + periods/props | 400 | 113 | no | no |
-| v1 + date | 200 | 449,281 | **yes** | no |
-| v2 public betting | 200 | 470,050 | no | yes |
-| v2 public betting + date | 200 | 470,050 | no | yes |
+| v1 + date | 200 | 449,319 | **yes** | no |
+| v2 public betting | 200 | 470,065 | no | yes |
+| v2 public betting + date | 200 | 470,065 | no | yes |
 
 _A variant answering **yes** in the ml_*_money column is the call to build against._
+
+## Inside v2's `bet_info`
+
+- top-level keys: `league, games, market_rules, content_live_count`
+- games: **15**
+
+_First game's keys:_
+
+```
+id, league_id, status, real_status, status_display, start_time, away_team_id, home_team_id, winning_team_id, league_name, type, season, week, attendance, coverage, is_free, trending, away_rotation_number, home_rotation_number, teams, meta, num_bets, core_id, boxscore, player_stats, broadcast
+```
+
+_This game has no `bet_info`; the key may sit elsewhere or only on games with action._
 
 _Keys exist but do not resolve into per-game away/home pairs here; the parser would need the sub-object that does._
 
