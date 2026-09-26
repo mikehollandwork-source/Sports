@@ -45,6 +45,20 @@ log = logging.getLogger("action_probe")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 URL = "https://api.actionnetwork.com/web/v1/scoreboard/mlb"
+# The bare scoreboard carries num_bets but no per-side money. Public betting
+# usually rides on the odds sub-objects and often needs asking for: these are
+# the variants worth trying before concluding the shares are not exposed.
+import datetime as _dt
+_TODAY = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d")
+VARIANTS = [
+    ("v1 scoreboard", URL),
+    ("v1 + periods/props", URL + "?period=game&include=betting,polls"),
+    ("v1 + date", f"{URL}?date={_TODAY}"),
+    ("v2 public betting",
+     "https://api.actionnetwork.com/web/v2/scoreboard/publicbetting/mlb"),
+    ("v2 public betting + date",
+     f"https://api.actionnetwork.com/web/v2/scoreboard/publicbetting/mlb?date={_TODAY}"),
+]
 BROWSER = {
     "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                    "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -101,13 +115,14 @@ def build() -> str:
                                "The hunt saw them in the raw text, so they may "
                                "sit under a query parameter this call omits.", ""])
 
-    path, obj = hits[0]
-    md += ["## Where the numbers sit", "", f"- first at `{path}`", "",
-           "_That object's keys:_", "", "```",
-           ", ".join(list(obj)[:24]), "```", "",
-           "_Its money-ish values:_", "", "```",
-           json.dumps({k: obj.get(k) for k in MONEY_KEYS if k in obj},
-                      indent=1)[:500], "```", ""]
+    md += ["## Every object carrying a money-ish key", "",
+           "_The first pass printed only the first of these, which hid "
+           "whatever the other eleven were._", "",
+           "| path | money keys and values |", "|---|---|"]
+    for path, obj in hits[:14]:
+        vals = {k: obj.get(k) for k in MONEY_KEYS if k in obj}
+        md.append(f"| `{path}` | `{json.dumps(vals)[:110]}` |")
+    md.append("")
 
     # do away+home actually sum to ~100 per game?
     pairs, named = [], 0
@@ -131,7 +146,24 @@ def build() -> str:
         ok = sum(1 for s in sums if 95 <= s <= 105)
         md += [f"- pairs summing to 95–105: **{ok}/{len(pairs)}**",
                f"- sample: {pairs[:4]}"]
-    md += [f"- games with two named teams: **{named}**", "",
+    md += [f"- games with two named teams: **{named}**", ""]
+
+    # If the bare call has no shares, ask the ways the site's own front end
+    # does. A source that needs a parameter is still a source.
+    md += ["## Other request shapes", "",
+           "| variant | status | bytes | has ml_*_money | has 'value' bets |",
+           "|---|---|---|---|---|"]
+    for label, u in VARIANTS:
+        try:
+            rr = requests.get(u, headers=BROWSER, timeout=25)
+            body = rr.text
+            md.append(f"| {label} | {rr.status_code} | {len(body):,} | "
+                      f"{'**yes**' if 'ml_away_money' in body else 'no'} | "
+                      f"{'yes' if 'public_betting' in body or 'bet_info' in body else 'no'} |")
+        except Exception as exc:
+            md.append(f"| {label} | {type(exc).__name__} | — | — | — |")
+    md += ["", "_A variant answering **yes** in the ml_*_money column is the "
+           "call to build against._", "",
            ("_Money keys present, paired, summing to ~100 across a full slate "
             "is a usable handle source._" if pairs and named else
             "_Keys exist but do not resolve into per-game away/home pairs "
