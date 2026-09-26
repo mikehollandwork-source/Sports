@@ -1,0 +1,49 @@
+name: VSIN net probe
+
+# The handle gate loses 20% of the slate and rising. Earlier probes showed the
+# VSIN splits page ships no data - the table is filled by the browser. This
+# loads it in headless Chromium and records what it calls, to find a free JSON
+# endpoint. If nothing scores, the free routes are exhausted and a paid splits
+# feed is the remaining option.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Run
+        run: python -m src.vsin_net_probe
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "VSIN net probe ($(date -u +%Y-%m-%d))" \
+            --body-file output/vsin_net_probe.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/vsin_net_probe.md
+          if ! git diff --staged --quiet; then
+            git commit -m "VSIN net probe ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
