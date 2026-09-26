@@ -160,6 +160,43 @@ def build() -> str:
                "### First 40 tokens verbatim", "", "```",
                " | ".join(t[:18] for t in toks[:40]), "```", ""]
 
+        # The page has 201 percent tokens in its SOURCE but only 12 in
+        # rendered text, and 746 text tokens total on 361 KB - almost all of
+        # it navigation. That is a table that moved into a client-side
+        # payload. Find where the numbers actually live before writing
+        # anything that reads them.
+        md += ["### Where the numbers actually live", ""]
+        scripts = soup.find_all("script") if soup else []
+        md += [f"- `<script>` tags: **{len(scripts)}**"]
+        hits = []
+        for sc in scripts:
+            body = sc.string or sc.get_text() or ""
+            if not body:
+                continue
+            score = sum(body.count(w) for w in
+                        ("handle", "Handle", "bets", "Bets", "moneyline",
+                         "moneyLine", "Mets", "Nationals"))
+            if score:
+                hits.append((score, len(body), body))
+        hits.sort(key=lambda t: -t[0])
+        md += [f"- scripts mentioning handle/bets/team names: **{len(hits)}**", ""]
+        if hits:
+            score, n, body = hits[0]
+            md += [f"_Best candidate: {n:,} chars, {score} keyword hits. First "
+                   "600 characters:_", "", "```",
+                   body[:600].replace("`", "'"), "```", ""]
+            import re as _re
+            keys = _re.findall(r'"([A-Za-z_][A-Za-z0-9_]{2,24})"\s*:', body)
+            from collections import Counter as _C
+            common = _C(keys).most_common(25)
+            md += ["_Most common JSON keys in that payload:_", "", "```",
+                   ", ".join(f"{k}({v})" for k, v in common) or "(no JSON keys)",
+                   "```", ""]
+        else:
+            md += ["_No script carries the numbers either - the page may fetch "
+                   "them from a separate endpoint, which the browser network "
+                   "tab would name._", ""]
+
     md += ["", "_A view that parses rows with the EXISTING parser is the "
            "cheapest third source available: no new selectors, no new decay "
            "surface. Note the redirect check — several book views may serve "
