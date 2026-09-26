@@ -163,7 +163,47 @@ def build() -> str:
         except Exception as exc:
             md.append(f"| {label} | {type(exc).__name__} | — | — | — |")
     md += ["", "_A variant answering **yes** in the ml_*_money column is the "
-           "call to build against._", "",
+           "call to build against._", ""]
+
+    # v1 publishes ml_*_money as fields and nulls every value. v2 answers "no"
+    # to that string but carries `bet_info`, which is a different schema my
+    # string check could not evaluate - and is the object public betting would
+    # actually live in. Look inside it rather than judging it on a keyword.
+    md += ["## Inside v2's `bet_info`", ""]
+    try:
+        rv = requests.get(
+            "https://api.actionnetwork.com/web/v2/scoreboard/publicbetting/mlb",
+            headers=BROWSER, timeout=25)
+        v2 = rv.json()
+    except Exception as exc:
+        v2 = None
+        md += [f"_v2 fetch/parse failed: {type(exc).__name__}: {exc}_", ""]
+    if isinstance(v2, dict):
+        g2 = v2.get("games") or []
+        md += [f"- top-level keys: `{', '.join(list(v2)[:12])}`",
+               f"- games: **{len(g2)}**", ""]
+        if g2:
+            g = g2[0]
+            md += ["_First game's keys:_", "", "```",
+                   ", ".join(list(g)[:26]), "```", ""]
+            bi = g.get("bet_info")
+            if bi is not None:
+                md += ["_Its `bet_info`:_", "", "```",
+                       json.dumps(bi, indent=1)[:900], "```", ""]
+                # does anything in there look like a 0-100 share pair?
+                flat = json.dumps(bi)
+                import re as _re
+                nums = [float(x) for x in _re.findall(r":\s*(\d{1,3}(?:\.\d+)?)", flat)]
+                near = [n for n in nums if 0 < n < 100]
+                md += [f"- numeric values between 0 and 100 in bet_info: "
+                       f"**{len(near)}** (e.g. {near[:8]})", "",
+                       ("_Pairs of those summing to ~100 are the split._"
+                        if near else
+                        "_Nothing share-shaped in here._"), ""]
+            else:
+                md += ["_This game has no `bet_info`; the key may sit "
+                       "elsewhere or only on games with action._", ""]
+    md += [
            ("_Money keys present, paired, summing to ~100 across a full slate "
             "is a usable handle source._" if pairs and named else
             "_Keys exist but do not resolve into per-game away/home pairs "
