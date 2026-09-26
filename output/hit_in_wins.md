@@ -1,28 +1,29 @@
-# Cincinnati Reds — who hits when they win?
+# Toronto Blue Jays — who hits when they win?
 
-_asked of 2026-09-25; MLB Stats API and this board only_
+_asked of 2026-09-26; MLB Stats API and this board only_
 
 - **Cincinnati Reds @ Toronto Blue Jays** · Rogers Centre · park factor **1.02**
-- opposing starter: **José Soriano (R)**
-- board form read for this lineup: delta **-0.02**
+- opposing starter: **Rhett Lowder (R)**
+- board form read for this lineup: delta **-0.026**
 
-- team wins this season in the sample: **76**
+- team wins this season in the sample: **80**
 
 ## Ranked by hit rate in team wins
 
-| hitter | hit in wins | in ALL games | gap | avg PA | vs José Soriano | form |
+| hitter | hit in wins | in ALL games | gap | avg PA | vs Rhett Lowder | form |
 |---|---|---|---|---|---|---|
-| Elly De La Cruz | **85%** (57/67) | 71% (99/140) | +14 pts | 4.6 | 0.453 OPS / 7 PA | +0.088 |
-| Sal Stewart | **78%** (58/74) | 70% (111/159) | +9 pts | 4.4 | 0.000 OPS / 3 PA | -0.107 |
-| JJ Bleday | **65%** (36/55) | 56% (73/130) | +9 pts | 4.3 | 0.763 OPS / 13 PA | — |
-| Eugenio Suárez | **62%** (36/58) | 53% (65/123) | +9 pts | 4.2 | 1.031 OPS / 11 PA | +0.049 |
-| Héctor Rodríguez | **59%** (10/17) | 50% (19/38) | +9 pts | 4.3 | never faced | -0.117 |
-| Jose Trevino | **57%** (12/21) | 50% (23/46) | +7 pts | 3.9 | never faced | — |
+| Brett Bateman | **87%** (20/23) | 74% (29/39) | +13 pts | 4.6 | never faced | — |
+| Vladimir Guerrero Jr. | **83%** (59/71) | 65% (93/143) | +18 pts | 4.4 | never faced | +0.059 |
+| Alejandro Kirk | **69%** (25/36) | 71% (55/78) | -1 pts | 4.1 | never faced | +0.044 |
+| Kazuma Okamoto | **68%** (50/73) | 63% (97/153) | +5 pts | 4.2 | never faced | — |
+| Nathan Lukes | **68%** (39/57) | 64% (78/121) | +4 pts | 3.9 | never faced | — |
+| Andrés Giménez | **67%** (45/67) | 59% (82/140) | +9 pts | 3.7 | never faced | — |
+| Ernie Clement | **65%** (50/77) | 66% (103/156) | -1 pts | 4.0 | never faced | -0.145 |
 
 ## Reading it
 
-- highest hit rate in wins: **Elly De La Cruz** at 85% (57/67), against 71% in all games — a gap of +14 points
-- least outcome-dependent: **Jose Trevino**, 57% in wins vs 50% overall, so his hitting is closest to independent of whether the team won
+- highest hit rate in wins: **Brett Bateman** at 87% (20/23), against 74% in all games — a gap of +13 points
+- least outcome-dependent: **Alejandro Kirk**, 69% in wins vs 71% overall, so his hitting is closest to independent of whether the team won
 
 _The **gap** column is the part to distrust. A large positive gap means the number is describing wins, not the hitter: he hits when the offence rolls, which is when the team wins. The small-gap bat is the more dependable one._
 
