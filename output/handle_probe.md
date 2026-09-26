@@ -10,17 +10,17 @@ Gate 1 needs the dollars to agree with the tickets. There are two handle sources
 
 | candidate | status | bytes | rows parsed | tables | % tokens |
 |---|---|---|---|---|---|
-| vsin:dk (current) | ok | 361,198 | **1** | 1 | 201 |
+| vsin:dk (current) | ok | 361,200 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
-| vsin:circa | ok | 361,200 | **1** | 1 | 201 |
+| vsin:circa | ok | 361,181 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
 | vsin:southpoint | ok | 361,168 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
-| vsin:betmgm | ok | 361,168 | **1** | 1 | 201 |
+| vsin:betmgm | ok | 361,166 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
 | vsin:fanduel | ok | 361,181 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
-| vsin:caesars | ok | 361,166 | **1** | 1 | 201 |
+| vsin:caesars | ok | 361,198 | **1** | 1 | 201 |
 | ↳ sample | `NYM` money 52 / `WSH` money 48 | | | | |
 
 ## Why the VSIN parser finds so few games
@@ -48,6 +48,13 @@ New York Mets, Washington Nationals
 VSiN - Betting Spl | Sign in | Join | My Account | Log Out | Sports | NFL | Today’s NFL Games | Vegas NFL Odds | NFL Live Odds | NFL Prop Analyzer | Opta AI Player Pro | NFL Injury Report | WR/CB Matchup Tool | Team Bets Analyzer | NFL Referee Analyz | Daily Matchup Rati | Makinen NFL Power  | NFL Betting Strate | VSiN Football Arti | NFL Draft | Super Bowl LX | College Football | Today’s CFB Games | Vegas CFB Odds | CFB Matchup Rating | Makinen CFB Power  | CFB Injury Report | Team Bets Analyzer | VSiN Football Arti | 2025 NFL Draft | NBA | Today’s NBA Games | Vegas NBA Odds | Live NBA Odds | Opta AI NBA Prop P | NBA Injury Report | Daily Matchup Rati | Makinen NBA Power  | NBA Prop Bet Analy
 ```
 
+### Where the numbers actually live
+
+- `<script>` tags: **60**
+- scripts mentioning handle/bets/team names: **0**
+
+_No script carries the numbers either - the page may fetch them from a separate endpoint, which the browser network tab would name._
+
 
 _A view that parses rows with the EXISTING parser is the cheapest third source available: no new selectors, no new decay surface. Note the redirect check — several book views may serve the same default page, which would look like a new source while being the same numbers._
 
@@ -56,7 +63,7 @@ _A view that parses rows with the EXISTING parser is the cheapest third source a
 | candidate | status | bytes | tables | % tokens | says handle | says bets |
 |---|---|---|---|---|---|---|
 | oddstrader | **fetch failed / blocked** | — | — | — | — | — |
-| sbr-consensus | ok | 850,248 | 0 | 182 | no | no |
+| sbr-consensus | ok | 853,617 | 0 | 182 | no | no |
 | covers-consensus | **fetch failed / blocked** | — | — | — | — | — |
 | wagertalk | **fetch failed / blocked** | — | — | — | — | — |
 
