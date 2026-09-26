@@ -57,13 +57,25 @@ def _has_tickets(g: dict) -> bool:
     return bool(((det.get("consensus") or {}).get("pcts")))
 
 
+# `money` is ALWAYS a string - "with public", "against public", "sources
+# split" or "unknown" - and all four are truthy. The old test was
+# `if chk.get("money")`, so it passed on "unknown" and "sources split": it
+# reported the handle healthy in exactly the cases where the handle is
+# unusable. That is why this file logged a clean bill through September while
+# VSIN coverage fell from 100% to 61% and a quarter of the slate stopped
+# clearing gate 1.
+USABLE_MONEY = ("with public", "against public")
+
+
 def _has_handle(g: dict) -> bool:
-    """VSiN/handle read. `money` carries the verdict; `vegas.basis` names its
-    source. Either present means the handle half actually ran."""
-    chk = g.get("public_check") or {}
-    if chk.get("money"):
-        return True
-    return bool((g.get("pick_criteria") or {}).get("vegas", {}).get("basis"))
+    """A handle read the RULE can act on, not merely a populated field.
+
+    The `vegas.basis` fallback that used to sit here is gone. It is present on
+    every game — 13 of 13 on 2026-09-26 — so it forced this True regardless,
+    which defeated the fix above on its own. Tightening the money test while
+    leaving an always-true `or` beside it would have looked like a repair and
+    changed nothing."""
+    return (g.get("public_check") or {}).get("money") in USABLE_MONEY
 
 
 def _has_line(g: dict) -> bool:
@@ -99,7 +111,7 @@ def _has_price(g: dict) -> bool:
 
 CHECKS = {
     "covers tickets": _has_tickets,
-    "handle (VSiN)": _has_handle,
+    "handle (usable)": _has_handle,
     "line movement": _has_line,
     "moneylines": _has_price,
 }
@@ -125,6 +137,19 @@ def assess(date: str | None = None) -> dict:
     pm_pks = _pm_covered(date)
     checks = dict(CHECKS)
     checks["PM order book"] = lambda g: str(g.get("game_pk")) in pm_pks
+
+    # Per-source coverage. The aggregate checks above ask "is this input
+    # available at all", which stays green while one of several providers
+    # dies - the other covers for it until both are gone. VSIN went 100% ->
+    # 61% over September without moving any aggregate.
+    names = sorted({s.get("name") for g in games
+                    for s in ((g.get("public_check") or {}).get("sources") or [])
+                    if s.get("name")})
+    for nm in names:
+        checks[f"src: {nm}"] = (
+            lambda g, _n=nm: any(
+                s.get("name") == _n
+                for s in ((g.get("public_check") or {}).get("sources") or [])))
 
     for label, fn in checks.items():
         have = sum(1 for g in games if fn(g))
