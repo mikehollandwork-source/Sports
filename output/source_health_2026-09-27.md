@@ -1,21 +1,21 @@
 # Source health — 2026-09-27
 
-- board generated: `2026-09-27T05:12:19.645064+00:00`
-- games on slate: **15** · picks: **0**
+- board generated: `2026-09-27T19:38:52.768219+00:00`
+- games on slate: **15** · picks: **3**
 
 | input | games covered | state |
 |---|---|---|
-| covers tickets | 8/15 (53%) | ⚠️ degraded |
-| handle (usable) | 8/15 (53%) | ⚠️ degraded |
-| line movement | 8/15 (53%) | ⚠️ degraded |
-| moneylines | 11/15 (73%) | ✅ ok |
+| covers tickets | 13/15 (87%) | ✅ ok |
+| handle (usable) | 12/15 (80%) | ✅ ok |
+| line movement | 14/15 (93%) | ✅ ok |
+| moneylines | 15/15 (100%) | ✅ ok |
 | PM order book | 15/15 (100%) | ✅ ok |
-| src: covers | 8/15 (53%) | ⚠️ degraded |
-| src: forum | 5/15 (33%) | ⚠️ degraded |
+| src: covers | 13/15 (87%) | ✅ ok |
+| src: forum | 10/15 (67%) | ✅ ok |
 | src: polymarket_bets | 15/15 (100%) | ✅ ok |
-| src: scoresodds_bets | 8/15 (53%) | ⚠️ degraded |
+| src: scoresodds_bets | 12/15 (80%) | ✅ ok |
 | src: vsin_bets | 1/15 (7%) | ❌ dead |
 
-## ❌ SILENT FAILURE
+## ❌ Dead inputs: src: vsin_bets
 
-The board shows **0 picks** while these inputs are dead: **src: vsin_bets**. That empty board is a data outage, not a quiet slate - the two are indistinguishable from the board alone, which is the reason this check exists.
+Picks are still being produced, so the board is not empty - but it is running on fewer gates than it is supposed to.
