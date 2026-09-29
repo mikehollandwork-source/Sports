@@ -50,6 +50,41 @@ MIN_READINGS = 2       # need a run-up, not a single snapshot
 LOCK_LEAD = dt.timedelta(minutes=15)
 IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 
+# BOOK GATE: REMOVED 2026-09-29. Five independent measurements put it at zero.
+#
+#   gate_sweep     standing alone on 958 games, worth +1.3 points
+#   venue_swap     -1.4 on Polymarket, -9.5 on Kalshi's far better prices,
+#                  best of five variants below what noise produces, p = 0.915
+#   disagreement   sign reversed once the look-ahead was fixed: confirming
+#                  -11.1%, not confirming +6.7%
+#   venue_cross    "both venues confirm the money side" backs at -10.5%
+#   gate_removal   the games it rejects return +7.3% (n=104), i.e. not losing
+#
+# Feeding it prices five to eleven times more accurate made it WORSE, which is
+# what rules out "mis-fed" and leaves "empty". Measured against the book's own
+# de-vigged price, Kalshi sits 0.007 out where the venues agree and 0.018 where
+# they diverge; Polymarket 0.038 and 0.206.
+#
+# What the removal is and is not justified by (gate_removal.md):
+#
+#                       live        confirm dropped   book dropped
+#   all months      +5.5% (104)      +4.3% (168)      +6.4% (208)
+#   excluding Aug   +1.0%  (54)      +2.2%  (94)      +6.4% (132)
+#   September       +2.7%  (37)      +1.3%  (60)      -0.4%  (61)
+#   blocks won         -              4/8               4/8
+#
+# No ROI improvement is demonstrated - every interval overlaps and the blocks
+# split evenly. What IS demonstrated is that the gate discards half the picks
+# for nothing. More bets at the same edge is more edge in units, and a parameter
+# measured at zero is overfitting surface. That is the whole case.
+#
+# The read requirement goes with it. It existed only to feed the confirmation
+# check, so keeping it would reject games purely because a market was not
+# logged - a cost with no remaining rationale. Set REQUIRE_BOOK_READ back to
+# True to keep the read without the confirmation.
+REQUIRE_BOOK_CONFIRM = False
+REQUIRE_BOOK_READ = False
+
 # CONFIRMATION: EITHER signal. Reverted 2026-09-21, the same day it was changed,
 # because the change did not survive the test it should have been given first.
 #
@@ -207,16 +242,20 @@ def evaluate(result: dict, metrics: dict) -> dict | None:
     if not isinstance(odds, int):
         return None
     m = metrics.get(result.get("game_pk"))
-    if not m:
+    if REQUIRE_BOOK_READ and not m:
         return None                      # no order-book read yet -> no play
-    if not _confirms(m, maj == adv):
+    if REQUIRE_BOOK_CONFIRM and (not m or not _confirms(m, maj == adv)):
         return None
     tag = line_tag(result, maj)
     if REQUIRE_LINE_AGAINST and tag != "against":
         return None                      # no price discount -> no play
-    return {"bet": maj, "odds": odds,
-            "reason": "handle+tickets agree, order book confirms, line moved against us",
-            "drift": m["drift"], "imbalance": m["imbalance"], "line": tag}
+    reason = ("handle+tickets agree, line moved against us"
+              if not REQUIRE_BOOK_CONFIRM else
+              "handle+tickets agree, order book confirms, line moved against us")
+    # drift/imbalance are display-only now; None when no market was logged
+    return {"bet": maj, "odds": odds, "reason": reason,
+            "drift": m["drift"] if m else None,
+            "imbalance": m["imbalance"] if m else None, "line": tag}
 
 
 def reject_reason(result: dict, metrics: dict) -> str:
@@ -229,10 +268,10 @@ def reject_reason(result: dict, metrics: dict) -> str:
     if not maj:
         return "no public majority read — no play"
     m = metrics.get(result.get("game_pk"))
-    if not m:
+    if REQUIRE_BOOK_READ and not m:
         return "no pre-game order-book read yet — no play"
     adv = pc.get("advantage_team")
-    if not _confirms(m, maj == adv):
+    if REQUIRE_BOOK_CONFIRM and (not m or not _confirms(m, maj == adv)):
         return "order book does not confirm the consensus side — no play"
     if REQUIRE_LINE_AGAINST:
         tag = line_tag(result, maj)

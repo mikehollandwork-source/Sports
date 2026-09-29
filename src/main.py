@@ -137,7 +137,9 @@ def run(date: str) -> dict:
     # CONSENSUS DECISION (2026-07-28): the board's pick logic. The old fade gate
     # above still computes every signal (kept as context and for the backtests),
     # but the PLAY is now decided here - back the side handle+tickets agree on,
-    # when the pre-game order book confirms it. See src/consensus.py for why.
+    # when the line has moved against it. The order-book confirmation that used
+    # to be required was removed 2026-09-29 after five independent tests put it
+    # at zero; the book is still read, for display only. See src/consensus.py.
     cmetrics = consensus_rule.book_metrics(date)
     for r in results:
         _apply_consensus(r, cmetrics)
