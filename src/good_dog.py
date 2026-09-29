@@ -39,11 +39,15 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
+from . import mlb_api
+
 log = logging.getLogger("good_dog")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
+CACHE = OUTPUT_DIR / "team_splits_cache.json"
 FAV_RATE = 0.60
 MIN_PRIOR = 20
+MIN_SPLIT = 8          # games needed before a split percentage is worth showing
 
 
 def favourite_rates(before: str) -> dict[str, float]:
@@ -98,3 +102,99 @@ def tag(game: dict, rates: dict[str, float]) -> dict | None:
             if r is not None and r >= FAV_RATE:
                 return {"team": team, "rate": round(r, 3), "odds": odds}
     return None
+
+
+def _board_prices(date: str) -> dict[str, int]:
+    """{team: its moneyline} from one board file."""
+    out = {}
+    try:
+        day = json.loads((OUTPUT_DIR / f"picks_{date}.json").read_text())
+    except (OSError, ValueError):
+        return out
+    for g in day.get("games", []):
+        m = g.get("matchup") or ""
+        pc = g.get("pick_criteria") or {}
+        adv = pc.get("advantage_team")
+        a, o = pc.get("advantage_moneyline"), pc.get("opponent_moneyline")
+        if " @ " not in m or not adv or not isinstance(a, int) or not isinstance(o, int):
+            continue
+        away, home = m.split(" @ ")
+        if adv not in (away, home):
+            continue
+        out[adv] = a
+        out[home if adv == away else away] = o
+    return out
+
+
+def _load_cache() -> dict:
+    try:
+        return json.loads(CACHE.read_text())
+    except (OSError, ValueError):
+        return {"days": {}}
+
+
+def splits(before: str) -> dict[str, dict]:
+    """{team: {"fav": [w, l], "dog": [w, l]}} over games before `before`.
+
+    Needs winners, which board files do not store, so results are fetched once
+    per date and cached. A day is only cached when every game in it is final -
+    otherwise a board built mid-afternoon would freeze that day half-graded and
+    never correct it.
+
+    Fails soft: a date that cannot be fetched is skipped, so the board still
+    prints the tag without the splits rather than not printing at all.
+    """
+    cache = _load_cache()
+    days = cache.setdefault("days", {})
+    dirty = False
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        date = Path(f).stem.split("picks_")[1]
+        if date >= before or date in days:
+            continue
+        prices = _board_prices(date)
+        if not prices:
+            continue
+        try:
+            res = mlb_api.results_for(date)
+        except Exception as exc:
+            log.warning("splits: results unavailable for %s (%s)", date, exc)
+            continue
+        if not res or not all(v.get("final") for v in res.values()):
+            continue                       # don't freeze a half-played day
+        rows = []
+        for v in res.values():
+            w = v.get("winner")
+            if not w:
+                continue
+            for t in (v.get("home"), v.get("away")):
+                if t in prices:
+                    rows.append({"t": t, "fav": prices[t] < 0, "won": t == w})
+        days[date] = rows
+        dirty = True
+    if dirty:
+        try:
+            CACHE.write_text(json.dumps(cache))
+        except OSError as exc:
+            log.warning("splits: cache not written (%s)", exc)
+
+    agg: dict[str, dict] = defaultdict(lambda: {"fav": [0, 0], "dog": [0, 0]})
+    for date, rows in days.items():
+        if date >= before:
+            continue
+        for r in rows:
+            cell = agg[r["t"]]["fav" if r["fav"] else "dog"]
+            cell[0 if r["won"] else 1] += 1
+    return dict(agg)
+
+
+def split_text(team: str, sp: dict) -> str:
+    """'as a dog 31% (9-20) · as a favourite 58% (32-23)', or '' when too thin."""
+    rec = sp.get(team)
+    if not rec:
+        return ""
+    parts = []
+    for key, label in (("dog", "as a dog"), ("fav", "as a favourite")):
+        w, l = rec[key]
+        if w + l >= MIN_SPLIT:
+            parts.append(f"{label} {w/(w+l):.0%} ({w}-{l})")
+    return "  ·  ".join(parts)

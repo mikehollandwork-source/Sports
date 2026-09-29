@@ -1361,6 +1361,15 @@ def _pick_line(g: dict) -> str:
     return f"{head}\n{sub}"
 
 
+def _board_date(board: list) -> str:
+    """The slate's date, used as the cutoff for prior-games history."""
+    for g in board:
+        d = (g.get("game_datetime") or "")[:10]
+        if d:
+            return d
+    return "9999-99-99"
+
+
 def _good_dog_lines(board: list, picks: list) -> list[str]:
     """Tonight's good dogs that are NOT plays, as a watch list.
 
@@ -1373,6 +1382,13 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
     """
     bet_teams = {(_bet_side(g["pick_criteria"]) or (None,))[0] for g in picks}
     pick_pks = {g.get("game_pk") for g in picks}
+    # how often each team actually wins as a dog and as a favourite - the trust
+    # check, put where the decision is. Fails soft to no splits.
+    try:
+        sp = good_dog.splits(_board_date(board))
+    except Exception as exc:
+        log.warning("good-dog splits unavailable: %s", exc)
+        sp = {}
     out = []
     for g in board:
         gd = (g.get("pick_criteria") or {}).get("good_dog") or {}
@@ -1389,6 +1405,9 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
         out.append(f"👀 {gd['team']} {gd['odds']:+d} "
                    f"{'vs' if at_home else 'at'} {ha if not at_home else aa}"
                    f"  ·  favoured {gd['rate']:.0%} of its games{clash}")
+        line = good_dog.split_text(gd["team"], sp)
+        if line:
+            out.append(f"      {line}")
     return out
 
 
