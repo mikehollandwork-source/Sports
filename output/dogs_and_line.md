@@ -75,7 +75,20 @@ _This is a conjunction chosen after seeing both parts, which is the weakest prov
 | September only | 21-20 · exp 18.2 · **+14.1%** (n=41) ⚠ | 117-180 · exp 123.1 · **-8.1%** (n=297) |
 
 **Outside August: 38 wins against 33.5 expected on 77 games — +1.04 standard deviations.**
-- that is indistinguishable from correctly priced, so the combination is not adding anything August was not already providing
+- that is indistinguishable from correctly priced
+- August is NOT carrying it: +6.8% inside August against +11.8% outside, so whatever this is, it is not the hot month
+
+## Main effects — where the power actually is
+
+_Correcting for the best of sixteen cells is the right test for cherry-picking ONE cell, and the wrong test for a gradient across four. The 2×2 makes two claims that each use every underdog game rather than a 124-game corner, so they are tested as two hypotheses instead of sixteen._
+
+| effect | with | without | difference |
+|---|---|---|---|
+| being a good dog (≥55%) | 134-157 · exp 127.3 · **+3.0%** (n=291) | 214-339 · exp 228.2 · **-8.7%** (n=553) | **+11.8 pts** |
+| line moved against | 160-216 · exp 155.3 · **+0.1%** (n=376) | 188-280 · exp 200.2 · **-8.6%** (n=468) | **+8.7 pts** |
+
+- **being a good dog**: +11.8 pts · null within ±16.4 · **two-sided p = 0.154** (2 hypotheses, so Bonferroni threshold is 0.025)
+- **line moved against**: +8.7 pts · null within ±15.8 · **two-sided p = 0.277** (2 hypotheses, so Bonferroni threshold is 0.025)
 
 ## The bar
 
