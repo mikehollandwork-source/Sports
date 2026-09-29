@@ -1,6 +1,31 @@
 """
 Back the other side when the rule withdraws a pick. Added at the user's call.
 
+RE-BASELINED 2026-09-29, because the rule's INPUT changed
+The book-confirm gate was removed from the consensus rule that day. A fade is
+triggered by a withdrawal, and two of the five withdrawal reasons were book-gate
+reasons, so a third of this rule's historical triggers can no longer occur.
+`fade_reason.md` splits them:
+
+    withdrawals that STILL happen      48-48 · +15.0% (n=96)   CI -12.3 to +41.4
+    withdrawals now impossible         26-23 · +13.2% (n=49)   CI -10.7 to +38.8
+    pooled, as shipped                 74-71 · +14.4% (n=145)
+
+The two populations perform the SAME, so removing the gate did not strip out the
+good fades or the bad ones - it removed a third of the VOLUME at the same
+return. The evidence therefore still applies to what the rule now does, which is
+the question that was asked and is not something the pooled figure could answer.
+
+Two consequences. The forward-relevant figure is +15.0% on 96, not the pooled
++12.8% this was shipped on - quote that one. And fades will fire noticeably less
+often, because a rule with fewer gates withdraws fewer picks.
+
+Nothing is restricted, because there is nothing left to restrict: book
+withdrawals cannot happen, so the rule is already confined to the surviving
+reasons. The by-reason column stays unactionable - handle/ticket fades look best
+at +26.6% but that is the top of four cells on 29 games with a CI of -9.9 to
++57.6.
+
 WHAT THE EVIDENCE ACTUALLY SAYS, recorded before this goes live
 Withdrawn picks returned -14.7% over 196 games; fading them returned +12.8%.
 That looks like an edge and it has not cleared any bar:
