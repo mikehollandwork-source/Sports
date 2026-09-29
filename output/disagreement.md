@@ -20,8 +20,8 @@ _The cell the question names is the middle row: money one way, tickets the other
 
 | order book | backing the MONEY side | backing the TICKET side |
 |---|---|---|
-| book CONFIRMS the money | 22-19 · **+3.4%** (n=41) | 19-22 · **-10.7%** (n=41) |
-| book does NOT confirm the money | 26-28 · **-3.6%** (n=54) | 28-26 · **-1.4%** (n=54) |
+| book CONFIRMS the money | 18-21 · **-11.1%** (n=39) | 21-18 · **+0.6%** (n=39) |
+| book does NOT confirm the money | 30-26 · **+6.7%** (n=56) | 26-30 · **-9.6%** (n=56) |
 | book unreadable | 6-12 · **-35.9%** (n=18) | 12-6 · **+26.5%** (n=18) |
 
 ## Does it matter how lopsided the money is?
@@ -34,13 +34,13 @@ _The cell the question names is the middle row: money one way, tickets the other
 ## Paying for the look
 
 - cells at n≥25: **8** (both sides of each, so picking a direction afterwards is paid for)
-- best: **handle < 64% · money** at +4.2%
-- biggest a price-redraw manufactures: median **+15.7%**, 95th **+31.9%**
-- **corrected p = 0.949**
+- best: **book does NOT confirm the money · money** at +6.7%
+- biggest a price-redraw manufactures: median **+15.7%**, 95th **+32.1%**
+- **corrected p = 0.891**
 
 **Does not clear.**
 
-- split-half of **handle < 64% · money**: 19-10 · **+35.6%** (n=29) against 7-15 · **-37.2%** (n=22)
+- split-half of **book does NOT confirm the money · money**: 15-16 · **-0.6%** (n=31) against 15-10 · **+15.8%** (n=25)
 
 ## How to read this
 
