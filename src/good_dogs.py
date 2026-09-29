@@ -224,6 +224,66 @@ def build() -> str:
                           f"**{(_roi(a)-_roi(b))*100:+.1f} pts** |")
         md.append("")
 
+    # ---- the test that killed the gate change ---------------------------
+    if use:
+        _, mine, rest = use[best]
+        md += ["## Leave August out — the test that killed the gate change", "",
+               "_August was hot: `change_check` showed the gate change worth "
+               "+9.6 points in August and −11.6 in September, and that is why it "
+               "was reverted. This effect is +35.5 points in August against +7.0 "
+               "and +7.3 either side, so it has to clear the same bar._", "",
+               "| period | good dogs | other dogs | difference |",
+               "|---|---|---|---|"]
+        for lab, keep in (("all months", lambda d: True),
+                          ("**excluding August**", lambda d: d[:7] != "2026-08"),
+                          ("August only", lambda d: d[:7] == "2026-08")):
+            a = [r for r in mine if keep(r["date"])]
+            b = [r for r in rest if keep(r["date"])]
+            if len(a) >= 25 and len(b) >= 25:
+                lo, hi = _boot_diff(a, b)
+                md.append(f"| {lab} | {_fmt(a)} | {_fmt(b)} | "
+                          f"**{(_roi(a)-_roi(b))*100:+.1f} pts** "
+                          + ("" if lo != lo else f"({lo:+.0f} to {hi:+.0f})") + " |")
+        md.append("")
+        ex_a = [r for r in mine if r["date"][:7] != "2026-08"]
+        ex_b = [r for r in rest if r["date"][:7] != "2026-08"]
+        if len(ex_a) >= 25 and len(ex_b) >= 25:
+            d = (_roi(ex_a) - _roi(ex_b)) * 100
+            md += [f"**Outside August it is worth {d:+.1f} points.** "
+                   + ("The effect survives removing the hot month, so it is not "
+                      "the month talking." if d > 5 else
+                      "That is a long way below the +20.2 headline, so August is "
+                      "carrying most of it — the same shape as the gate change "
+                      "that was reverted."), ""]
+
+        # temporal holdout: fit the cut on the first half, score the second
+        days = sorted({r["date"] for r in mine} | {r["date"] for r in rest})
+        split = days[len(days) // 2]
+        md += ["## Temporal holdout — cut chosen on the first half only", "",
+               "_The split-half above assigns games at random, so both halves "
+               "contain August. This picks the cut using only games before "
+               f"{split} and scores it on games from {split} on — the ordering a "
+               "live rule actually faces._", ""]
+        early = [r for r in pit if r["date"] < split]
+        late = [r for r in pit if r["date"] >= split]
+        if len(early) >= 100 and len(late) >= 100:
+            def diff(pool, c):
+                a = [r for r in pool if r["rate"] >= c]
+                b = [r for r in pool if r["rate"] < c]
+                return ((_roi(a) - _roi(b)) * 100) if len(a) >= 20 and len(b) >= 20 else None
+            scored = [(c, diff(early, c)) for c in CUTS]
+            ok = [(c, d) for c, d in scored if d is not None]
+            if ok:
+                pick = max(ok, key=lambda t: t[1])[0]
+                a = [r for r in late if r["rate"] >= pick]
+                b = [r for r in late if r["rate"] < pick]
+                md += [f"- best cut on the first half: **≥{pick:.0%}** "
+                       f"({dict(ok)[pick]:+.1f} pts there)",
+                       f"- that cut on the held-out second half: {_fmt(a)} "
+                       f"against {_fmt(b)} → "
+                       f"**{(_roi(a)-_roi(b))*100:+.1f} pts**" if a and b else
+                       "- held-out half too thin", ""]
+
     md += ["## The bar", "",
            "- the **difference** against other underdogs is the number, not the "
            "ROI — underdogs generally returned −5.8%, so a positive ROI here is "
