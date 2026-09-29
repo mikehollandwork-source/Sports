@@ -60,17 +60,27 @@ IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 # are worried about does not answer the worry. Run month by month
 # (`src/change_check.py`, output/change_check.md):
 #
-#                   old: EITHER / >=1.0%        new: BOTH / >=0.5%
-#   2026-07          12-7   (19)  +14.8%        10-6   (16)  +17.9%
-#   2026-08          38-17  (55)  +20.1%        25-4   (29)  +59.5%
-#   2026-09          17-8   (25)  +14.1%        13-9   (22)   -0.2%
-#   all             67-32   (99)  +17.6%        48-19  (67)  +30.0%
-#   excluding Aug   29-15   (44)  +14.4%        23-15  (38)   +7.4%
+# The figures below were RESTATED on 2026-09-29. The originals were computed
+# through an uncut book_metrics, which read the whole day file including
+# post-settlement prices, so every gate decision in them was partly set by the
+# result. Corrected (backing the drift was +9.9% uncut against -5.0% cut, on the
+# same 714 games), the numbers are smaller and the conclusion is unchanged:
 #
-# The entire +12.4-point improvement is August. Outside it the change is worth
-# -7.0 points. The old setting is also the more consistent of the two: +14.8 /
-# +20.1 / +14.1 across three months, against +17.9 / +59.5 / -0.2. One of those
-# is a rule and the other is a month, and it carries 99 picks against 67.
+#                   old: EITHER / >=1.0%        new: BOTH / >=0.5%
+#   2026-07           9-8   (17)   -2.6%         8-6   (14)   +7.5%
+#   2026-08          32-18  (50)  +10.4%        24-12  (36)  +19.9%
+#   2026-09          22-15  (37)   +2.7%        18-17  (35)   -8.9%
+#   all             63-41  (104)   +5.5%        50-35  (85)   +6.0%
+#   excluding Aug   31-23   (54)   +1.0%        26-23  (49)   -4.2%
+#
+# The change is worth +0.5 points overall and -5.2 outside August, so the
+# improvement was the hot month. The old setting is also the more consistent of
+# the two: -2.6 / +10.4 / +2.7 across three months against +7.5 / +19.9 / -8.9,
+# and it carries 104 picks against 85.
+#
+# Note what the correction cost: this rule's backtested edge was +17.6% and is
+# +5.5%. Twelve of those points were look-ahead. The live record (-1.41% over
+# 273 bets) was never the anomaly it looked like against +17.6%.
 #
 # The near_miss finding that motivated the change is not withdrawn - games
 # failing only the book gate really did return -12.6%, stable across halves.
