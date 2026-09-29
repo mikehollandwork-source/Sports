@@ -57,9 +57,11 @@ def _rows(team: str) -> list[dict]:
             if team not in (away, home) or adv not in (away, home):
                 continue
             odds = a_ml if team == adv else o_ml
-            if not isinstance(odds, int):
+            opp_odds = o_ml if team == adv else a_ml
+            if not isinstance(odds, int) or not isinstance(opp_odds, int):
                 continue
             out.append({"date": date, "matchup": m, "odds": odds,
+                        "opp_odds": opp_odds,
                         "won": res["winner"] == team,
                         "opp": home if team == away else away,
                         "score": f"{res.get('away_score')}-{res.get('home_score')}",
