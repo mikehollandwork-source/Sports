@@ -73,14 +73,20 @@ def _classify(reason: str) -> tuple[str, bool]:
     return "other/unrecorded", True
 
 
-def collect() -> list[dict]:
+def collect() -> tuple[list[dict], int]:
+    """(rows, boards_with_history). The second value distinguishes "no
+    withdrawals" from "no git history" - a shallow clone yields one version per
+    board, which makes every pick look like it was never withdrawn, and reporting
+    that as "too few withdrawals" hides a broken checkout as a finding."""
     rows = []
+    with_history = 0
     for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
         date = Path(f).stem.split("picks_")[1]
         rel = f"output/picks_{date}.json"
         shas = _versions(rel)
         if len(shas) < 2:
             continue
+        with_history += 1
         try:
             results = mlb_api.results_for(date)
         except Exception:
@@ -136,7 +142,7 @@ def collect() -> list[dict]:
                 "won": res["winner"] == other,
                 "p": (_implied(odds) / tot) if tot > 0 else 0.5,
             })
-    return rows
+    return rows, with_history
 
 
 def _roi(rs) -> float:
@@ -173,7 +179,7 @@ def _boot(rs) -> tuple[float, float]:
 
 
 def build() -> str:
-    rows = collect()
+    rows, with_history = collect()
     md = ["# Which withdrawals does the fade rule live on, and do they still "
           "happen?", "",
           "_First, a correction to my own guess: `fade_profile` is **not** "
@@ -191,8 +197,16 @@ def build() -> str:
           "every stay-away game at board time, so the version immediately after a "
           "withdrawal records which gate stopped passing, as judged live._", "",
           f"- withdrawals reconstructed with an outcome: **{len(rows)}**", ""]
+    if with_history == 0:
+        return "\n".join(md + [
+            "**No board history available — this is a broken run, not a result.** "
+            "`_versions()` found fewer than two committed versions of every board, "
+            "which happens when the checkout is shallow. The workflow needs "
+            "`fetch-depth: 0`.", ""])
     if len(rows) < 40:
-        return "\n".join(md + ["Too few withdrawals to judge.", ""])
+        return "\n".join(md + [
+            f"Too few withdrawals to judge ({len(rows)} across {with_history} "
+            "boards with history).", ""])
 
     md += ["## By the gate that caused the withdrawal", "",
            "| withdrawal reason | still possible? | fading it | 95% CI |",
