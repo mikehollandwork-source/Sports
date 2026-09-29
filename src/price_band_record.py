@@ -168,17 +168,24 @@ def build() -> str:
             counts.append(sum(
                 1 for n in sizes
                 if sum(1 for _ in range(n) if rng.random() < base[lab]) / n > base[lab]))
+        counts.sort()
+        exp_c = sum(counts) / len(counts)
+        p95 = counts[int(.95 * len(counts))]
+        # compare against the SPREAD of the simulated counts, not a fixed margin.
+        # A fixed "+2" threshold was too loose three times over in this project:
+        # with ~29 teams the count's own SD is about 2.7, so +2 is inside noise.
         md += ["",
                f"- teams listed (≥{MIN_BAND} games in this band): **{len(listed)}**",
                f"- **winning records** (more wins than losses): **{winning}**",
-               f"- **above the band's own rate: {above}** — if every team were "
-               f"just a band-average team, you would expect "
-               f"**{sum(counts)/len(counts):.1f}**",
-               "- " + ("more teams beat the band than chance explains, so some of "
-                       "this may be real" if above > sum(counts) / len(counts) + 2
-                       else "that is what chance produces, so a team being above "
-                            "its band here is not evidence it can be trusted "
-                            "there"), ""]
+               f"- **above the band's own rate: {above}** — band-average teams "
+               f"would give **{exp_c:.1f}**, and 95% of the time no more than "
+               f"**{p95}**",
+               "- " + (f"**{above} is beyond that**, so something here may be "
+                       "real" if above > p95 else
+                       f"**{above} is inside that**, so a team being above its "
+                       "band here is not evidence it can be trusted there — it "
+                       "is what thirty teams produce when every price is right"),
+               ""]
 
     md += ["## How to use this", "",
            "- **read the `vs band` column, not the record.** Winning 7 of 10 at "
