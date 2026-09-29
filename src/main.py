@@ -21,7 +21,8 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import consensus as consensus_rule, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import consensus as consensus_rule
+from . import good_dog, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -143,6 +144,18 @@ def run(date: str) -> dict:
     cmetrics = consensus_rule.book_metrics(date)
     for r in results:
         _apply_consensus(r, cmetrics)
+
+    # GOOD DOG TAG: a team the market usually favours, priced as a dog tonight.
+    # Reporting only - it changes no pick. The backtest could not close the
+    # question (main effects p = 0.154 and 0.277, null width +/-16 points), and
+    # settling it needs about 2.5x the data, so the tag exists to accumulate
+    # forward evidence while we wait. See src/good_dog.py.
+    try:
+        dog_rates = good_dog.favourite_rates(date)
+        for r in results:
+            (r.setdefault("pick_criteria", {}))["good_dog"] = good_dog.tag(r, dog_rates)
+    except Exception as exc:                     # never let a tag break a board
+        log.warning("good-dog tag failed: %s", exc)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
@@ -1290,6 +1303,12 @@ def build_summary(payload: dict) -> str:
         out += [_pick_line(g) for g in picks]
     else:
         out.append("_No plays on the board._")
+    dogs = _good_dog_lines(board, picks)
+    if dogs:
+        out += ["", "## Watching — good dogs (NOT bets)", "",
+                "_Usually-favoured teams priced as dogs tonight. Labelled to "
+                "gather forward evidence; the backtest could not settle them. "
+                "**Do not bet these.**_", ""] + dogs
     out += ["", grade.records_block()]
     # props stay backend-only for now (still computed + tracked in prop_ledger.json,
     # just not shown on the board)
@@ -1330,12 +1349,47 @@ def _pick_line(g: dict) -> str:
     mls = f" {ml:+d}" if isinstance(ml, int) else ""
     star = " ⭐" if _star(pc) else ""
     tag = "  ·  fade" if pc.get("source") == "fade" else ""
+    gd = pc.get("good_dog") or {}
+    # only label it when the team we are BACKING is the good dog
+    if gd.get("team") == bet_team:
+        tag += "  ·  good dog"
     head = f"✅ BET {bet_team}{mls}{star}{tag}"
     where = f"{'vs' if at_home else 'at'} {opp_ab}"
     live = "🔴 LIVE · " if g.get("state") == "live" else ""
     st = _start_time(g)
     sub = f"     {live}{where}" + (f" · {st}" if st else "")
     return f"{head}\n{sub}"
+
+
+def _good_dog_lines(board: list, picks: list) -> list[str]:
+    """Tonight's good dogs that are NOT plays, as a watch list.
+
+    Worded so it cannot be mistaken for a bet. The tag is an open question, not
+    a pick: its two main effects came in at p = 0.154 and p = 0.277, and closing
+    the question needs roughly 2.5x the data, so these are labelled and left
+    alone to accumulate. Anything already on the board as a play is skipped -
+    it is labelled there instead, and listing it twice was the bug that put the
+    Yankees on the board twice.
+    """
+    bet_teams = {(_bet_side(g["pick_criteria"]) or (None,))[0] for g in picks}
+    pick_pks = {g.get("game_pk") for g in picks}
+    out = []
+    for g in board:
+        gd = (g.get("pick_criteria") or {}).get("good_dog") or {}
+        if not gd or gd.get("team") in bet_teams:
+            continue
+        aa, ha = _abbrs(g)
+        away, home = g["matchup"].split(" @ ")
+        at_home = gd["team"] == home
+        # A good dog in a game we are already betting is the OTHER SIDE of that
+        # play. Listing it unmarked put two opposing sides of one game on the
+        # board looking like two suggestions - say so instead.
+        clash = ("  ·  ⚠ opposes tonight's play — the rule and the tag disagree"
+                 if g.get("game_pk") in pick_pks else "")
+        out.append(f"👀 {gd['team']} {gd['odds']:+d} "
+                   f"{'vs' if at_home else 'at'} {ha if not at_home else aa}"
+                   f"  ·  favoured {gd['rate']:.0%} of its games{clash}")
+    return out
 
 
 def _telegram_records_lines() -> list[str]:
@@ -1384,6 +1438,11 @@ def telegram_text(payload: dict) -> str:
     else:
         L.append("No plays on the board.")
 
+    dogs = _good_dog_lines(board, picks)
+    if dogs:
+        L += ["", "👀 WATCHING — NOT BETS", "",
+              "Usually-favoured teams priced as dogs tonight. Tracking only —",
+              "do not bet these.", ""] + dogs
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)
