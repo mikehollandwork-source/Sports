@@ -1,6 +1,6 @@
 {
   "date": "2026-09-29",
-  "generated_at": "2026-09-29T20:46:04.255936+00:00",
+  "generated_at": "2026-09-29T21:03:12.047970+00:00",
   "games": [
     {
       "game_pk": 849845,
@@ -1006,7 +1006,7 @@
           "losses": 45
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 849851,
@@ -1118,13 +1118,13 @@
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 11,
-            "away": 20
+            "home": 14,
+            "away": 27
           },
           "agree": false,
-          "forum_lean": -0.29,
+          "forum_lean": -0.317,
           "consensus_lean": 0.38,
-          "blended_lean": 0.097,
+          "blended_lean": 0.086,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1261,12 +1261,12 @@
         "majority": {
           "team": "New York Yankees",
           "consensus_pct": 69.0,
-          "moneyline": "-122"
+          "moneyline": "-123"
         },
         "non_majority": {
           "team": "Boston Red Sox",
           "consensus_pct": 31.0,
-          "moneyline": "+117"
+          "moneyline": "+114"
         }
       },
       "consistency": {
@@ -1431,7 +1431,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.097,
+            "blended_lean": 0.086,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1441,14 +1441,14 @@
           }
         },
         "consistency_hits": 1,
-        "advantage_moneyline": -125,
+        "advantage_moneyline": -128,
         "opponent_moneyline": 118,
         "line_check": {
           "open": -139,
-          "current": -125,
-          "implied_shift": -0.026,
+          "current": -128,
+          "implied_shift": -0.02,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-139\u2192-125, -2.6%)",
+          "reason": "line moved away from the pick (-139\u2192-128, -2.0%)",
           "pinny_morning": -127
         },
         "form_edge": true,
@@ -1470,7 +1470,7 @@
           "bet": "Boston Red Sox",
           "odds": 118,
           "basis": "money %",
-          "hold_home": -3206000,
+          "hold_home": -3099688,
           "hold_away": 4100600
         },
         "play": "pick",
@@ -1479,7 +1479,7 @@
         "pm_quote": {
           "pm_pct": 56,
           "pm_american": -127,
-          "edge_pts": -0.4,
+          "edge_pts": 0.1,
           "vs_book": "same"
         },
         "projected": {
@@ -1488,11 +1488,11 @@
         },
         "line_vs_money": "against",
         "bet_team": "New York Yankees",
-        "bet_moneyline": -125,
+        "bet_moneyline": -128,
         "starred": [],
         "consensus": {
-          "drift": 0.025,
-          "imbalance": 0.715,
+          "drift": 0.03,
+          "imbalance": 0.545,
           "line": "against"
         },
         "win_prob": 68,
@@ -1642,7 +1642,7 @@
         }
       },
       "public_majority": {
-        "team": "San Diego Padres",
+        "team": "Chicago Cubs",
         "detail": {
           "consensus": {
             "pick": "Sd",
@@ -1653,13 +1653,13 @@
           },
           "forum": {
             "pick": "Chicago Cubs",
-            "home": 11,
+            "home": 8,
             "away": 14
           },
           "agree": false,
-          "forum_lean": -0.12,
+          "forum_lean": -0.273,
           "consensus_lean": 0.14,
-          "blended_lean": 0.039,
+          "blended_lean": -0.024,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1686,33 +1686,35 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 3,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/4 sources agree (forum differ)",
-        "flags": [],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 3,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets, polymarket_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "home",
         "money_pct": 52
       },
@@ -1792,14 +1794,14 @@
       },
       "betting_lines": {
         "majority": {
+          "team": "Chicago Cubs",
+          "consensus_pct": 43.0,
+          "moneyline": "+114"
+        },
+        "non_majority": {
           "team": "San Diego Padres",
           "consensus_pct": 57.0,
           "moneyline": "-130"
-        },
-        "non_majority": {
-          "team": "Chicago Cubs",
-          "consensus_pct": 43.0,
-          "moneyline": "+106"
         }
       },
       "consistency": {
@@ -1950,12 +1952,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "San Diego Padres",
-        "public_edge": false,
-        "public_trusted": true,
+        "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.18,
+        "confidence": 0.183,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1964,8 +1966,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.039,
-            "strength": 0.0,
+            "blended_lean": -0.024,
+            "strength": 0.006,
             "weight": 0.45
           },
           "consistency": {
@@ -1986,16 +1988,20 @@
         },
         "form_edge": true,
         "form_gap": 0.027,
-        "sharp_money": false,
+        "sharp_money": true,
         "sp_dog_edge": 0.081,
         "pitching_dog": false,
-        "signals_hit": 4,
+        "signals_hit": 5,
+        "public_pct_against": 48,
+        "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
-          "side": null,
+          "side": "San Diego Padres",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "San Diego Padres",
