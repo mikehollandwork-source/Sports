@@ -71,8 +71,13 @@ def _game_log(player_id: int, season: int) -> list:
     return splits
 
 
+RECENT_GAMES = 5       # "hot" window, matching the board's own last-5 framing
+SUPER_HOT = 15         # percentage points above his own season rate
+
+
 def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
-                       exclude_pk: int | None = None) -> list[dict]:
+                       exclude_pk: int | None = None,
+                       opp_pitcher_id: int | None = None) -> list[dict]:
     """Tonight's lineup ranked by hit rate in the team's season WINS.
 
     Each entry also carries `all_rate` - the same hitter's hit rate across EVERY
@@ -83,6 +88,12 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
     that caused the win. A hitter at 89% in wins and 74% overall is largely
     telling you the team wins when he hits. One whose two numbers are CLOSE is
     the dependable bat, and `gap` is that difference.
+
+    Each entry also carries `form` - his hit rate over his last RECENT_GAMES
+    games minus his season rate, in percentage points - and `bvp` against
+    tonight's opposing starter when `opp_pitcher_id` is given. `form` is derived
+    from the same game log already being fetched, so it costs nothing and covers
+    the whole lineup rather than the board's top-two hot and cold.
 
     exclude_pk drops one game from the season-wins sample - used by the backtest
     to reconstruct the pre-game prop without leaking the game being graded (live
@@ -104,6 +115,7 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
         played = with_hit = 0
         all_played = all_with_hit = 0
         pa_total = 0.0
+        recent: list[tuple[str, bool]] = []      # (date, got a hit) for form
         for s in _game_log(p.player_id, season):
             st = s.get("stat") or {}
             try:
@@ -116,8 +128,12 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
             pk = (s.get("game") or {}).get("gamePk")
             if pk == exclude_pk:
                 continue                  # never count the game being graded
+            d = s.get("date") or ""
+            if d and d >= date:
+                continue                  # never let tonight or later inform form
             all_played += 1
             all_with_hit += 1 if hits >= 1 else 0
+            recent.append((d, hits >= 1))
             if pk not in wins:
                 continue
             played += 1
@@ -128,11 +144,27 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
             continue
         rate = with_hit / played
         all_rate = (all_with_hit / all_played) if all_played else None
+        # form: his last-5 hit rate against his OWN season rate, so a 55% hitter
+        # at 80% reads hot and an 80% hitter at 80% does not
+        form = None
+        if all_rate is not None and len(recent) >= RECENT_GAMES:
+            recent.sort(key=lambda x: x[0])
+            last = recent[-RECENT_GAMES:]
+            form = round((sum(1 for _, h in last if h) / len(last) - all_rate) * 100)
+        bvp = None
+        if opp_pitcher_id:
+            try:
+                bvp = mlb_api.batter_vs_pitcher(p.player_id, opp_pitcher_id)
+            except Exception as exc:
+                log.warning("bvp failed (%s vs %s): %s", p.player_id,
+                            opp_pitcher_id, exc)
         out.append({"player": p.name, "player_id": p.player_id,
                     "hit_rate": round(rate * 100),
                     "all_rate": round(all_rate * 100) if all_rate is not None else None,
                     "gap": (round((rate - all_rate) * 100)
                             if all_rate is not None else None),
+                    "form": form, "super_hot": form is not None and form >= SUPER_HOT,
+                    "bvp": bvp,
                     "wins_played": played, "games_played": all_played,
                     "avg_pa": round(pa_total / played, 1)})
     out.sort(key=lambda c: (c["hit_rate"], c["avg_pa"]), reverse=True)
