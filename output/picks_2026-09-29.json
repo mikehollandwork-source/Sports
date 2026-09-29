@@ -1,6 +1,6 @@
 {
   "date": "2026-09-29",
-  "generated_at": "2026-09-29T21:09:51.372795+00:00",
+  "generated_at": "2026-09-29T21:30:50.587852+00:00",
   "games": [
     {
       "game_pk": 849845,
@@ -1118,13 +1118,13 @@
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 17,
-            "away": 30
+            "home": 18,
+            "away": 34
           },
           "agree": false,
-          "forum_lean": -0.277,
+          "forum_lean": -0.308,
           "consensus_lean": 0.38,
-          "blended_lean": 0.103,
+          "blended_lean": 0.09,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1259,7 +1259,7 @@
         "majority": {
           "team": "New York Yankees",
           "consensus_pct": 69.0,
-          "moneyline": "-120"
+          "moneyline": "-122"
         },
         "non_majority": {
           "team": "Boston Red Sox",
@@ -1415,7 +1415,7 @@
       },
       "pick_criteria": {
         "status": "PICK",
-        "reason": "fade \u2014 New York Yankees -128 was withdrawn",
+        "reason": "fade \u2014 standing bet on Boston Red Sox",
         "advantage_team": "New York Yankees",
         "public_edge": false,
         "public_trusted": true,
@@ -1429,7 +1429,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.103,
+            "blended_lean": 0.09,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1496,10 +1496,46 @@
           "player": "Ceddanne Rafaela",
           "player_id": 678882,
           "hit_rate": 89,
+          "all_rate": 75,
+          "gap": 14,
           "wins_played": 73,
+          "games_played": 136,
           "avg_pa": 4.4,
           "odds": -175
-        }
+        },
+        "hit_bats": [
+          {
+            "player": "Ceddanne Rafaela",
+            "player_id": 678882,
+            "hit_rate": 89,
+            "all_rate": 75,
+            "gap": 14,
+            "wins_played": 73,
+            "games_played": 136,
+            "avg_pa": 4.4,
+            "odds": -175
+          },
+          {
+            "player": "Adley Rutschman",
+            "player_id": 668939,
+            "hit_rate": 75,
+            "all_rate": 58,
+            "gap": 17,
+            "wins_played": 20,
+            "games_played": 99,
+            "avg_pa": 4.0
+          },
+          {
+            "player": "Willson Contreras",
+            "player_id": 575929,
+            "hit_rate": 71,
+            "all_rate": 64,
+            "gap": 7,
+            "wins_played": 66,
+            "games_played": 129,
+            "avg_pa": 4.3
+          }
+        ]
       },
       "flagged": false,
       "pick": null,
@@ -1542,7 +1578,7 @@
       "park_factor": 0.96,
       "statistical_advantage": {
         "team": "San Diego Padres",
-        "home_score": 0.18714000000000003,
+        "home_score": 0.18882000000000002,
         "away_score": 0.057800000000000004,
         "home": {
           "name": "San Diego Padres",
@@ -1632,7 +1668,7 @@
         }
       },
       "public_majority": {
-        "team": "San Diego Padres",
+        "team": "Chicago Cubs",
         "detail": {
           "consensus": {
             "pick": "Sd",
@@ -1643,13 +1679,13 @@
           },
           "forum": {
             "pick": "Chicago Cubs",
-            "home": 10,
-            "away": 15
+            "home": 11,
+            "away": 20
           },
           "agree": false,
-          "forum_lean": -0.2,
+          "forum_lean": -0.29,
           "consensus_lean": 0.14,
-          "blended_lean": 0.006,
+          "blended_lean": -0.032,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1676,33 +1712,35 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 3,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/4 sources agree (forum differ)",
-        "flags": [],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 3,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets, polymarket_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "home",
         "money_pct": 52
       },
@@ -1782,14 +1820,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "San Diego Padres",
-          "consensus_pct": 57.0,
-          "moneyline": "-122"
-        },
-        "non_majority": {
           "team": "Chicago Cubs",
           "consensus_pct": 43.0,
-          "moneyline": "+120"
+          "moneyline": "+105"
+        },
+        "non_majority": {
+          "team": "San Diego Padres",
+          "consensus_pct": 57.0,
+          "moneyline": "-125"
         }
       },
       "consistency": {
@@ -1940,22 +1978,22 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "San Diego Padres",
-        "public_edge": false,
-        "public_trusted": true,
+        "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.178,
+        "confidence": 0.184,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.129,
-            "strength": 0.323,
+            "margin": 0.131,
+            "strength": 0.328,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.006,
-            "strength": 0.0,
+            "blended_lean": -0.032,
+            "strength": 0.008,
             "weight": 0.45
           },
           "consistency": {
@@ -1976,16 +2014,20 @@
         },
         "form_edge": true,
         "form_gap": 0.027,
-        "sharp_money": false,
+        "sharp_money": true,
         "sp_dog_edge": 0.081,
         "pitching_dog": false,
-        "signals_hit": 4,
+        "signals_hit": 5,
+        "public_pct_against": 48,
+        "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
-          "side": null,
+          "side": "San Diego Padres",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "San Diego Padres",
@@ -2021,14 +2063,20 @@
       "pick": null,
       "game_datetime": "2026-09-30T02:00:00Z",
       "weather": {
-        "temp_f": 73,
-        "wind_mph": 1,
-        "wind_dir": "E",
+        "temp_f": 74,
+        "wind_mph": 4,
+        "wind_dir": "S",
         "precip_pct": 0,
         "roof": "open"
       },
-      "umpire_hp": null,
-      "ump_tend": null,
+      "umpire_hp": "Ramon De Jesus",
+      "ump_tend": {
+        "games": 14,
+        "k_pg": 16.43,
+        "bb_pg": 7.86,
+        "r_pg": 8.71,
+        "k_extra": -0.32
+      },
       "situational": {
         "home": {
           "abbr": "SD",
