@@ -16,6 +16,8 @@ import logging
 
 import requests
 
+from . import apitime
+
 log = logging.getLogger("pinnacle")
 
 MLB_LEAGUE = 246   # Pinnacle's league id for MLB
@@ -30,9 +32,10 @@ HEADERS = {
 
 def _get(path: str):
     try:
-        r = requests.get(f"{BASE}{path}", headers=HEADERS, timeout=20)
-        r.raise_for_status()
-        return r.json()
+        with apitime.timed("pinnacle", path):
+            r = requests.get(f"{BASE}{path}", headers=HEADERS, timeout=20)
+            r.raise_for_status()
+            return r.json()
     except Exception as exc:  # network/HTTP/JSON - degrade gracefully
         log.warning("pinnacle fetch failed (%s): %s", path, exc)
         return None

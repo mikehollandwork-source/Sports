@@ -1,0 +1,49 @@
+name: Window experiment
+
+# Re-rates every historical slate on a 10/15/20-game form window instead of 5
+# (point-in-time) to test whether the model's bottleneck is sample noise.
+# Heavy: it re-enriches every game, so it runs on demand only.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run window experiment
+        run: python -m src.window_test
+
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Window experiment $(date -u +%Y-%m-%d)" \
+            --body-file output/window_test.md
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/window_test.md
+          if git diff --staged --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Window experiment report ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi

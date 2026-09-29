@@ -89,7 +89,13 @@ def empty_ledger() -> dict:
     return {"stake": STAKE,
             "odds_basis": "pre-game moneyline from covers odds page (unpriced games skipped)",
             "grade_from": None,   # if set (YYYY-MM-DD), dates before this are never booked
-            "plays": _empty_book(), "leans_faded": _empty_book()}
+            "plays": _empty_book(), "leans_faded": _empty_book(),
+            # Fades are tracked but NEVER counted toward the main record (user's
+            # call). They are a different bet - the other side of a pick the rule
+            # withdrew - with their own evidence, and every direct test of them
+            # came back null. Mixing them in would make the consensus rule's own
+            # number unreadable, which is the mistake the prop parlays made.
+            "fades": _empty_book()}
 
 
 def load_ledger() -> dict:
@@ -173,6 +179,8 @@ def _settle(date, g, res, bet, won, odds) -> dict:
         "score": f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}",
         "odds": odds, "odds_source": "pre-game moneyline",
         "profit": round(american_profit(odds) if won else -STAKE, 2),
+        # which rule produced it: "rule" (consensus), "fade", "manual", ...
+        "source": (g.get("pick_criteria") or {}).get("source", "rule"),
     }
 
 
@@ -222,12 +230,16 @@ def settle_day(date: str) -> tuple[list[dict], int]:
     pending = 0
     for g in payload.get("games", []):
         pc = g.get("pick_criteria", {})
-        adv = pc.get("advantage_team")
+        # consensus picks carry bet_team/bet_moneyline; older snapshots fall back
+        # to the advantage side so already-booked history grades identically.
+        adv = pc.get("bet_team") or pc.get("advantage_team")
         if not adv or _play(g) != "pick":
             continue        # no-action / legacy lock snapshots: never booked
         if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
             continue
-        odds = _price(g, "advantage_moneyline")
+        odds = (int(pc["bet_moneyline"]) if pc.get("bet_team")
+                and pc.get("bet_moneyline") is not None
+                else _price(g, "advantage_moneyline"))
         if odds is None:
             continue        # unpriced: never booked at fake even money
         res = results.get(g.get("game_pk"))
@@ -235,6 +247,22 @@ def settle_day(date: str) -> tuple[list[dict], int]:
             pending += 1     # a play still to be decided -> slate not done
             continue
         entries.append(_settle(date, g, res, adv, res["winner"] == adv, odds))
+
+    # Reversal picks (bvp+form promotion) bet the OPPONENT and are booked into the
+    # same record as any other play - one unified record, counted only from the
+    # date they first appear on a board forward (older snapshots carry no reversal).
+    for g in payload.get("games", []):
+        rev = (g.get("pick_criteria") or {}).get("reversal")
+        if not rev or not rev.get("bet") or rev.get("odds") is None:
+            continue
+        if _voided(voids, date, g.get("matchup"), g.get("game_pk")):
+            continue
+        res = results.get(g.get("game_pk"))
+        if not res or not res["final"] or not res["winner"]:
+            pending += 1
+            continue
+        entries.append(_settle(date, g, res, rev["bet"],
+                               res["winner"] == rev["bet"], int(rev["odds"])))
     return entries, pending
 
 
@@ -273,10 +301,49 @@ def _mark_recap_sent(date: str) -> None:
     RECAPS_PATH.write_text(json.dumps(sorted(_recaps_sent() | {date})))
 
 
+# A pick is frozen this long before first pitch (mirrors main.LOCK_LEAD; defined
+# here rather than imported because main imports grade, not the other way round).
+LOCK_LEAD = dt.timedelta(minutes=15)
+
+
+def slate_locked(date: str, now: dt.datetime | None = None) -> bool:
+    """True once NO game on the slate can still turn into a new pick.
+
+    The consensus rule decides plays dynamically: a later game is not a pick until
+    its pre-game order book has enough readings, so the board GROWS through the
+    day. Waiting only for 'every current play is final' therefore fires the recap
+    early - the afternoon games finish, nothing is pending, and then the evening
+    games become picks. A pick can only appear while a game is still unlocked, so
+    the slate is safe once every first pitch (minus the lock lead) has passed.
+
+    Games with no recorded start time can't be judged and are treated as locked,
+    so a missing timestamp delays the recap rather than blocking it forever."""
+    picks_path = OUTPUT_DIR / f"picks_{date}.json"
+    if not picks_path.exists():
+        return False
+    try:
+        payload = json.loads(picks_path.read_text())
+    except ValueError:
+        return False
+    now = now or dt.datetime.now(dt.timezone.utc)
+    for g in payload.get("games", []):
+        raw = g.get("game_datetime")
+        if not raw:
+            continue
+        try:
+            start = dt.datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if now < start - LOCK_LEAD:
+            return False          # this game could still become a pick
+    return True
+
+
 def send_day_recap_if_complete(date: str, send) -> bool:
     """Send the day's recap via `send(text)` exactly once, and only after EVERY
-    play on the slate is final (the last game of the day is over). No-op if the
-    slate isn't done, has no booked plays, or the recap already went out.
+    play on the slate is final AND graded into the ledger (the last game of the
+    day is over and booked). No-op if the slate isn't done, has no booked plays,
+    or the recap already went out.
 
     The recap is built from the LEDGER (the authoritative running record) — the
     same source as the Yesterday/Week/Month record — NOT from a re-derivation of
@@ -284,11 +351,22 @@ def send_day_recap_if_complete(date: str, send) -> bool:
     and would otherwise disagree with the record."""
     if date in _recaps_sent():
         return False
-    _, pending = settle_day(date)   # board completion signal: any play still live?
-    if pending:
+    # The board grows through the day (see slate_locked), so "no play is pending"
+    # is not enough on its own - hold until no game can still become a pick.
+    if not slate_locked(date):
+        log.info("recap for %s held: games on the slate can still become picks", date)
         return False
+    settled, pending = settle_day(date)   # settled = final+priced plays; pending = not-final
+    if pending or not settled:            # a play still live/undecided, or nothing to book
+        return False
+    # every play is final -> GRADE this date first, so the last game (incl. any
+    # that finalized after midnight) is booked before the recap is built. Without
+    # this the prior-day recap could read a ledger the loop never re-graded and
+    # undercount a just-finalized game. Idempotent, so re-grading is a no-op.
+    update_ledger(date)
     entries = [e for e in load_ledger()["plays"]["entries"] if e["date"] == date]
-    if not entries:                 # nothing booked for the day -> nothing to recap
+    if len(entries) < len(settled):       # a final play isn't booked yet -> wait
+        log.info("recap for %s held: %d/%d plays booked", date, len(entries), len(settled))
         return False
     send(day_recap_text(date, entries))
     _mark_recap_sent(date)
@@ -355,12 +433,29 @@ def update_ledger(date: str) -> dict:
         save_ledger(ledger)
         return ledger
     pe = grade_date(date)
+    # Fades count in the MAIN record (user's call, 2026-09-22, reversing the
+    # separate-book split of the day before). They stay tagged `source: fade`
+    # on the entry and labelled on the board, so they remain identifiable -
+    # what changed is only where they are tallied.
+    #
+    # Nothing is restated: the fades book was still empty when this changed, so
+    # no settled bet moved between books and the all-time record was untouched.
+    # The migration below exists only so a fade settled by a run between the
+    # decision and this deploy is not stranded in the old book.
+    ledger.setdefault("fades", _empty_book())
+    stranded = ledger["fades"]["entries"]
+    if stranded:
+        moved = _add(ledger["plays"], stranded)
+        log.info("migrated %d fade(s) from the separate book into plays", moved)
+        ledger["fades"] = _empty_book()
     added = _add(ledger["plays"], pe)
     if added:
         ledger["review"] = review(ledger["plays"])
-        log.info("graded %s: plays %+.2f (%d-%d)",
-                 date, ledger["plays"]["bankroll"], ledger["plays"]["record"]["wins"],
-                 ledger["plays"]["record"]["losses"])
+        nf = sum(1 for e in pe if e.get("source") == "fade")
+        log.info("graded %s: plays %+.2f (%d-%d), of which %d fade(s)",
+                 date, ledger["plays"]["bankroll"],
+                 ledger["plays"]["record"]["wins"],
+                 ledger["plays"]["record"]["losses"], nf)
     else:
         log.info("nothing new to settle for %s", date)
     # Always persist so the ledger artifact exists from the first grade onward
@@ -410,11 +505,10 @@ def combined_book(ledger: dict) -> dict:
 def bankroll_line(ledger: dict | None = None) -> str:
     """One-line summary of the books for the daily issue."""
     ledger = ledger or load_ledger()
-    comb = combined_book(ledger)
-    w, l, u = _tally(comb["entries"])
-    return (_book_line("Plays", ledger["plays"]) + "  ·  "
-            + f"**All plays: {u:+.2f}u** ({w}-{l})"
-            + "  _($1/bet at pre-game moneyline)_")
+    out = _book_line("Plays", ledger["plays"])
+    nf = sum(1 for e in ledger["plays"]["entries"] if e.get("source") == "fade")
+    suffix = f" · incl. {nf} fade{'s' if nf != 1 else ''}" if nf else ""
+    return out + f"  _($1/bet at pre-game moneyline{suffix})_"
 
 
 # --- windowed records (Day / Week / Month / YTD) ------------------------------

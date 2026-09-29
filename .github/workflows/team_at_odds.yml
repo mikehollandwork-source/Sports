@@ -1,0 +1,58 @@
+name: Team at odds
+
+# A team's record at a given price, from the board's own stored moneylines.
+on:
+  workflow_dispatch:
+    inputs:
+      team:
+        description: "Full team name, e.g. Atlanta Braves"
+        required: true
+      odds:
+        description: "American odds, e.g. -190 or 168"
+        required: true
+      band:
+        description: "Price band in cents either side"
+        default: "20"
+      team2:
+        description: "Optional second team to run in the same job"
+        default: ""
+      odds2:
+        description: "Odds for the second team"
+        default: "0"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: |
+          python -m src.team_at_odds "${{ inputs.team }}" "${{ inputs.odds }}" \
+            --band "${{ inputs.band }}"
+          if [ -n "${{ inputs.team2 }}" ] && [ "${{ inputs.odds2 }}" != "0" ]; then
+            python -m src.team_at_odds "${{ inputs.team2 }}" "${{ inputs.odds2 }}" \
+              --band "${{ inputs.band }}"
+          fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/team_at_odds_*.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Team at odds ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

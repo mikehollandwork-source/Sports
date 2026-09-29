@@ -1,0 +1,16 @@
+# Source health — 2026-08-24
+
+- board generated: `2026-08-25T03:13:52.928660+00:00`
+- games on slate: **10** · picks: **2**
+
+| input | games covered | state |
+|---|---|---|
+| covers tickets | 8/10 (80%) | ✅ ok |
+| handle (VSiN) | 10/10 (100%) | ✅ ok |
+| line movement | 10/10 (100%) | ✅ ok |
+| moneylines | 10/10 (100%) | ✅ ok |
+| PM order book | 10/10 (100%) | ✅ ok |
+
+## ✅ All inputs healthy
+
+An empty board today would be a genuinely quiet slate.

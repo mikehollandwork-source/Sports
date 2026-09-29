@@ -1,0 +1,49 @@
+name: Record audit
+
+# Reconstructs every committed version of every board and compares what was
+# posted against what the ledger actually graded. The board is stateless, so a
+# pick that stops qualifying before its lock window vanishes from the record.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # full history: the audit reconstructs every committed version of
+          # every board, and a shallow clone silently yields one version per
+          # file - which would report zero dropped picks and look like a pass
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.record_audit
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Record audit $(date -u +%Y-%m-%d)" \
+            --body-file output/record_audit.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/record_audit.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Record audit ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

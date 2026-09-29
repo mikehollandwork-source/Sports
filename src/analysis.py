@@ -192,6 +192,25 @@ EDGE_THRESHOLD = 0.40  # calibrated bar: the favorite only wins (~62%) at >= thi
 # the stats by venue added ~nothing, so we use a flat bump, not home/road splits.)
 HOME_FIELD = 0.10
 
+# Projected ("fair") win probability from OUR stats alone - no market/odds input.
+# Calibrated off the same mapping the whole system uses: a team_score margin of
+# EDGE_THRESHOLD (0.40) -> ~62% win, and HOME_FIELD (0.10) -> ~3% - i.e. ~30
+# win-probability points per 1.0 of margin. p = 0.50 + slope*margin, clamped.
+PROJ_WIN_SLOPE = (0.62 - 0.50) / EDGE_THRESHOLD   # = 0.30 win-prob per margin unit
+PROJ_PROB_CLAMP = (0.05, 0.95)
+
+
+def projected_from_margin(margin: float | None) -> dict | None:
+    """Our model's fair win probability + equivalent American moneyline for the
+    advantage side, derived from the stat-edge margin ALONE (no odds data). None
+    when the margin isn't available."""
+    if not isinstance(margin, (int, float)):
+        return None
+    lo, hi = PROJ_PROB_CLAMP
+    p = min(hi, max(lo, 0.50 + PROJ_WIN_SLOPE * margin))
+    american = -round(100 * p / (1 - p)) if p >= 0.5 else round(100 * (1 - p) / p)
+    return {"win_prob": round(p * 100, 1), "fair_american": int(american)}
+
 # Line-movement gate (implied-probability shift of OUR side, open->current):
 #   < LINE_CONFIRM_MIN : noise / too small to mean anything (does not confirm)
 #   LINE_CONFIRM_MIN..  : confirms the fade; "strong" once it clears LINE_STRONG

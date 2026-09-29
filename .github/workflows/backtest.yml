@@ -36,12 +36,83 @@ jobs:
       - name: Run signal backtest (snapshot-based, real results)
         run: python -m src.signal_backtest
 
+      # Prop backtest: does the hits-in-wins prop, split by our signals, make ROI?
+      # Reconstructs each past board play's prop from the MLB API (slower).
+      - name: Run prop backtest
+        continue-on-error: true
+        timeout-minutes: 25
+        run: python -m src.prop_backtest
+
+      # Polymarket order-book money (size imbalance + run-up drift) x signals.
+      - name: Run PM order-book backtest
+        continue-on-error: true
+        timeout-minutes: 10
+        run: python -m src.pm_book_backtest
+
+      # Pressure test: baselines + true holdout split + every ablation/retired feature.
+      - name: Run pressure test
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.pressure_test
+
+      # Edge finder: calibration, breakeven-by-price, win/loss stat profiles, dogs.
+      - name: Run edge finder
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.edge_finder
+
+      # Candidate rules: margin x price gates, holdout-judged, before anything ships.
+      - name: Run candidate rules
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.candidate_rules
+
+      # Every signal/stat individually vs outcome, bet AND fade.
+      - name: Run signal audit
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.signal_audit
+
+      # Line movement + PM order book + the sharp/public alignment theory.
+      - name: Run market signals
+        continue-on-error: true
+        timeout-minutes: 20
+        run: python -m src.market_signals
+
       - name: Post backtest issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue create --title "Signal backtest $(date -u +%Y-%m-%d)" \
             --body-file output/signal_backtest.md
+          if [ -f output/prop_backtest.md ]; then
+            gh issue create --title "Prop backtest $(date -u +%Y-%m-%d)" \
+              --body-file output/prop_backtest.md
+          fi
+          if [ -f output/pm_book_backtest.md ]; then
+            gh issue create --title "PM order-book backtest $(date -u +%Y-%m-%d)" \
+              --body-file output/pm_book_backtest.md
+          fi
+          if [ -f output/pressure_test.md ]; then
+            gh issue create --title "Pressure test $(date -u +%Y-%m-%d)" \
+              --body-file output/pressure_test.md
+          fi
+          if [ -f output/edge_finder.md ]; then
+            gh issue create --title "Edge finder $(date -u +%Y-%m-%d)" \
+              --body-file output/edge_finder.md
+          fi
+          if [ -f output/candidate_rules.md ]; then
+            gh issue create --title "Candidate rules $(date -u +%Y-%m-%d)" \
+              --body-file output/candidate_rules.md
+          fi
+          if [ -f output/signal_audit.md ]; then
+            gh issue create --title "Signal audit $(date -u +%Y-%m-%d)" \
+              --body-file output/signal_audit.md
+          fi
+          if [ -f output/market_signals.md ]; then
+            gh issue create --title "Market signals $(date -u +%Y-%m-%d)" \
+              --body-file output/market_signals.md
+          fi
 
       - name: Commit report
         run: |

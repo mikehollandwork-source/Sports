@@ -1,0 +1,47 @@
+name: Shadow fade-hot-bats ledger
+
+# Forward-only record of the fade-hot-bats rule at -130 or cheaper. Records
+# from each day's frozen board and grades what is final. No money, no board,
+# no effect on the main ledger.
+#
+# Runs late morning ET so the previous day's games have settled. The step is
+# idempotent and self-healing - a missed day backfills on the next run - so a
+# delayed or dropped cron costs nothing.
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shadow-fade
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Record and grade
+        run: python -m src.shadow_fade
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/shadow_fade_hot_bats.json output/shadow_fade_hot_bats.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Shadow fade ledger ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

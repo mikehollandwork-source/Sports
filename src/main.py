@@ -21,11 +21,13 @@ import os
 import zoneinfo
 from pathlib import Path
 
-from . import covers, early_lines, espn, grade, notify, public_sources, reddit, tune, umpire, weather, wiki
+from . import consensus as consensus_rule
+from . import good_dog, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
-                       find_slate_line, line_confirms)
+                       find_slate_line, line_confirms,
+                       projected_from_margin)
 from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
                       team_home_away_split)
 
@@ -124,12 +126,74 @@ def run(date: str) -> dict:
 
     for g, r in zip(games, results):
         _attach_line(g, r, slate, early, evening)
+        _attach_pm_quote(g, r, extra_public.get("polymarket_bets") or [])
         _attach_situational(g, r, date)
+        # projected fair odds from our stats alone (no market data) - backend
+        pc = r.get("pick_criteria") or {}
+        margin = (pc.get("components") or {}).get("stat_edge", {}).get("margin")
+        proj = projected_from_margin(margin)
+        if proj:
+            pc["projected"] = proj
+
+    # CONSENSUS DECISION (2026-07-28): the board's pick logic. The old fade gate
+    # above still computes every signal (kept as context and for the backtests),
+    # but the PLAY is now decided here - back the side handle+tickets agree on,
+    # when the line has moved against it. The order-book confirmation that used
+    # to be required was removed 2026-09-29 after five independent tests put it
+    # at zero; the book is still read, for display only. See src/consensus.py.
+    cmetrics = consensus_rule.book_metrics(date)
+    for r in results:
+        _apply_consensus(r, cmetrics)
+
+    # GOOD DOG TAG: a team the market usually favours, priced as a dog tonight.
+    # Reporting only - it changes no pick. The backtest could not close the
+    # question (main effects p = 0.154 and 0.277, null width +/-16 points), and
+    # settling it needs about 2.5x the data, so the tag exists to accumulate
+    # forward evidence while we wait. See src/good_dog.py.
+    try:
+        dog_rates = good_dog.favourite_rates(date)
+        for r in results:
+            (r.setdefault("pick_criteria", {}))["good_dog"] = good_dog.tag(r, dog_rates)
+    except Exception as exc:                     # never let a tag break a board
+        log.warning("good-dog tag failed: %s", exc)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
     # can't flip a pick to a lean or move the price after the game is underway.
     results = _lock_started_games(date, results)
+
+    # Operator-entered picks go AFTER the lock, which is the only place they are
+    # genuinely last. Applied before it, _lock_started_games restores the frozen
+    # snapshot over the top and silently discards them - which is exactly what
+    # happened on 2026-08-09: a pick entered 24 min before first pitch was wiped
+    # by the lock window that opens 15 min before it, and never reached any board.
+    manual_picks.apply(results, date)
+
+    # Road-trip rule: a no-op until its pre-registered bar is met, at which
+    # point it promotes itself and starts adding picks here. Placed after the
+    # lock for the same reason manual picks are, and it never overwrites a game
+    # the consensus rule already picked. Entries carry source="road_trip" so the
+    # two populations stay separable in the ledger.
+    try:
+        road_trip.apply(results, date)
+    except Exception as exc:
+        log.warning("road-trip rule failed (board unaffected): %s", exc)
+
+    # Fade: back the other side of any pick the rule has withdrawn. Last, so it
+    # only ever touches games nothing else is picking - a game being backed now
+    # is not a game that was withdrawn. Tagged source="fade" so the consensus
+    # rule's own record stays readable separately.
+    try:
+        fade_rule.apply(results, date)
+    except Exception as exc:
+        log.warning("fade rule failed (board unaffected): %s", exc)
+
+    # Last of all: collapse a market that arrived under two game ids, so the
+    # board cannot post the same bet twice (see _dedupe_same_market).
+    try:
+        _dedupe_same_market(results)
+    except Exception as exc:
+        log.warning("duplicate-market dedupe failed (board unaffected): %s", exc)
 
     # Tag each game's live state (upcoming / live / final) for the board.
     try:
@@ -140,7 +204,36 @@ def run(date: str) -> dict:
     for r in results:
         r["state"] = states.get(r.get("game_pk"), {}).get("state", "upcoming")
 
-    picks = [r["pick_criteria"]["advantage_team"] for r in results if _play(r) == "pick"]
+    # Best 1+ hit prop for each PLAY (the picked team's most-consistent bat in its
+    # season wins). Only upcoming/live plays; fails soft so it never blocks the board.
+    gbypk = {g.game_pk: g for g in games}
+    for r in results:
+        if _play(r) != "pick" or r.get("state") == "final":
+            continue
+        gm = gbypk.get(r.get("game_pk"))
+        if gm is None:
+            continue
+        adv = _bet_side(r["pick_criteria"])[0]
+        if not adv:
+            continue
+        is_home = adv == gm.home.name
+        team = gm.home if is_home else gm.away
+        try:
+            # one fetch serves both: the prop (top bat) and the board's ranked
+            # hit-in-wins line. Calling best_hit_prop separately would re-pull
+            # the lineup and every game log.
+            ranked = props.hit_in_wins_ranked(gm.game_pk, team.team_id, date, is_home)
+            prop = ranked[0] if ranked else None
+            if prop:
+                line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
+                if line is not None:
+                    prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
+                r["pick_criteria"]["prop"] = prop
+                r["pick_criteria"]["hit_bats"] = ranked[:3]
+        except Exception as exc:
+            log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
+
+    picks = [_bet_side(r["pick_criteria"])[0] for r in results if _play(r) == "pick"]
     no_action = sum(1 for r in results if _play(r) == "stay_away")
     log.info("Board: %d play(s), %d no-action", len(picks), no_action)
 
@@ -161,6 +254,58 @@ def _parse_iso(s: str | None) -> dt.datetime | None:
         return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+# HOTFIX 2026-09-25: one market, two game ids.
+# Baltimore @ NY Yankees arrived as game_pk 823489 and 823491, five minutes
+# apart (4:05 and 4:10 PM). They are not a doubleheader - the order-book log
+# shows both tracking OPPOSITE SIDES of a single Polymarket market: identical
+# reading timestamps, and bid/ask sizes that are exact mirrors (52.36/2891.84
+# against 2891.84/52.36). Because the readings mirror, so does everything
+# derived from them (drift -0.055/+0.055, imbalance -0.702/+0.702), and the
+# rule resolved both ids to the same bet. The board posted "BET New York
+# Yankees -115" twice, which is two units of exposure to one outcome and would
+# have booked into the ledger twice.
+#
+# A real doubleheader is hours apart (Cubs @ Boston, 1:05 and 5:35 PM), so a
+# 30-minute window separates the two cases without touching legitimate ones.
+# This is the narrow fix; deduping on market identity belongs in the schedule
+# layer where the ids are read, not here.
+DUP_WINDOW = dt.timedelta(minutes=30)
+
+
+def _dedupe_same_market(results: list) -> int:
+    """Drop a pick that repeats another pick's matchup within DUP_WINDOW."""
+    by_matchup: dict = {}
+    for r in results:
+        if (r.get("pick_criteria") or {}).get("play") != "pick":
+            continue
+        by_matchup.setdefault(r.get("matchup") or "", []).append(r)
+
+    dropped = 0
+    for games in by_matchup.values():
+        if len(games) < 2:
+            continue
+        games.sort(key=lambda g: (g.get("game_datetime") or "", g.get("game_pk") or 0))
+        kept, kept_start = games[0], _parse_iso(games[0].get("game_datetime"))
+        for g in games[1:]:
+            st = _parse_iso(g.get("game_datetime"))
+            if (kept_start and st
+                    and abs(st - kept_start) <= DUP_WINDOW):
+                pc = g["pick_criteria"]
+                pc["play"] = "stay_away"
+                pc["status"] = "NO PLAY"
+                pc["reason"] = (
+                    f"duplicate market — same matchup as game "
+                    f"{kept.get('game_pk')} starting within 30 minutes; one "
+                    "market listed under two game ids, so this would double "
+                    "the same bet")
+                dropped += 1
+            else:
+                kept, kept_start = g, st        # a real doubleheader
+    if dropped:
+        log.warning("dropped %d duplicate-market pick(s)", dropped)
+    return dropped
 
 
 def _lock_started_games(date: str, results: list) -> list:
@@ -289,6 +434,39 @@ def _line_windows(o, evening, morning, c) -> dict:
     return out
 
 
+def _prob_to_american(p: float) -> int:
+    """Implied win probability -> the equivalent American moneyline."""
+    return -int(round(100 * p / (1 - p))) if p >= 0.5 else int(round(100 * (1 - p) / p))
+
+
+def _attach_pm_quote(game, result: dict, pm_rows: list) -> None:
+    """Polymarket quote for the advantage side (STAGE 1 of auto-betting: read-only).
+    A Polymarket price in cents IS the breakeven win probability, so comparing it
+    to the book moneyline's implied probability says which venue sells our side
+    cheaper. Recorded in the snapshot (pick_criteria.pm_quote) so PM's value vs
+    the book can be graded over time before any real order is ever placed."""
+    pc = result.get("pick_criteria") or {}
+    adv = pc.get("advantage_team")
+    if not adv or not pm_rows:
+        return
+    a, h = _canon_abbr(game.away.abbreviation), _canon_abbr(game.home.abbreviation)
+    row = next((x for x in pm_rows if _canon_abbr(x["away_abbr"]) == a
+                and _canon_abbr(x["home_abbr"]) == h), None)
+    if not row:
+        return
+    side = "home" if adv == game.home.name else "away"
+    pct = row.get(f"{side}_pct")
+    if not isinstance(pct, (int, float)) or not 1 <= pct <= 99:
+        return
+    q = {"pm_pct": int(pct), "pm_american": _prob_to_american(pct / 100)}
+    ml = pc.get("advantage_moneyline")
+    if ml is not None:
+        diff = round((_implied(int(ml)) - pct / 100) * 100, 1)  # +ve = PM cheaper
+        q["edge_pts"] = diff
+        q["vs_book"] = "better" if diff >= 1 else "worse" if diff <= -1 else "same"
+    pc["pm_quote"] = q
+
+
 def _attach_line(game, result: dict, slate: list, early: dict | None = None,
                  evening: dict | None = None) -> None:
     """Capture the advantage team's current pre-game moneyline (for the tracker,
@@ -415,13 +593,15 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
                       (pd_hit, pd_label)):
         (hits if ok else misses).append(label)
     pc["signals_hit"] = len(hits)
-    opp_name = home if adv == away else away
     shift = info.get("implied_shift")
-    # CORE signals carry a play; favorite + BvP are supporting only. The graded
-    # record: bets with a core signal (margin>=.50 / line toward / consistency>=3)
-    # went 11-4 (+3.06u), while no-core bets (favorite-only, BvP-only, favorite+BvP)
-    # went 7-8 (-1.78u). So ANY play now needs a core signal.
-    core_hit = m_hit or l_hit or c_hit
+    # CORE signals carry a play; favorite, BvP AND now LINE are supporting only.
+    # The 335-game leak-finder: line as a standalone core bled (line-only -9.3%
+    # ROI, line+consistency-no-margin -20%), because our line signal can't tell a
+    # sharp move from a public one and public-window moves grade -17%. Dropping it
+    # from core lifts the board 62%->65% / +8.9%->+13.4% ROI. margin (+34.6%) and
+    # consistency (+8.1%) are the only edges that carry a play alone; line still
+    # counts toward signals_hit / star / win-prob.
+    core_hit = m_hit or c_hit
     # Mild-public gate: a public lean UNDER PUBLIC_HEAVY% on the OTHER side has been
     # the sharp side (both the 106-game study and the live record: our side ~38%
     # into it). It's now a NO-ACTION, not a demoted lean - that bucket bled -2.23u.
@@ -464,15 +644,21 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
     pc["vegas"] = book   # frozen book_needs read: drives the fade gate (behind the scenes)
     if book:
         is_tail = adv == book["bet"]          # we're on the side Vegas NEEDS
-        qualifies = (core_hit and not is_tail) or pd_hit  # fade+core, OR a pitching dog
+        qualifies = core_hit and not is_tail  # fade + core
     else:
         is_tail = False
-        qualifies = core_hit or pd_hit        # no book read -> core, or pitching dog
+        qualifies = core_hit                  # no book read -> core alone
     # ONE play tier (user call - no more pick/lean split): a game is a PLAY when it
-    # clears the fade gate + core signal and isn't a mild-public fade. A PITCHING
-    # DOG also bypasses the fade + mild-public gates - it's its own high-conviction
-    # path (backtested +11% ROI on 186 dogs). The internal play value stays "pick".
-    playable = qualifies and (not mild_public or pd_hit)
+    # clears the fade gate + core signal and isn't a mild-public fade.
+    # PITCHING-DOG BYPASS — REMOVED (2026-07-28). It let a game skip BOTH the fade
+    # and mild-public gates on the strength of a 186-game backtest, and has since
+    # gone 0-5 (-100% ROI) - it has never once won, in-sample or holdout. A bypass
+    # that overrides safety gates has to earn it; this never did. pitching_dog is
+    # still computed and shown as a signal, it just can't carry a play by itself.
+    # (Also tried an extra underdog gate — dogs need margin/pitching — but the fade
+    # gate already cuts the losing dogs; the survivors went 4-3 +21%, so it dropped
+    # winners and LOWERED ROI. Reverted, kept as a note.)
+    playable = qualifies and not mild_public
     if playable and len(hits) >= 1:
         pc["play"] = "pick"
         pc["status"] = "pick"
@@ -518,10 +704,48 @@ def _attach_line(game, result: dict, slate: list, early: dict | None = None,
         elif book and is_tail and core_hit:
             why = "core signal but not a fade setup — no play"
         elif not core_hit and hits:
-            why = f"only {', '.join(hits)} — no core signal (margin/line/consistency), no play"
+            why = f"only {', '.join(hits)} — no core signal (margin/consistency), no play"
         else:
             why = "0/8 signals — no play"
         pc["reason"] = why
+        # REVERSAL PROMOTION — REMOVED (2026-07-28). Mined from the backtest at
+        # 24-12/+25% on the no-play subset, it collapsed the moment it went live:
+        # 5-11 (31%), -6.56u, -41% ROI on the real ledger - 59% of the system's
+        # entire all-time deficit from 10% of its bets. The holdout says it is
+        # exactly BACKWARDS: those same games bet on our STAT side returned +25.6%
+        # while fading them returned -31.7%. Textbook curve-fit; do not resurrect
+        # without out-of-sample evidence. Past entries stay in the record untouched.
+
+
+def _bet_side(pc: dict) -> tuple:
+    """(team, moneyline) actually being bet. Consensus picks carry bet_team /
+    bet_moneyline; older frozen snapshots fall back to the advantage side so
+    history renders and grades exactly as it did."""
+    if pc.get("bet_team"):
+        return pc.get("bet_team"), pc.get("bet_moneyline")
+    return pc.get("advantage_team"), pc.get("advantage_moneyline")
+
+
+def _apply_consensus(r: dict, metrics: dict) -> None:
+    """Decide the play with the consensus rule, overriding the legacy fade gate."""
+    pc = r.setdefault("pick_criteria", {})
+    play = consensus_rule.evaluate(r, metrics)
+    # Record how the line moved relative to the consensus side even when the game
+    # is filtered out, so the counterfactual bucket stays gradeable from snapshots.
+    maj = (r.get("public_majority") or {}).get("team")
+    if maj:
+        pc["line_vs_money"] = consensus_rule.line_tag(r, maj)
+    if play:
+        pc.update(play="pick", status="pick",
+                  bet_team=play["bet"], bet_moneyline=play["odds"],
+                  reason=play["reason"], starred=[],
+                  consensus={"drift": play["drift"], "imbalance": play["imbalance"],
+                             "line": play.get("line")},
+                  win_prob=68, win_driver="consensus")
+        return
+    pc.update(play="stay_away", status="stay_away",
+              bet_team=None, bet_moneyline=None, starred=[],
+              reason=consensus_rule.reject_reason(r, metrics))
 
 
 def _play(g: dict) -> str:
@@ -1075,42 +1299,24 @@ def build_summary(payload: dict) -> str:
     specific reason it's only a lean."""
     date = payload["date"]
     games = payload.get("games", [])
-    board, finals = _board_games(games), _finals(games)
-    picks = [g for g in board if _play(g) == "pick"]
-    no_action = [g for g in board if _play(g) == "stay_away"]
+    board = _board_games(games)
+    picks = _by_win([g for g in board if _play(g) == "pick"])
+    # Minimal board: only the plays, one clean line each, ranked by win chance.
+    # No-plays are still recorded in the picks JSON (backend), just not shown.
     out = [f"# MLB Board — {date}", ""]
-    out.append(f"**{len(picks)} play(s) · {len(no_action)} no-play**"
-               + (f" — picks: {', '.join(g['pick_criteria']['advantage_team'] for g in picks)}"
-                  if picks else ""))
-    if finals:
-        final_plays = sum(1 for g in finals if _play(g) == "pick")
-        out.append(f"\n_{len(finals)} game(s) final — {final_plays} was/were plays booked "
-                   f"to the record below; the rest were no-plays (never bet)._")
-    out.append("")
-
-    if board:
-        for g in _by_win(picks) + no_action:   # picks ranked by win chance, then no-plays
-            out.extend(_game_lines(g))
-            out.append("")
+    if picks:
+        out += [_pick_line(g, _splits_or_empty(board)) for g in picks]
     else:
-        out.append("_No upcoming or live games — full slate is final (see the record below)._")
-        out.append("")
-
-    out.append("_✅ = PLAY (core signal + not a mild-public fade, unless the sharp $ is on us). "
-               "⭐ = play on a proven-hot combo (margin+favorite+line, or 4+ proven signals). "
-               "▫️ = no play. 🔴 = live._")
-
-    out.append("")
-    out.append(grade.records_block())
-    rev = grade.review_line()
-    if rev:
-        out.append("")
-        out.append(rev)
-    tune_status = tune.status_line()
-    if tune_status:
-        out.append("")
-        out.append(tune_status)
-    out.append(f"\n_Full per-game detail: `output/picks_{date}.json`_")
+        out.append("_No plays on the board._")
+    dogs = _good_dog_lines(board, picks)
+    if dogs:
+        out += ["", "## Watching — good dogs (NOT bets)", "",
+                "_Usually-favoured teams priced as dogs tonight. Labelled to "
+                "gather forward evidence; the backtest could not settle them. "
+                "**Do not bet these.**_", ""] + dogs
+    out += ["", grade.records_block()]
+    # props stay backend-only for now (still computed + tracked in prop_ledger.json,
+    # just not shown on the board)
     return "\n".join(out)
 
 
@@ -1129,12 +1335,189 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
+def _pick_line(g: dict, sp: dict | None = None) -> str:
+    """One board entry, written as an instruction rather than a notation.
+
+    'BET Texas Rangers -125' leaves nothing to work out; the old
+    '✅ TEX -125 vs NYM' made the reader decode an abbreviation and a tick to
+    find the team. The opponent, venue and first pitch go on a second,
+    indented line so the team and the price are never competing for attention.
+
+    Fades are tagged in words - they count in the record like anything else, so
+    the tag says where the pick came from and nothing more."""
+    pc = g["pick_criteria"]
+    aa, ha = _abbrs(g)
+    away, home = g["matchup"].split(" @ ")
+    bet_team, ml = _bet_side(pc)
+    at_home = bet_team == home
+    opp_ab = aa if at_home else ha
+    mls = f" {ml:+d}" if isinstance(ml, int) else ""
+    star = " ⭐" if _star(pc) else ""
+    tag = "  ·  fade" if pc.get("source") == "fade" else ""
+    gd = pc.get("good_dog") or {}
+    # only label it when the team we are BACKING is the good dog
+    if gd.get("team") == bet_team:
+        tag += "  ·  good dog"
+    head = f"✅ BET {bet_team}{mls}{star}{tag}"
+    where = f"{'vs' if at_home else 'at'} {opp_ab}"
+    live = "🔴 LIVE · " if g.get("state") == "live" else ""
+    st = _start_time(g)
+    sub = f"     {live}{where}" + (f" · {st}" if st else "")
+    lines = [head, sub]
+    # how often this team wins at this kind of price - the same trust check the
+    # watch list carries, on the bet itself. `applies` marks which of the two
+    # numbers tonight's price puts in play.
+    if sp:
+        applies = "fav" if isinstance(ml, int) and ml < 0 else "dog"
+        txt = good_dog.split_text(bet_team, sp, applies)
+        if txt:
+            lines.append(f"     {txt}")
+    lines += _hit_lines(g)
+    return "\n".join(lines)
+
+
+def _hit_lines(g: dict) -> list[str]:
+    """Who is most likely to get a hit if this pick wins, and the conditions.
+
+    The percentage is hit rate in the team's season WINS, with the hitter's
+    ALL-GAMES rate in brackets. That bracket is the point: the first number
+    conditions on the outcome, so every regular's rate rises inside wins and a
+    big gap mostly says "the team wins when he hits". A SMALL gap is the
+    dependable bat, so the gap is what to read.
+    """
+    pc = g.get("pick_criteria") or {}
+    bats = pc.get("hit_bats") or []
+    out = []
+    if bats:
+        hot, cold = _form_names(g, _bet_side(pc)[0])
+        parts = []
+        for b in bats:
+            ar = b.get("all_rate")
+            name = b.get("player") or ""
+            # the board's own last-5 form read, on the same hitters - a cold bat
+            # with a high hit-in-wins rate is the one to be careful with
+            form = " hot" if name in hot else " cold" if name in cold else ""
+            parts.append(f"{_surname(name)} {b['hit_rate']}%"
+                         + (f" ({ar}% all)" if ar is not None else "") + form)
+        out.append("     🔥 hit if they win: " + "  ·  ".join(parts))
+    cond = _conditions(g)
+    if cond and bats:
+        out.append(f"        {cond}")
+    return out
+
+
+def _form_names(g: dict, team: str | None) -> tuple[set, set]:
+    """The board's hot and cold bat names for one side of the matchup."""
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    side = "home" if team == home else "away" if team == away else None
+    f = ((g.get("form") or {}).get(side) or {}) if side else {}
+    return ({p.get("name") for p in (f.get("hot") or [])},
+            {p.get("name") for p in (f.get("cold") or [])})
+
+
+def _surname(name: str) -> str:
+    """Last name only - the board is read on a phone."""
+    parts = (name or "").split()
+    return parts[-1] if parts else name
+
+
+def _conditions(g: dict) -> str:
+    """Park, weather, umpire and BvP - the context behind the hit read."""
+    bits = []
+    pf = g.get("park_factor")
+    if isinstance(pf, (int, float)):
+        bits.append(f"park {pf:.2f}")
+    w = g.get("weather") or {}
+    if isinstance(w.get("temp_f"), int):
+        wind = (f", wind {w['wind_mph']} {w.get('wind_dir') or ''}".rstrip()
+                if isinstance(w.get("wind_mph"), int) else "")
+        roof = f", {w['roof']}" if w.get("roof") else ""
+        bits.append(f"{w['temp_f']}°F{wind}{roof}")
+    ump, tend = g.get("umpire_hp"), g.get("ump_tend") or {}
+    if ump:
+        r = tend.get("r_pg")
+        bits.append(f"ump {_surname(ump)}"
+                    + (f" {r:.1f} R/g" if isinstance(r, (int, float)) else ""))
+    bvp = g.get("bvp") or {}
+    if bvp.get("edge_team") and isinstance(bvp.get("gap"), (int, float)):
+        tag = "" if bvp.get("meaningful") else " (thin)"
+        bits.append(f"BvP {_abbr_of(g, bvp['edge_team'])} +{bvp['gap']:.3f}{tag}")
+    return " · ".join(bits)
+
+
+def _abbr_of(g: dict, team: str) -> str:
+    """The board's own abbreviation for a team name."""
+    aa, ha = _abbrs(g)
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    return ha if team == home else aa if team == away else team
+
+
+def _splits_or_empty(board: list) -> dict:
+    """Each team's win rate as favourite and as dog. Never raises - a missing
+    lookup costs a context line, and must not cost the board."""
+    try:
+        return good_dog.splits(_board_date(board))
+    except Exception as exc:
+        log.warning("fav/dog splits unavailable: %s", exc)
+        return {}
+
+
+def _board_date(board: list) -> str:
+    """The slate's date, used as the cutoff for prior-games history."""
+    for g in board:
+        d = (g.get("game_datetime") or "")[:10]
+        if d:
+            return d
+    return "9999-99-99"
+
+
+def _good_dog_lines(board: list, picks: list) -> list[str]:
+    """Tonight's good dogs that are NOT plays, as a watch list.
+
+    Worded so it cannot be mistaken for a bet. The tag is an open question, not
+    a pick: its two main effects came in at p = 0.154 and p = 0.277, and closing
+    the question needs roughly 2.5x the data, so these are labelled and left
+    alone to accumulate. Anything already on the board as a play is skipped -
+    it is labelled there instead, and listing it twice was the bug that put the
+    Yankees on the board twice.
+    """
+    bet_teams = {(_bet_side(g["pick_criteria"]) or (None,))[0] for g in picks}
+    pick_pks = {g.get("game_pk") for g in picks}
+    # how often each team actually wins as a dog and as a favourite - the trust
+    # check, put where the decision is. Fails soft to no splits.
+    sp = _splits_or_empty(board)
+    out = []
+    for g in board:
+        gd = (g.get("pick_criteria") or {}).get("good_dog") or {}
+        if not gd or gd.get("team") in bet_teams:
+            continue
+        aa, ha = _abbrs(g)
+        away, home = g["matchup"].split(" @ ")
+        at_home = gd["team"] == home
+        # A good dog in a game we are already betting is the OTHER SIDE of that
+        # play. Listing it unmarked put two opposing sides of one game on the
+        # board looking like two suggestions - say so instead.
+        clash = ("  ·  ⚠ opposes tonight's play — the rule and the tag disagree"
+                 if g.get("game_pk") in pick_pks else "")
+        out.append(f"👀 {gd['team']} {gd['odds']:+d} "
+                   f"{'vs' if at_home else 'at'} {ha if not at_home else aa}"
+                   f"  ·  favoured {gd['rate']:.0%} of its games{clash}")
+        line = good_dog.split_text(gd["team"], sp)
+        if line:
+            out.append(f"      {line}")
+    return out
+
+
 def _telegram_records_lines() -> list[str]:
     """Day/Week/Month/YTD records per book plus the all-time combined row, laid
     out one window per line."""
     ledger = grade.load_ledger()
     today = dt.datetime.now(EASTERN).date()
     out: list[str] = []
+    # Fades count in the MAIN record (user's call, 2026-09-22). They stay
+    # tagged on the entry and labelled 🔁 FADE on the board, so they are still
+    # identifiable game by game - they are simply tallied here with everything
+    # else rather than held apart.
     books = [("Plays", ledger["plays"])]
     for name, book in books:
         rec = grade.windowed_records(book, today)
@@ -1145,7 +1528,8 @@ def _telegram_records_lines() -> list[str]:
         for label, (w, l, u) in rec:
             out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
         w, l, u = grade._tally(book["entries"])
-        out.append(f"   • All-time: {w}-{l} ({u:+.2f}u)")
+        roi = f" · {u/(w+l):+.1%} ROI" if (w + l) else ""
+        out.append(f"   • All-time: {w}-{l} ({u:+.2f}u){roi}")
     return out
 
 
@@ -1154,92 +1538,30 @@ def telegram_text(payload: dict) -> str:
     the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
     date = payload["date"]
     games = payload.get("games", [])
-    board, finals = _board_games(games), _finals(games)
+    board = _board_games(games)
+    picks = _by_win([g for g in board if _play(g) == "pick"])
+    sp_all = _splits_or_empty(board)   # computed once; the cache makes it cheap
 
-    picks = [g for g in board if _play(g) == "pick"]
-    no_action = [g for g in board if _play(g) == "stay_away"]
+    # Minimal board: only the plays, one clean line each (ranked by win chance).
+    # No-plays stay recorded in the picks JSON (backend); they're not shown.
+    L = [f"⚾ MLB BOARD — {date}", ""]
+    if picks:
+        L.append(f"{len(picks)} play{'s' if len(picks) != 1 else ''} today:")
+        L.append("")
+        for g in picks:
+            L.append(_pick_line(g, sp_all))
+            L.append("")
+        L.pop()          # no trailing blank before the divider
+    else:
+        L.append("No plays on the board.")
 
-    L = [f"⚾ MLB BOARD — {date}",
-         f"{len(picks)} play(s) · {len(no_action)} no-play"]
-    if finals:
-        final_plays = sum(1 for g in finals if _play(g) == "pick")
-        L.append(f"({len(finals)} final → {final_plays} play(s) booked to the record; "
-                 f"rest were no-plays)")
-
-    def block(g):
-        pc = g["pick_criteria"]
-        aa, ha = _abbrs(g)
-        adv = _short(g, pc["advantage_team"])
-        edge = _edge_word(pc["components"]["stat_edge"]["strength"])
-        emargin = pc["components"]["stat_edge"]["margin"]
-        tag = "🔴 LIVE · " if g.get("state") == "live" else ""
-        frozen = " [frozen]" if g.get("state") == "live" else ""
-        star = _star(pc)
-        kind = "PLAY"
-        mark = "⭐" if star else "✅"
-        st = _start_time(g)
-        wphr = _win_phrase(g)
-        L.extend(["",
-                  f"{mark} {tag}{kind} {adv}{_ml_str(pc)}",
-                  f"   {aa} @ {ha}" + (f" · {st}" if st else ""),
-                  f"   edge: {adv} {edge} ({emargin}) · consistency {_cons_pair(g)}"]
-                 + ([f"   {wphr}"] if wphr else [])
-                 + [f"   👥 public {_public_evidence(g)}",
-                    f"   🦈 line: {_line_phrase(pc.get('line_check'))}{frozen}"])
-        mp = _money_phrase(g)
-        if mp:
-            L.append(f"   {mp}")
-        pcheck = _public_check_phrase(g)
-        if pcheck:
-            L.append(f"   🔍 check: {pcheck}")
-        bvp = _bvp_phrase(g)
-        if bvp:
-            L.append(f"   🥊 BvP {bvp}")
-        pen = _pen_bvp_phrase(g)
-        if pen:
-            L.append(f"   🧯 pen BvP {pen}")
-        pt = _pen_tax_phrase(g)
-        if pt:
-            L.append(f"   {pt}")
-        fp = _form_phrase(g)
-        if fp:
-            L.append(f"   📈 form: {fp}")
-        wx = _weather_phrase(g)
-        if wx:
-            L.append(f"   🌤 {wx}")
-        ump = _ump_phrase(g)
-        if ump:
-            L.append(f"   🧑‍⚖️ {ump}")
-        sit = _situational_phrase(g)
-        if sit:
-            L.append(f"   📅 {sit}")
-        L.append(f"   ✅ {pc['reason']}"
-                 + (f" · ⭐ {', '.join(star)}" if star else ""))
-
-    for g in _by_win(picks):   # ranked by win chance: core leads, pitching-dog trails
-        block(g)
-    if not picks:
-        L += ["", "No plays on the slate."]
-
-
-    if no_action:
-        L += ["", "— NO PLAY —"]
-        for g in no_action:
-            aa, ha = _abbrs(g)
-            pc = g["pick_criteria"]
-            tag = "🔴 " if g.get("state") == "live" else ""
-            mp = _money_phrase(g)
-            tm = _start_time(g)
-            L.append(f"▫️ {tag}{aa} @ {ha}" + (f" ({tm})" if tm else "")
-                     + f" — {pc.get('reason', 'no play')}"
-                     + (f" · {mp}" if mp else ""))
-    if not board:
-        L += ["", "No upcoming or live games — slate is final (see record)."]
-
+    dogs = _good_dog_lines(board, picks)
+    if dogs:
+        L += ["", "👀 WATCHING — NOT BETS", "",
+              "Usually-favoured teams priced as dogs tonight. Tracking only —",
+              "do not bet these.", ""] + dogs
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
-    ts = tune.status_line().replace("**", "")
-    if ts:
-        L += ["", ts]
+    # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)
 
 
@@ -1252,6 +1574,14 @@ def main() -> None:
     write_outputs(payload, args.date)
     grade.update_ledger(args.date)  # record any games that just went final (idempotent)
     notify.send_telegram(telegram_text(payload))
+    # A new pick gets a board post; a WITHDRAWN one used to get silence, which
+    # is indistinguishable from "the board hasn't refreshed yet" - the common
+    # case, since most scheduled runs are dropped. Runs after the board post so
+    # the channel sees the board first, then what changed on it.
+    try:
+        pick_watch.check(payload.get("games") or [], args.date)
+    except Exception as exc:
+        log.warning("pick watch failed (board unaffected): %s", exc)
     print(json.dumps(payload.get("leans", []), indent=2))
 
 

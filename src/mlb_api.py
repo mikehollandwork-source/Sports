@@ -6,10 +6,10 @@ all from the last 5 games:
 
   - today's schedule + probable pitchers (with throwing hand)
   - each team's projected lineup (boxscore battingOrder, falling back to roster)
-  - per-hitter last-5 counting stats (for wOBA / ISO / discipline / speed),
-    park-neutralized by the parks actually played in
-  - probable starter's last-5 FIP inputs
-  - bullpen's last-5 FIP inputs (relievers aggregated)
+  - per-hitter recent counting stats over the last FORM_WINDOW games (for
+    wOBA / ISO / discipline / speed), park-neutralized by the parks played in
+  - probable starter's FIP inputs over the same window
+  - bullpen's FIP inputs over the same window (relievers aggregated)
 
 The v1 API is undocumented; field paths below are best-effort and may need a
 small tweak after the first live run (this code can't be tested from the build
@@ -27,11 +27,19 @@ import requests
 
 from .park_factors import factor_for
 from . import strength
+from . import apitime
 
 log = logging.getLogger("mlb_api")
 
 BASE = "https://statsapi.mlb.com/api/v1"
 SPORT_ID = 1
+
+# How many recent games the "form" stats sample (hitter counting stats, starter
+# and bullpen FIP). Moved 5 -> 10 on 2026-07-28: a 5-game window is ~20 PA per
+# hitter, which is mostly variance, and the live record (53.6% vs a 57.3%
+# breakeven bar) pointed at input noise rather than the gate. src/window_test.py
+# re-rates history at several windows to measure this.
+FORM_WINDOW = 10
 TIMEOUT = 20
 POLITE_DELAY = 0.1
 SEASON_FIP_MIN_IP = 20.0   # innings a starter needs before his season FIP is trusted
@@ -41,10 +49,12 @@ SESSION.headers.update({"User-Agent": "mlb-edge-finder/1.0"})
 
 
 def _get(path: str, **params) -> dict:
-    resp = SESSION.get(f"{BASE}/{path}", params=params, timeout=TIMEOUT)
-    resp.raise_for_status()
+    with apitime.timed("mlb", path):
+        resp = SESSION.get(f"{BASE}/{path}", params=params, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
     time.sleep(POLITE_DELAY)
-    return resp.json()
+    return data
 
 
 # --- data models --------------------------------------------------------------
@@ -164,6 +174,23 @@ def hp_umpire(game_pk: int) -> str | None:
                 return o.get("official", {}).get("fullName") or None
     except Exception:
         pass
+    return None
+
+
+def player_hits(game_pk: int, player_id: int) -> int | None:
+    """Hits the player recorded in a game, from the boxscore batting line. None
+    if unavailable (game not final / player absent / fetch fails)."""
+    try:
+        with apitime.timed("mlb", f"box/{game_pk}"):
+            box = SESSION.get(
+                f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore",
+                timeout=TIMEOUT).json()
+        for side in ("home", "away"):
+            p = (box.get("teams", {}).get(side, {}).get("players") or {}).get(f"ID{player_id}")
+            if p:
+                return int((p.get("stats", {}).get("batting", {}) or {}).get("hits", 0) or 0)
+    except Exception as exc:
+        log.warning("player_hits fetch failed (%s/%s): %s", game_pk, player_id, exc)
     return None
 
 
@@ -345,10 +372,11 @@ HIT_FIELDS = {
 
 
 def hitter_last5(player_id: int, team_name: str, season: int,
-                 as_of: str | None = None) -> dict:
-    """Sum a hitter's last-5 counting stats + PA-weighted park factor and the
-    PA-weighted strength (FIP, win%) of the pitching staffs faced."""
-    rows = _last_n_gamelog(player_id, "hitting", season, 5, as_of=as_of)
+                 as_of: str | None = None, n: int = FORM_WINDOW) -> dict:
+    """Sum a hitter's last-n counting stats + PA-weighted park factor and the
+    PA-weighted strength (FIP, win%) of the pitching staffs faced. n defaults to
+    FORM_WINDOW (5); the window experiment overrides it to test longer samples."""
+    rows = _last_n_gamelog(player_id, "hitting", season, n, as_of=as_of)
     acc = {k: 0.0 for k in HIT_FIELDS}
     park_pa = pf_weight = 0.0
     opp_fip_pa = opp_fip_w = opp_win_pa = 0.0
@@ -413,10 +441,11 @@ def _new_pitch_acc() -> dict:
             "opp_woba_ip": 0.0, "opp_woba_w": 0.0, "opp_win_ip": 0.0}
 
 
-def pitcher_last5(player_id: int, season: int, as_of: str | None = None) -> dict:
-    """Starter's last-5 FIP + IP-weighted opponent-offense strength faced."""
+def pitcher_last5(player_id: int, season: int, as_of: str | None = None,
+                  n: int = FORM_WINDOW) -> dict:
+    """Starter's last-n FIP + IP-weighted opponent-offense strength faced."""
     acc = _new_pitch_acc()
-    _accumulate_pitching(_last_n_gamelog(player_id, "pitching", season, 5, as_of=as_of),
+    _accumulate_pitching(_last_n_gamelog(player_id, "pitching", season, n, as_of=as_of),
                          season, acc, as_of)
     return _fip_from_acc(acc)
 
@@ -453,7 +482,10 @@ def raw_woba(ab, h, d2, d3, hr, bb, hbp, sf) -> float | None:
             + 1.24 * d2 + 1.56 * d3 + 1.95 * hr) / den
 
 
-FORM_MIN_PA5 = 8       # hitter needs this many last-5 PA to count toward form
+# Hitter needs this many PA inside the form window to count toward the form
+# signal. Kept proportional to FORM_WINDOW (1.6 PA/game, i.e. the original 8 PA
+# per 5 games) so widening the window doesn't quietly let bench bats qualify.
+FORM_MIN_PA5 = round(1.6 * FORM_WINDOW)
 FORM_MIN_SEASON_PA = 80  # ...and this season sample for a stable baseline
 
 
@@ -507,8 +539,16 @@ def probable_hands(game: Game) -> None:
             pp.hand = people[pp.player_id].get("pitchHand", {}).get("code", "")
 
 
+_LINEUP_CACHE: dict[tuple, list] = {}
+
+
 def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
-    """Projected lineup: boxscore battingOrder if posted, else roster hitters."""
+    """Projected lineup: boxscore battingOrder if posted, else roster hitters.
+    Cached per (game, team, date) for the process - a backtest re-rating the same
+    slate at several form windows would otherwise re-fetch each boxscore."""
+    ck = (game_pk, team_id, date, home)
+    if ck in _LINEUP_CACHE:
+        return _LINEUP_CACHE[ck]
     try:
         box = SESSION.get(
             f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore", timeout=TIMEOUT
@@ -517,11 +557,12 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
         order = box["teams"][side].get("battingOrder", [])
         if order:
             people = _people(list(order))
-            return [
+            _LINEUP_CACHE[ck] = [
                 Player(pid, people.get(pid, {}).get("fullName", ""),
                        hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
                 for pid in order
             ]
+            return _LINEUP_CACHE[ck]
     except Exception as exc:
         log.warning("boxscore lineup unavailable for %s (%s); using roster", game_pk, exc)
 
@@ -532,11 +573,12 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
         if e.get("position", {}).get("type", "") not in ("Pitcher", "")
     ]
     people = _people(ids)
-    return [
+    _LINEUP_CACHE[ck] = [
         Player(pid, people.get(pid, {}).get("fullName", ""),
                hand=people.get(pid, {}).get("batSide", {}).get("code", ""))
         for pid in ids
     ]
+    return _LINEUP_CACHE[ck]
 
 
 _TEAM_GAMELOG_CACHE: dict[tuple, tuple] = {}
@@ -706,7 +748,8 @@ def reliever_ids(team_id: int, date: str, starter_id: int | None) -> list[int]:
 
 
 # --- orchestration ------------------------------------------------------------
-def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
+def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
+                      n: int = FORM_WINDOW, skip_context: bool = False) -> Game:
     """Populate last-5 offense + starter/bullpen FIP + handedness for both teams.
     With as_of (YYYY-MM-DD), only stats from games before that date are used -
     point-in-time, for an unbiased backtest. Default (None) = latest available."""
@@ -725,7 +768,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         per_hitter = []  # (pid, name, last5 line) for the hot/cold form pass
         for h in hitters:
             try:
-                line = hitter_last5(h.player_id, team.name, season, as_of=as_of)
+                line = hitter_last5(h.player_id, team.name, season, as_of=as_of, n=n)
             except Exception as exc:
                 log.warning("hitter %s last-5 failed: %s", h.player_id, exc)
                 continue
@@ -743,7 +786,8 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         agg["park_factor"] = (park_num / park_den) if park_den else 1.0
         # hot/cold form: each hitter's last-5 wOBA vs his own season baseline
         try:
-            team.form_delta, team.player_form = _lineup_form(per_hitter, season)
+            if not skip_context:
+                team.form_delta, team.player_form = _lineup_form(per_hitter, season)
         except Exception as exc:
             log.warning("lineup form failed for %s: %s", team.name, exc)
         team._hitter_ids = [h.player_id for h in hitters]  # for the pen-BvP pass below
@@ -756,7 +800,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         # --- batter-vs-pitcher: this lineup's PA-weighted CAREER OPS vs the OPPOSING
         # starter (display context; samples are tiny so it carries a PA count). ---
         opp_sp = (game.away if is_home else game.home).probable_pitcher
-        if opp_sp:
+        if opp_sp and not skip_context:
             pa_tot = ops_w = 0.0
             for h in hitters:
                 try:
@@ -777,7 +821,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None) -> Game:
         # --- pitching: starter FIP + bullpen FIP (last 5), with opp offense ---
         if team.probable_pitcher:
             try:
-                sp = pitcher_last5(team.probable_pitcher.player_id, season, as_of=as_of)
+                sp = pitcher_last5(team.probable_pitcher.player_id, season, as_of=as_of, n=n)
                 team.starter_fip_last5 = sp["fip"]
                 team.starter_ip_last5 = sp["ip"]
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]

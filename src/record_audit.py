@@ -1,0 +1,423 @@
+"""
+Audit the record itself: what was posted vs what got graded.
+
+THE FLAW THIS EXISTS TO MEASURE
+The board is stateless - every refresh regenerates picks_<date>.json from
+scratch - and `grade.settle_day` reads only the FINAL committed version of that
+file. `_lock_started_games` freezes a game 15 minutes before its first pitch, so
+anything that stops qualifying BEFORE that window simply disappears.
+
+A game can therefore be posted to Telegram at 2pm as a pick, stop qualifying at
+5pm because the order book flipped or the line moved back, and never be graded.
+It was a live bet to anyone reading the channel; it is absent from the ledger.
+
+A probe over five dates found 25 games that were a pick in some version of the
+board and 8 that survived to the final one. That is not a rounding error, and
+whether it flatters or hurts the recorded ROI depends entirely on whether the
+dropped picks won - which is what this measures.
+
+WHY THIS MATTERS MORE THAN ANOTHER SIGNAL SCAN
+Thirteen signal tests have found nothing. But every one of them, and every ROI
+number quoted from this record, rests on the ledger being a faithful list of the
+bets that were actually offered. If the ledger silently drops a third of them,
+the bias in that number is larger than any edge being hunted.
+
+WHAT IS RECONSTRUCTED
+Every committed version of every board, from git history, giving for each game:
+    first_posted   the earliest version where it was a pick, and its price then
+    final          whether the last version still had it as a pick
+Then both populations are graded and compared.
+
+Also reports PRICE DRIFT: for picks that survived, the price when first posted
+versus the price finally recorded. The ledger books the frozen closing price,
+but the channel showed the earlier one - if they differ systematically, the
+recorded ROI is not the ROI a reader of the channel would have got.
+
+Needs full git history: the workflow must check out with fetch-depth 0.
+
+Writes output/record_audit.md.
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import logging
+import random
+import statistics as st
+import subprocess
+from pathlib import Path
+
+from . import grade, mlb_api
+
+log = logging.getLogger("record_audit")
+
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
+REPO = Path(__file__).resolve().parent.parent
+
+
+def _versions(rel: str) -> list[str]:
+    """Every commit that touched this board file, oldest first."""
+    try:
+        out = subprocess.run(["git", "log", "--format=%H", "--all", "--reverse",
+                              "--", rel], cwd=REPO, capture_output=True,
+                             text=True, timeout=120)
+        return [s for s in out.stdout.split() if s]
+    except Exception as exc:
+        log.warning("git log failed for %s: %s", rel, exc)
+        return []
+
+
+def _at(sha: str, rel: str) -> dict | None:
+    try:
+        out = subprocess.run(["git", "show", f"{sha}:{rel}"], cwd=REPO,
+                             capture_output=True, text=True, timeout=60)
+        if out.returncode:
+            return None
+        return json.loads(out.stdout)
+    except Exception:
+        return None
+
+
+def scan_date(date: str) -> dict:
+    """{game_pk: {first_bet, first_odds, final_bet, final_odds, matchup}}"""
+    rel = f"output/picks_{date}.json"
+    shas = _versions(rel)
+    if not shas:
+        return {}
+    seen: dict = {}
+    for sha in shas:
+        day = _at(sha, rel)
+        if not day:
+            continue
+        for g in day.get("games", []):
+            pc = g.get("pick_criteria") or {}
+            if pc.get("play") != "pick":
+                continue
+            pk = g.get("game_pk")
+            bet = pc.get("bet_team") or pc.get("advantage_team")
+            odds = pc.get("bet_moneyline")
+            if odds is None:
+                odds = pc.get("advantage_moneyline")
+            if not pk or not bet or not isinstance(odds, int):
+                continue
+            if pk not in seen:
+                # the other side, at ITS real price - fading a -12.9% bet is not
+                # +12.9%, it is the opposite side minus that side's own vig
+                adv = pc.get("advantage_team")
+                m = g.get("matchup") or ""
+                other = other_odds = None
+                if " @ " in m:
+                    away, home = m.split(" @ ")
+                    other = home if bet == away else away
+                    other_odds = (pc.get("opponent_moneyline") if bet == adv
+                                  else pc.get("advantage_moneyline"))
+                seen[pk] = {"matchup": m, "first_bet": bet,
+                            "first_odds": odds, "source": pc.get("source", "rule"),
+                            "other_bet": other,
+                            "other_odds": other_odds if isinstance(other_odds, int) else None}
+    # the final committed state decides what the ledger books
+    final = _at(shas[-1], rel) or {}
+    for g in final.get("games", []):
+        pc = g.get("pick_criteria") or {}
+        pk = g.get("game_pk")
+        if pk not in seen:
+            continue
+        if pc.get("play") == "pick":
+            seen[pk]["final_bet"] = pc.get("bet_team") or pc.get("advantage_team")
+            o = pc.get("bet_moneyline")
+            seen[pk]["final_odds"] = o if isinstance(o, int) else pc.get("advantage_moneyline")
+        else:
+            # WHY it was dropped. A pick the order book turned against is a
+            # different event from one whose price discount simply evaporated,
+            # and lumping them hides whichever one carries the information.
+            seen[pk]["why"] = (pc.get("reason") or "unknown")
+    return seen
+
+
+def collect() -> list[dict]:
+    rows = []
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        date = Path(f).stem.split("picks_")[1]
+        seen = scan_date(date)
+        if not seen:
+            continue
+        try:
+            results = mlb_api.results_for(date)
+        except Exception:
+            continue
+        for pk, d in seen.items():
+            res = results.get(pk)
+            if not res or not res.get("final") or not res.get("winner"):
+                continue
+            survived = "final_bet" in d
+            rows.append({
+                "why": d.get("why", "unknown"),
+                "other_bet": d.get("other_bet"), "other_odds": d.get("other_odds"),
+                "won_other": ((res["winner"] == d["other_bet"])
+                              if d.get("other_bet") else None),
+                "date": date, "game_pk": pk, "matchup": d["matchup"],
+                "survived": survived, "source": d.get("source", "rule"),
+                "first_bet": d["first_bet"], "first_odds": d["first_odds"],
+                "final_odds": d.get("final_odds"),
+                "won_first": res["winner"] == d["first_bet"],
+                "won_final": (res["winner"] == d["final_bet"]) if survived else None,
+            })
+    return rows
+
+
+def _roi(rows, odds_key: str, won_key: str) -> tuple[int, int, float, float]:
+    w = u = 0
+    for r in rows:
+        o = r.get(odds_key)
+        if not isinstance(o, int) or r.get(won_key) is None:
+            continue
+        won = r[won_key]
+        w += 1 if won else 0
+        u += grade.american_profit(o) if won else -1
+    n = sum(1 for r in rows
+            if isinstance(r.get(odds_key), int) and r.get(won_key) is not None)
+    return w, n - w, u, (u / n if n else 0.0)
+
+
+def _fmt(rows, odds_key="first_odds", won_key="won_first") -> str:
+    w, l, u, roi = _roi(rows, odds_key, won_key)
+    if w + l == 0:
+        return "—"
+    return f"{w}-{l} ({w/(w+l):.0%}) · {u:+.2f}u · **{roi:+.1%}** (n={w+l})"
+
+
+def build() -> str:
+    rows = collect()
+    md = ["# Record audit — what was posted vs what got graded", "",
+          "_The board is stateless and `settle_day` reads only the final "
+          "committed version, so a pick that stops qualifying before its "
+          "15-minute lock window disappears. It was on Telegram; it is not in "
+          "the ledger._", "",
+          f"- games that were a pick in SOME version, and are final: "
+          f"**{len(rows)}**"]
+    if not rows:
+        return "\n".join(md + ["", "No history recovered — is git history shallow?", ""])
+
+    kept = [r for r in rows if r["survived"]]
+    lost = [r for r in rows if not r["survived"]]
+    md += [f"- survived to the final board (graded): **{len(kept)}**",
+           f"- **dropped before the lock (never graded): {len(lost)}** "
+           f"({len(lost)/len(rows):.0%})", "",
+           "## Does dropping them flatter the record?", "",
+           "| population | at the price first posted |", "|---|---|",
+           f"| survived — what the ledger books | {_fmt(kept)} |",
+           f"| **dropped — never graded** | **{_fmt(lost)}** |",
+           f"| everything ever posted | {_fmt(rows)} |", ""]
+    _, _, _, rk = _roi(kept, "first_odds", "won_first")
+    _, _, _, ra = _roi(rows, "first_odds", "won_first")
+    md += [f"- the recorded population returns **{rk:+.1%}**; everything that "
+           f"actually appeared returns **{ra:+.1%}**",
+           f"- **bias from silent dropping: {(rk - ra) * 100:+.1f} points**", ""]
+    md += ([f"The ledger is FLATTERED by {(rk-ra)*100:+.1f} points: the picks that "
+            "quietly vanished did worse than the ones that stayed.", ""]
+           if rk > ra else
+           [f"The ledger UNDERSTATES the record by {(ra-rk)*100:+.1f} points: the "
+            "dropped picks did better than the ones that stayed.", ""])
+
+    # Is "still qualifying at its own lock time" actually predictive, or is the
+    # gap the sort of thing a 351-game split throws up? Permuting the
+    # survived/dropped labels holds the outcomes fixed and asks only whether the
+    # LABEL carries information.
+    import random as _rnd
+    rng = _rnd.Random(401)
+    obs = rk - _roi(lost, "first_odds", "won_first")[3]
+    pool = kept + lost
+    k = len(kept)
+    null = []
+    for _ in range(4000):
+        sh = pool[:]
+        rng.shuffle(sh)
+        null.append(_roi(sh[:k], "first_odds", "won_first")[3]
+                    - _roi(sh[k:], "first_odds", "won_first")[3])
+    pv = sum(1 for x in null if x >= obs) / len(null)
+    md += ["## Is surviving to the lock actually predictive?", "",
+           "_Permuting the survived/dropped labels keeps every outcome and price "
+           "fixed and asks only whether the label carries information._", "",
+           f"- observed gap: **{obs * 100:+.1f} points**",
+           f"- **permutation p = {pv:.4f}**", ""]
+    md += ([f"**Real.** A pick that still qualifies at its own lock window is a "
+            "materially better bet than one that has stopped qualifying, and "
+            "that is implementable: check the board ~15 minutes before first "
+            "pitch and skip anything that has fallen out.", ""]
+           if pv <= 0.05 else
+           ["**Not established.** The gap is within what a split this size "
+            "produces by chance.", ""])
+
+    # ---- fading the withdrawn picks, priced honestly ----
+    fadeable = [r for r in lost if isinstance(r.get("other_odds"), int)
+                and r.get("won_other") is not None]
+    md += ["## Fading the picks the rule withdrew", "",
+           "_Backing the OTHER side of every pick that stopped qualifying, at "
+           "that side's own real price. A -12.9% bet does not become +12.9% "
+           "reversed - the fade pays its own vig, which is the whole reason a "
+           "losing cell is not automatically a winning one backwards._", ""]
+    if len(fadeable) < 20:
+        md += [f"Only {len(fadeable)} withdrawn picks carry a priced opposite "
+               "side. Too few to report.", ""]
+    else:
+        w, l, u, roi = _roi(fadeable, "other_odds", "won_other")
+        bw, bl, bu, broi = _roi(fadeable, "first_odds", "won_first")
+        md += [f"- withdrawn picks with a priced other side: **{len(fadeable)}**",
+               f"- backing them (what the rule dropped): {bw}-{bl} · {bu:+.2f}u · "
+               f"**{broi:+.1%}**",
+               f"- **fading them: {w}-{l} · {u:+.2f}u · {roi:+.1%}**",
+               f"- the two do not sum to zero: the gap is the vig paid twice "
+               f"({broi + roi:+.1%} combined)", ""]
+        # is the fade distinguishable from zero, day-blocked?
+        from collections import defaultdict as _dd
+        by = _dd(list)
+        for x in fadeable:
+            by[x["date"]].append(x)
+        days = list(by)
+        rng = random.Random(613)
+        boots = []
+        for _ in range(4000):
+            samp = []
+            for _ in days:
+                samp += by[days[rng.randrange(len(days))]]
+            boots.append(_roi(samp, "other_odds", "won_other")[3])
+        boots.sort()
+        lo, hi = boots[100], boots[3899]
+        md += [f"- day-block 95% CI on the fade: **{lo:+.1%} to {hi:+.1%}**", ""]
+        md += (["**The fade clears zero.** Worth carrying forward as a "
+                "pre-registered forward test, not acting on retrospectively.", ""]
+               if lo > 0 else
+               ["**The fade does not clear zero.** The withdrawn picks lost, but "
+                "not by enough to pay the vig on the other side - which is the "
+                "usual fate of an inverted losing cell.", ""])
+
+        # which KIND of withdrawal carries the information?
+        def _short(w):
+            w = (w or "").lower()
+            if "order book" in w:
+                return "book turned against it"
+            if "line moved" in w or "discount" in w:
+                return "price discount evaporated"
+            if "handle" in w or "ticket" in w:
+                return "handle/tickets stopped agreeing"
+            if "order-book read" in w:
+                return "book read disappeared"
+            return "other"
+        groups = {}
+        for x in fadeable:
+            groups.setdefault(_short(x["why"]), []).append(x)
+        md += ["### Which kind of withdrawal is worth fading?", "",
+               "_A pick the order book turned against is a different event from "
+               "one whose discount simply evaporated. Lumping them hides "
+               "whichever carries the information._", "",
+               "| why it was dropped | n | backing it | fading it |",
+               "|---|---|---|---|"]
+        for lbl, rs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+            bw, bl, _, br = _roi(rs, "first_odds", "won_first")
+            fw, fl, _, fr = _roi(rs, "other_odds", "won_other")
+            md.append(f"| {lbl} | {len(rs)} | {br:+.1%} | **{fr:+.1%}** |")
+        md.append("")
+        # corrected for having looked at several reasons
+        big = {k: v for k, v in groups.items() if len(v) >= 25}
+        if big:
+            bestk = max(big, key=lambda k: _roi(big[k], "other_odds", "won_other")[3])
+            bestv = _roi(big[bestk], "other_odds", "won_other")[3]
+            rng2 = random.Random(769)
+            nm = []
+            for _ in range(4000):
+                lab = [x for x in fadeable]
+                rng2.shuffle(lab)
+                i = 0
+                sc = []
+                for k, v in big.items():
+                    sc.append(_roi(lab[i:i + len(v)], "other_odds", "won_other")[3])
+                    i += len(v)
+                nm.append(max(sc))
+            pv = sum(1 for x in nm if x >= bestv) / len(nm)
+            md += [f"- best reason: `{bestk}` fading at **{bestv:+.1%}** "
+                   f"(n={len(big[bestk])})",
+                   f"- median best-in-noise across {len(big)} reasons: "
+                   f"**{st.median(nm):+.1%}**",
+                   f"- **corrected p = {pv:.3f}**", ""]
+
+        # ---- reason x price ----
+        PB = [("≤-150", lambda o: o <= -150), ("-149..-120", lambda o: -149 <= o <= -120),
+              ("-119..-101", lambda o: -119 <= o <= -101), ("+100..+139", lambda o: 100 <= o <= 139),
+              ("≥+140", lambda o: o >= 140)]
+        md += ["### Fade by reason AND price of the side we would back", "",
+               "_The grid asked for. Cells below n=15 are italic and excluded "
+               "from the correction - at 20 cells this dataset has manufactured "
+               "a winner every time, so the corrected p below is the number that "
+               "decides, not the greenest box._", "",
+               "| why dropped | " + " | ".join(l for l, _ in PB) + " |",
+               "|---" * (len(PB) + 1) + "|"]
+        grid = {}
+        for lbl, rs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+            cells_row = []
+            for pl, pt in PB:
+                sub = [x for x in rs if pt(x["other_odds"])]
+                if not sub:
+                    cells_row.append("—")
+                    continue
+                _w, _l, _u, r_ = _roi(sub, "other_odds", "won_other")
+                if len(sub) >= 15:
+                    grid[f"{lbl} @ {pl}"] = sub
+                    cells_row.append(f"**{r_:+.0%}** ({len(sub)})")
+                else:
+                    cells_row.append(f"_{r_:+.0%} ({len(sub)})_")
+            md.append(f"| {lbl} | " + " | ".join(cells_row) + " |")
+        md.append("")
+        if grid:
+            bk = max(grid, key=lambda k: _roi(grid[k], "other_odds", "won_other")[3])
+            bv = _roi(grid[bk], "other_odds", "won_other")[3]
+            rng3 = random.Random(1117)
+            nm2 = []
+            for _ in range(4000):
+                lab = fadeable[:]
+                rng3.shuffle(lab)
+                i, sc = 0, []
+                for k, v in grid.items():
+                    sc.append(_roi(lab[i:i + len(v)], "other_odds", "won_other")[3])
+                    i = (i + len(v)) % max(1, len(lab) - 1)
+                nm2.append(max(sc))
+            pv2 = sum(1 for x in nm2 if x >= bv) / len(nm2)
+            md += [f"- cells at n≥15: **{len(grid)}**",
+                   f"- best: `{bk}` at **{bv:+.1%}** (n={len(grid[bk])})",
+                   f"- median best-in-noise: **{st.median(nm2):+.1%}**",
+                   f"- **corrected p = {pv2:.3f}**", ""]
+            md += (["**Clears.**", ""] if pv2 <= 0.05 else
+                   ["**Does not clear.** Slicing further did not find a pocket - "
+                    "it found what a 20-cell grid always finds here.", ""])
+            md += ["_If the fade is added, the POOLED version is the "
+                   "statistically safer one: it selects nothing, so there is no "
+                   "selection to be wrong about. Picking the best cell of twenty "
+                   "is the move that has failed sixteen times in this repo._", ""]
+
+    # price drift on the survivors
+    drift = [r for r in kept if isinstance(r.get("final_odds"), int)
+             and r["final_odds"] != r["first_odds"]]
+    md += ["## Price drift on the picks that survived", "",
+           "_The ledger books the frozen closing price; the channel showed the "
+           "earlier one. If they differ, the recorded ROI is not the ROI a "
+           "reader would have got._", "",
+           f"- survivors whose price changed: **{len(drift)}/{len(kept)}**",
+           f"- graded at the FIRST posted price: {_fmt(kept)}",
+           f"- graded at the FINAL recorded price: "
+           f"{_fmt(kept, 'final_odds', 'won_final')}", ""]
+    _, _, _, rf = _roi(kept, "final_odds", "won_final")
+    md += [f"- difference: **{(rk - rf) * 100:+.1f} points** in favour of the "
+           f"{'posted' if rk > rf else 'recorded'} price", ""]
+    return "\n".join(md)
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    md = build()
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    (OUTPUT_DIR / "record_audit.md").write_text(md)
+    print(md)
+
+
+if __name__ == "__main__":
+    main()

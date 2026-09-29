@@ -12,8 +12,14 @@ name: Early lines snapshot
 on:
   workflow_dispatch:
   schedule:
+    # Two firings per reading - GitHub silently DROPS scheduled crons, so a lone
+    # daily cron loses the whole window when it's skipped (and ESPN gives no
+    # backfill). The capture overwrites the same file, so a later firing just
+    # re-freezes a slightly later price - harmless, and the redundancy is cheap.
     - cron: "0 3 * * *"    # evening reading (11pm ET, tomorrow's openers)
+    - cron: "30 3 * * *"   #   backup evening firing
     - cron: "0 10 * * *"   # morning reading (6am ET, today's slate)
+    - cron: "30 10 * * *"  #   backup morning firing
 
 permissions:
   contents: write

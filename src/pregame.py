@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 
-from . import grade, main as picks_main, notify
+from . import early_lines, gate_report, grade, main as picks_main, notify, pick_watch
 
 log = logging.getLogger("pregame")
 
@@ -40,14 +40,17 @@ def run(force_telegram: bool = False) -> bool:
 
     payload = picks_main.run(date)          # freezes started games, refreshes the rest
     picks_main.write_outputs(payload, date)
+    early_lines.append_checkpoint(date)     # dense line history: every game, every tick
     grade.update_ledger(date)               # move any now-final games into the record
 
     # once the LAST game of a slate is final, send a one-time end-of-day recap.
     # check today and the prior day (late games finish after midnight ET, so the
     # slate that just wrapped may be dated yesterday by the time it's all final).
     import datetime as _dt
+    from . import prop_grade
     prev = (_dt.date.fromisoformat(date) - _dt.timedelta(days=1)).isoformat()
     for d in (date, prev):
+        prop_grade.update(d)                # settle the day's hit props (own ledger)
         grade.send_day_recap_if_complete(d, notify.send_telegram)
 
     changed = (payload.get("picks"), payload.get("coin_flips")) != old_picks
@@ -57,6 +60,25 @@ def run(force_telegram: bool = False) -> bool:
                  else "picks changed")
     else:
         log.info("board refreshed, picks unchanged -> no telegram")
+
+    # Withdrawal alerts belong HERE, not in main.main(): the hourly refresh is
+    # the only path that re-evaluates a slate repeatedly, so it is the only path
+    # where a pick can be withdrawn. main.main() runs once a day and would never
+    # have seen one. Runs unconditionally - a withdrawal is exactly the case
+    # where `changed` is True but the board post above may say nothing useful,
+    # and it is also the case a dropped cron makes invisible.
+    try:
+        pick_watch.check(payload.get("games") or [], date)
+    except Exception as exc:
+        log.warning("pick watch failed (board unaffected): %s", exc)
+
+    # Gate breakdown for the slate. The board reports only the FIRST gate a game
+    # failed, so a near-miss and a game that failed everything read identically.
+    # Written to output/, which the workflow already commits wholesale.
+    try:
+        (OUTPUT_DIR / f"gates_{date}.md").write_text(gate_report.build(date))
+    except Exception as exc:
+        log.warning("gate report failed (board unaffected): %s", exc)
     return True
 
 

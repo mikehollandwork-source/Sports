@@ -1,0 +1,45 @@
+name: Change check
+
+# The gate change (confirm BOTH, line move >=0.5%) was tuned on data that
+# includes August, and August was the hot month. This runs the old and new
+# configurations separately in each calendar month, plus a leave-August-out
+# comparison, so a change that only works in one month is visible as such.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.change_check
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Change check $(date -u +%Y-%m-%d)" \
+            --body-file output/change_check.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/change_check.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Change check ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

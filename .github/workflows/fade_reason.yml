@@ -1,0 +1,49 @@
+name: Fade reason
+
+# Which withdrawal reasons the fade rule lives on, read from the reject_reason
+# recorded at board time - and which of them can no longer happen now the
+# book-confirm gate is gone. The rule's input distribution just changed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # full history: the reason is read from every committed version of
+          # every board, and a shallow clone silently yields ONE version per
+          # board, which makes every pick look like it was never withdrawn.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.fade_reason
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Fade reason $(date -u +%Y-%m-%d)" \
+            --body-file output/fade_reason.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/fade_reason.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Fade reason ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

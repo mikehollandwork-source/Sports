@@ -25,7 +25,7 @@ import statistics as st
 from . import grade, mlb_api
 from .main import _book_needs, _book_stance
 from .analysis import (LEAN_STRONG_MARGIN, LEAN_MIN_CONSISTENCY, LINE_CONFIRM_MIN,
-                       PDOG_FIP_MIN)
+                       PDOG_FIP_MIN, projected_from_margin)
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 SIGNALS = ("margin", "favorite", "line", "consistency", "bvp", "sharp", "form", "pitching_dog")
@@ -172,6 +172,14 @@ def _row(label: str, rows: list[dict]) -> str:
     return f"| {label} | {w}-{l} ({w / len(rows):.0%}) | {u:+.2f}u |"
 
 
+def roi3(label: str, rows: list[dict]) -> str:
+    """A row with the ROI/bet column: '| label (n=..) | W-L (win%) | +Xu | +Y% |'."""
+    if not rows:
+        return f"| {label} | 0 | — | — |"
+    w, l, u = _units(rows)
+    return f"| {label} (n={len(rows)}) | {w}-{l} ({w / len(rows):.0%}) | {u:+.2f}u | {u / len(rows):+.1%} |"
+
+
 def build() -> str:
     games: list[dict] = []
     total = graded = 0
@@ -199,7 +207,32 @@ def build() -> str:
                    "line_timing": lc.get("timing"),
                    "strike": (lc.get("strike_shift") or -9) >= LINE_CONFIRM_MIN,
                    "overnight": (lc.get("overnight_shift") or -9) >= LINE_CONFIRM_MIN,
-                   "shade": shading_gap(g), "prof": profile(g)}
+                   "shade": shading_gap(g), "prof": profile(g),
+                   "play": (g.get("pick_criteria") or {}).get("play")}
+            # Polymarket's frozen price for both sides (recorded in the public
+            # detail since the PM source was added). An exact 50/50 pair is an
+            # unopened/placeholder market, not a real price - excluded.
+            side = _adv_side(g)
+            pmrow = (((g.get("public_majority") or {}).get("detail") or {})
+                     .get("books") or {}).get("polymarket_bets") or {}
+            pm_p = pmrow.get(side)
+            pm_o = pmrow.get("away" if side == "home" else "home")
+            if pm_p == 50 and pm_o == 50:
+                pm_p = pm_o = None
+            rec["pm_pct"], rec["pm_opp_pct"] = pm_p, pm_o
+            rec["opp_odds"] = (g.get("pick_criteria") or {}).get("opponent_moneyline")
+            # OUR projected fair win% (from the stat margin alone) minus the
+            # market's implied % - the "value" edge. Recomputed from margin so it
+            # covers every historical game, not just post-feature snapshots.
+            mg = sig.get("_margin")
+            proj = projected_from_margin(mg) if mg is not None else None
+            rec["proj_win"] = proj["win_prob"] if proj else None
+            rec["proj_edge"] = (round(proj["win_prob"] - _implied(sig["_ml"]) * 100, 1)
+                                if proj and sig.get("_ml") is not None else None)
+            # PM money vs our side: PM implied % for our side minus the market's -
+            # positive = PM's real money is MORE on our pick than the book price.
+            rec["pm_edge"] = (round(pm_p - _implied(sig["_ml"]) * 100, 1)
+                              if pm_p is not None and sig.get("_ml") is not None else None)
             bn = _book_needs(g)
             if bn:
                 rec.update(veg_won=res["winner"] == bn["bet"], veg_odds=bn["odds"],
@@ -347,7 +380,7 @@ def build() -> str:
     # Vegas does NOT need) carrying a CORE signal (margin/line/consistency). This is
     # what actually makes the board now - validate it's +EV and see what it drops.
     def is_core(g):
-        return any(g["sig"].get(s) is True for s in ("margin", "line", "consistency"))
+        return any(g["sig"].get(s) is True for s in ("margin", "consistency"))
     gate = [g for g in agree if is_core(g)]                     # fade + core
     dropped_tail = [g for g in veg if not g["anti_is_adv"] and is_core(g)]  # tail + core (now cut)
     md += ["## NEW BOARD GATE — fade + core signal (what makes the board now)", "",
@@ -356,6 +389,65 @@ def build() -> str:
                 [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in gate]),
            _row(f"DROPPED: tail + core signal (was played, now cut) (n={len(dropped_tail)})",
                 [{"won": g["veg_won"], "odds": g["veg_odds"]} for g in dropped_tail]), ""]
+
+    # WHERE'S THE LEAK? Split the live board by WHICH core signal each pick carries.
+    # margin is the strongest core; the question is whether the non-margin picks
+    # (core = line-only or consistency-only) are a drag we could tighten out.
+    def ganti(sub):
+        return [{"won": g["anti_won"], "odds": g["anti_odds"]} for g in sub]
+    has = lambda g, s: g["sig"].get(s) is True
+    has_margin = [g for g in gate if has(g, "margin")]
+    no_margin = [g for g in gate if not has(g, "margin")]
+    line_only = [g for g in no_margin if has(g, "line") and not has(g, "consistency")]
+    cons_only = [g for g in no_margin if has(g, "consistency") and not has(g, "line")]
+    line_and_cons = [g for g in no_margin if has(g, "line") and has(g, "consistency")]
+    two_plus = [g for g in gate if sum(has(g, s) for s in ("margin", "line", "consistency")) >= 2]
+    md += ["## Board leak-finder — the live board by core-signal type", "",
+           "_Which picks on the current board (fade + core) carry ROI, and which "
+           "are the drag we could tighten out. All bet the fade side, $1/pick._", "",
+           "| board subset | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("has MARGIN (with anything)", ganti(has_margin)),
+           roi3("NO margin (core = line/consistency only)", ganti(no_margin)),
+           roi3("  ...line-only core (no margin, no consistency)", ganti(line_only)),
+           roi3("  ...consistency-only core (no margin, no line)", ganti(cons_only)),
+           roi3("  ...line AND consistency (no margin)", ganti(line_and_cons)),
+           roi3("2+ core signals together", ganti(two_plus)), ""]
+
+    # STARRED vs the rest of the board. Recompute the ⭐ under the CURRENT rule
+    # (margin+favorite+line together, OR 4+ of the 5 proven signals, and never
+    # when the book's informed money is against us) so the split reflects today's
+    # logic, not whatever each old snapshot happened to freeze.
+    def is_star(g):
+        s = g["sig"]
+        proven = sum(1 for k in ("margin", "favorite", "line", "consistency", "bvp")
+                     if s.get(k) is True)
+        hot = (s.get("margin") and s.get("favorite") and s.get("line")) or proven >= 4
+        return bool(hot and not g["stance_against"])
+    starred = [g for g in gate if is_star(g)]
+    unstarred = [g for g in gate if not is_star(g)]
+    md += ["## Starred (⭐) plays vs the rest of the board", "",
+           "_The board split by the current star rule. Both bet the fade side, "
+           "$1/pick._", "",
+           "| board tier | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("⭐ STARRED plays", ganti(starred)),
+           roi3("✅ the rest of the board", ganti(unstarred)),
+           roi3("whole board (both tiers)", ganti(gate)), ""]
+
+    # UNDERDOG DISCIPLINE impact: a dog (ml>0) only plays with margin or the
+    # pitching-dog edge; a dog carried only by consistency is now no-action. Show
+    # the board before/after and what gets dropped.
+    def is_dogcut(g):
+        ml = g["sig"].get("_ml")
+        is_dog = isinstance(ml, int) and ml > 0
+        return is_dog and not (g["sig"].get("margin") is True
+                               or g["sig"].get("pitching_dog") is True)
+    kept = [g for g in gate if not is_dogcut(g)]
+    dogcut = [g for g in gate if is_dogcut(g)]
+    md += ["## Underdog discipline — drop dogs without margin / pitching edge", "",
+           "| board | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("BEFORE (whole fade+core board)", ganti(gate)),
+           roi3("AFTER (dogs need margin/pitching)", ganti(kept)),
+           roi3("DROPPED (consistency-only dogs)", ganti(dogcut)), ""]
 
     # #5 - do tighter numeric thresholds sharpen a signal? Sweep the margin and
     # consistency cutoffs on the fade side (bet the anti-Vegas team).
@@ -400,6 +492,53 @@ def build() -> str:
                    [g for g in games if g.get("strike")]))
     md.append(_row("overnight drift after the strike window (11pm→6am)",
                    [g for g in games if g.get("overnight")]))
+    md.append("")
+
+    # POLYMARKET vs THE BOOK: settle the SAME graded picks twice - once at the
+    # book moneyline (the real record) and once at Polymarket's frozen price for
+    # our side (PM cents = breakeven probability; a $1 win pays 100/pct - 1).
+    # Also count historical ARBITRAGE windows: our side's PM price + the OTHER
+    # side's book price implying under 100% combined = a riskless spread existed
+    # at snapshot time. Caveats stated in the table notes.
+    pmg = [g for g in games if isinstance(g.get("pm_pct"), (int, float))
+           and 1 <= g["pm_pct"] <= 99]
+    md += [f"## Polymarket vs the book — same picks, PM's frozen price (n={len(pmg)})", "",
+           "_PM price is the gamma-API quote frozen in the snapshot: a mid/last "
+           "price with no fee or slippage modeling, so treat PM units as a "
+           "best-case. Unopened 50/50 placeholder markets excluded._", ""]
+    if pmg:
+        w, l, u = _units([{"won": g["won"], "odds": g["odds"]} for g in pmg])
+        pm_u = round(sum((100.0 / g["pm_pct"] - 1) if g["won"] else -1 for g in pmg), 2)
+        gaps = [(_implied(g["odds"]) - g["pm_pct"] / 100.0) * 100 for g in pmg]
+        avg_gap = sum(gaps) / len(gaps)
+        better = [g for g in pmg if (_implied(g["odds"]) - g["pm_pct"] / 100.0) * 100 >= 1]
+        md += ["| venue (same picks, same outcomes) | record | units | ROI/bet |",
+               "|---|---|---|---|",
+               f"| book (real prices) | {w}-{l} ({w / len(pmg):.0%}) | {u:+.2f}u | {u / len(pmg):+.1%} |",
+               f"| Polymarket (frozen quote) | {w}-{l} (same games) | {pm_u:+.2f}u | {pm_u / len(pmg):+.1%} |",
+               "",
+               f"_Avg price gap: PM sells our side {avg_gap:+.1f} prob. points vs the book "
+               f"(positive = PM cheaper). PM was >=1pt cheaper on {len(better)} of {len(pmg)} picks._"]
+        if better:
+            bw, bl, bu = _units([{"won": g["won"], "odds": g["odds"]} for g in better])
+            bpm = round(sum((100.0 / g["pm_pct"] - 1) if g["won"] else -1 for g in better), 2)
+            md += ["", f"_On those {len(better)} PM-cheaper picks: book {bw}-{bl} {bu:+.2f}u "
+                       f"vs PM {bpm:+.2f}u._"]
+        # arbitrage windows: back our side at PM + the other side at the book
+        # (or the mirror) with combined implied probability under 100%.
+        arbs = []
+        for g in pmg:
+            if g.get("opp_odds") is None or not isinstance(g.get("pm_opp_pct"), (int, float)):
+                continue
+            m1 = 1 - (g["pm_pct"] / 100.0 + _implied(g["opp_odds"]))   # PM us + book opp
+            m2 = 1 - (_implied(g["odds"]) + g["pm_opp_pct"] / 100.0)   # book us + PM opp
+            m = max(m1, m2)
+            if m > 0:
+                arbs.append(m)
+        md += ["", f"_ARBITRAGE windows (PM one side + book the other, combined implied < 100%): "
+                   f"{len(arbs)} of {len(pmg)} games"
+                   + (f"; margins avg {100 * sum(arbs) / len(arbs):.1f}%, "
+                      f"best {100 * max(arbs):.1f}%." if arbs else ".") + "_"]
     md.append("")
 
     # Underdog study: our stat side priced as a DOG (ml > 0). Dog wins pay >1u, so
@@ -506,6 +645,68 @@ def build() -> str:
         md.append(f"| {name} | {w}-{l} ({w/(w+l):.0%}) | {u:+.2f}u | {roi:+.0%} |")
     md.append("")
 
+    # ============================ NEW EXPERIMENTS ============================
+    # (A) VALUE vs the market: our projected fair win% (stats alone) minus the
+    # market's implied %. Does betting only when WE think the price is generous
+    # beat flat betting everything? Bucketed, then a min-edge sweep.
+    valg = [g for g in games if g.get("proj_edge") is not None]
+    md += [f"## Value bet — our projected odds vs the market (n={len(valg)})", "",
+           "_proj_edge = our stat-projected win% minus the market's implied %. "
+           "Positive = we think our side is underpriced. Recomputed from margin so "
+           "it spans every graded game._", "",
+           "| our edge over the market | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, hi, lab in ((-99, 0, "market richer than us (<0)"), (0, 5, "slight (0–5 pts)"),
+                        (5, 10, "moderate (5–10)"), (10, 20, "strong (10–20)"),
+                        (20, 999, "huge (20+)")):
+        md.append(roi3(lab, [{"won": g["won"], "odds": g["odds"]} for g in valg
+                             if lo <= g["proj_edge"] < hi]))
+    md += ["", "| bet only when edge ≥ | record | units | ROI/bet |", "|---|---|---|---|"]
+    for thr in (0, 3, 5, 8, 12, 15):
+        md.append(roi3(f"{thr} pts", [{"won": g["won"], "odds": g["odds"]}
+                                      for g in valg if g["proj_edge"] >= thr]))
+    md.append("")
+
+    # (B) Polymarket money vs our pick (#2 on the roadmap): when PM's real-money
+    # implied % sits MORE on our side than the book price, does our pick win more?
+    pme = [g for g in games if g.get("pm_edge") is not None]
+    md += [f"## Polymarket money agreeing with our pick (n={len(pme)})", "",
+           "_pm_edge = PM's implied % for our side minus the market's implied %. "
+           "Positive = PM's live money leans our way harder than the sportsbook._", "",
+           "| PM lean vs the book | record | units | ROI/bet |", "|---|---|---|---|"]
+    for lo, hi, lab in ((-99, -3, "PM against us (< -3)"), (-3, 3, "≈ agree (±3)"),
+                        (3, 8, "PM with us (3–8)"), (8, 999, "PM hard with us (8+)")):
+        md.append(roi3(lab, [{"won": g["won"], "odds": g["odds"]} for g in pme
+                             if lo <= g["pm_edge"] < hi]))
+    md.append("")
+
+    # (C) Line-move timing stacked on a core signal: does a SHARP-window move
+    # (overnight, before the public) plus a core signal beat the same core signal
+    # with a daytime/public move?
+    def is_core(g):
+        return any(g["sig"].get(s) is True for s in ("margin", "consistency"))
+    core_pool = [g for g in games if is_core(g)]
+    md += [f"## Sharp-window line move × core signal (n={len(core_pool)} core picks)", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("core signal, any", [{"won": g["won"], "odds": g["odds"]} for g in core_pool]),
+           roi3("core + moved in the SHARP window (early)",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool
+                 if g.get("line_timing") in ("early", "both")]),
+           roi3("core + moved only in the PUBLIC window (late)",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool
+                 if g.get("line_timing") == "late"]),
+           roi3("core + sharps STRUCK the fresh opener",
+                [{"won": g["won"], "odds": g["odds"]} for g in core_pool if g.get("strike")]), ""]
+
+    # (D) Value + a core signal together - the two independent edges stacked.
+    md += ["## Value edge + core signal together", "",
+           "| slice | record | units | ROI/bet |", "|---|---|---|---|"]
+    for thr in (5, 8, 12):
+        sub = [g for g in valg if g["proj_edge"] >= thr and is_core(g)]
+        md.append(roi3(f"proj_edge ≥{thr} AND a core signal",
+                       [{"won": g["won"], "odds": g["odds"]} for g in sub]))
+    md.append("")
+    # =========================== END NEW EXPERIMENTS =========================
+
     # EXHAUSTIVE: every non-empty subset of all 7 signals, ranked by ROI/bet. A
     # game counts for a subset when ALL its signals are present. Two pools: every
     # graded pick, and only the fade-gated ones (our stat side is the team Vegas
@@ -534,6 +735,59 @@ def build() -> str:
     fade_pool = [g for g in games if "veg_won" in g and g.get("anti_is_adv")]
     md += combo_table("ALL signal combinations — every graded pick", games)
     md += combo_table("ALL signal combinations — FADE-GATED picks (live board condition)", fade_pool)
+
+    # REVERSAL FINDER: is any signal profile so negative on OUR side that FADING it
+    # (betting the OPPONENT at its own price) clears the vig? Grade BOTH sides -
+    # the vig is paid twice, so a mild loser reverses to a mild loser; only a badly
+    # losing profile becomes a profitable fade. n>=25 and our-side ROI<=-12% only.
+    REV_MINN, REV_ROI = 25, -0.12
+    rev = []
+    for k in range(1, len(SIGNALS) + 1):
+        for cmb in itertools.combinations(SIGNALS, k):
+            sub = [g for g in games if all(g["sig"].get(s) is True for s in cmb)
+                   and g.get("opp_odds") is not None]
+            if len(sub) < REV_MINN:
+                continue
+            ow, ol, ou = _units([{"won": g["won"], "odds": g["odds"]} for g in sub])
+            if ou / len(sub) > REV_ROI:
+                continue
+            fr = [{"won": not g["won"], "odds": g["opp_odds"]} for g in sub]
+            fw, fl, fu = _units(fr)
+            rev.append((fu / len(fr), ou / len(sub), ow, ol, ou, fw, fl, fu, len(sub),
+                        " + ".join(cmb)))
+    md += ["## Reversal finder — negative profiles, and whether fading them profits", "",
+           "_Combos (n≥25) where OUR side loses ≤−12% ROI. 'fade' bets the OPPONENT "
+           "at its real price - the honest test of reversing the profile. The vig is "
+           "paid on the fade too, so only a BADLY losing profile clears +EV. Scanning "
+           "many combos for the worst also risks overfitting - trust n and a reason._", "",
+           "| profile | OUR side | FADE (bet opponent) |", "|---|---|---|"]
+    if rev:
+        for froi, oroi, ow, ol, ou, fw, fl, fu, n, name in sorted(rev, reverse=True):
+            md.append(f"| {name} (n={n}) | {ow}-{ol} ({ow/n:.0%}) {ou:+.1f}u ({oroi:+.0%}) "
+                      f"| {fw}-{fl} ({fw/n:.0%}) {fu:+.1f}u (**{froi:+.0%}**) |")
+    else:
+        md.append("| _none clear the bar_ | — | — |")
+    md.append("")
+
+    # PROMOTION VALIDATION: promoting only touches NO-PLAY games (board picks
+    # already stand). So the honest test of "promote bvp+form no-plays by fading
+    # the opponent" is the fade edge on the NO-PLAY subset specifically - if the
+    # edge lives in the already-played games, promoting the no-plays won't repeat it.
+    BOARD_PLAYS = ("pick", "lock", "lean")
+    bf = [g for g in games if g["sig"].get("bvp") is True and g["sig"].get("form") is True
+          and g.get("opp_odds") is not None]
+    bf_noplay = [g for g in bf if g.get("play") not in BOARD_PLAYS]
+    bf_play = [g for g in bf if g.get("play") in BOARD_PLAYS]
+
+    def fade_rows(sub):
+        return [{"won": not g["won"], "odds": g["opp_odds"]} for g in sub]
+    md += ["## Promotion check — fade bvp+form, NO-PLAY subset (what we'd promote)", "",
+           "_The promotion only touches no-play games, so this subset is the one "
+           "that matters. Fade = bet the opponent at its price._", "",
+           "| bvp+form fade | record | units | ROI/bet |", "|---|---|---|---|",
+           roi3("all bvp+form (context)", fade_rows(bf)),
+           roi3("NO-PLAY subset (the promotion)", fade_rows(bf_noplay)),
+           roi3("already-played subset (context)", fade_rows(bf_play)), ""]
 
     md.append("_Point-in-time: signals recomputed from the frozen pre-game snapshot; "
               "winners from the MLB Stats API; $1/bet at the frozen moneyline. A "

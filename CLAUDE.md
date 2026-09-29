@@ -132,6 +132,12 @@ unit-testable with mock `Game`/`Team` objects.
   change the flagged pick. `team_last5_gamelog` supplies the per-game data.
 - Match the existing defensive style: degrade gracefully on network/parse errors;
   never let one game's failure abort the whole run.
+- **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
+  pitch minus `LOCK_LEAD`.** Those logs run through the game and past
+  settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
+  now cuts for you; anything that walks `readings` itself must do the same, or its
+  "drift" reports the winner instead of the money. Measured cost of getting this
+  wrong: +9.9% against -5.0% on the same 714 games.
 
 ### Git & Branching
 

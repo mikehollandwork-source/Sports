@@ -1,0 +1,44 @@
+name: PM viability
+
+# Does the board's edge survive execution at real Polymarket prices?
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  viability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run PM viability
+        run: python -m src.pm_viability
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "PM viability $(date -u +%Y-%m-%d)" \
+            --body-file output/pm_viability.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/pm_viability.md
+          if git diff --staged --quiet; then
+            echo "No changes."
+          else
+            git commit -m "PM viability report ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi

@@ -1,0 +1,59 @@
+name: Kalshi debug
+
+# One-shot: run the Kalshi logger once and exit, so the job logs are readable
+# (the long-running poll loop never completes, so its logs can't be fetched).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Probe Kalshi directly
+        run: |
+          python - <<'PY'
+          import logging, json
+          logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+          from src import kalshi
+          raw = kalshi._get("/markets", series_ticker=kalshi.SERIES, status="active", limit=200)
+          mk = (raw or {}).get("markets") or []
+          print(f"RAW active markets returned: {len(mk)}")
+          for m in mk[:8]:
+              print("  ticker=", m.get("ticker"), "| event=", m.get("event_ticker"),
+                    "| status=", m.get("status"), "| vol=", m.get("volume"),
+                    "| oi=", m.get("open_interest"))
+          for st in ("open", "unopened", "closed", "settled"):
+              r = kalshi._get("/markets", series_ticker=kalshi.SERIES, status=st, limit=5)
+              print(f"status={st!r}: {len((r or {}).get('markets') or [])} market(s)")
+          idx = kalshi.game_markets()
+          print(f"paired game markets: {len(idx)//2}")
+          print("sample keys:", list(idx)[:6])
+          PY
+
+      - name: Run the logger once
+        run: python -m src.kalshi_books
+
+      - name: Commit anything produced
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/kalshi_books_*.json 2>/dev/null || true
+          if ! git diff --staged --quiet; then
+            git commit -m "Kalshi debug capture ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

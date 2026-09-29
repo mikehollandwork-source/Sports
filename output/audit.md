@@ -1,34 +1,34 @@
-# 10-day audit — generated 2026-07-11
+# 10-day audit — generated 2026-09-21
 
 ## Books
-- **plays**: 42-24 (+8.52u)
+- **plays**: 148-108 (+0.98u)
 
-## Signals on the 66 graded picks+leans
+## Signals on the 227 graded picks+leans
 
 | signals hit | record |
 |---|---|
-| 5/5 | 3-0 (100%) +1.36u |
-| 4/5 | 7-6 (54%) -1.06u |
-| 3/5 | 14-3 (82%) +7.64u |
-| 2/5 | 11-12 (48%) -3.77u |
-| 1/5 | 7-3 (70%) +4.35u |
+| 5/5 | 3-1 (75%) +0.36u |
+| 4/5 | 23-16 (59%) -2.63u |
+| 3/5 | 49-34 (59%) +1.72u |
+| 2/5 | 47-33 (59%) +2.04u |
+| 1/5 | 12-9 (57%) +1.80u |
 
 | signal present | with it | without it |
 |---|---|---|
-| margin | 13-3 (81%) +5.80u | 29-21 (58%) +2.72u |
-| favorite | 35-20 (64%) +4.42u | 7-4 (64%) +4.10u |
-| line | 10-8 (56%) -1.64u | 32-16 (67%) +10.16u |
-| consistency | 25-10 (71%) +9.06u | 17-14 (55%) -0.54u |
-| bvp | 31-19 (62%) +4.65u | 11-5 (69%) +3.87u |
-| form (cherry) | 8-2 (80%) +4.73u | 1-0 (100%) +1.24u |
-| sharp (unproven) | 0 games | 5-2 (71%) +2.15u |
-| stance_against (book fading us) | 2-0 (100%) +2.00u | 40-24 (62%) +6.52u |
+| margin | 29-12 (71%) +6.32u | 105-81 (56%) -3.03u |
+| favorite | 126-80 (61%) +7.20u | 8-13 (38%) -3.91u |
+| line | 33-27 (55%) -7.30u | 101-66 (60%) +10.59u |
+| consistency | 71-53 (57%) -2.13u | 63-40 (61%) +5.42u |
+| bvp | 101-74 (58%) -1.77u | 33-19 (63%) +5.06u |
+| form (cherry) | 61-48 (56%) -3.97u | 20-13 (61%) -0.47u |
+| sharp (unproven) | 2-2 (50%) -0.28u | 91-59 (61%) +3.94u |
+| stance_against (book fading us) | 39-22 (64%) +5.96u | 95-71 (57%) -2.67u |
 
 | component gap | winners median | losers median |
 |---|---|---|
-| fip_gap | +0.537 | +0.293 |
-| woba_gap | +0.031 | +0.050 |
-| iso_gap | +0.025 | +0.049 |
-| margin | +0.262 | +0.240 |
+| fip_gap | +0.531 | +0.444 |
+| woba_gap | +0.022 | +0.040 |
+| iso_gap | +0.024 | +0.038 |
+| margin | +0.255 | +0.274 |
 
 _Auto-generated every ~10 days. Same method as the manual autopsy: every settled bet joined back to the frozen signals it was made with._

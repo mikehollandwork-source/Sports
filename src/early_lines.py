@@ -78,6 +78,40 @@ def capture(date: str | None = None, reading: str = "early") -> dict:
     return snap
 
 
+def history_path(date: str) -> Path:
+    return OUTPUT_DIR / f"lines_history_{date}.json"
+
+
+def load_history(date: str) -> list:
+    """The day's dense, append-only line checkpoints (many per day), or []."""
+    try:
+        return json.loads(history_path(date).read_text())
+    except (OSError, ValueError):
+        return []
+
+
+def append_checkpoint(date: str | None = None) -> None:
+    """Append one timestamped price checkpoint for EVERY game to the day's line
+    history. Called on every board-loop tick, so every game is captured many
+    times a day off the loop's reliable ~hourly schedule - not the two fragile
+    off-hours crons. Append-only (a missed tick can't wipe the day); fail-soft."""
+    if date is None:
+        date = dt.datetime.now(EASTERN).date().isoformat()
+    try:
+        esp = espn.lines(date)
+    except Exception as exc:
+        log.warning("line checkpoint espn fetch failed: %s", exc)
+        return
+    if not esp:
+        return
+    hist = load_history(date)
+    hist.append({"captured_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                 "espn": esp})
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    history_path(date).write_text(json.dumps(hist, indent=1))
+    log.info("line checkpoint: %d games -> %s (%d today)", len(esp), history_path(date).name, len(hist))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Freeze the slate's current prices to a snapshot file")
     ap.add_argument("--evening", action="store_true",
