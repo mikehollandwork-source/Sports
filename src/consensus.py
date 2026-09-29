@@ -34,6 +34,7 @@ the order-book cron has logged anything - will have no picks.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 
 from . import pm_books
@@ -42,6 +43,11 @@ log = logging.getLogger("consensus")
 
 MAX_SPREAD = 0.15      # wider than this is not a real two-sided market
 MIN_READINGS = 2       # need a run-up, not a single snapshot
+
+# A pick freezes this long before first pitch (mirrors main.LOCK_LEAD;
+# defined here because main imports this module). Book readings after it
+# are not evidence the pick could have used.
+LOCK_LEAD = dt.timedelta(minutes=15)
 IMBALANCE_MIN = 0.20   # resting-size lean that counts as confirmation
 
 # CONFIRMATION: EITHER signal. Reverted 2026-09-21, the same day it was changed,
@@ -103,9 +109,33 @@ def line_tag(result: dict, team: str) -> str:
     return "flat"
 
 
+def _freeze_ts(game: dict) -> float | None:
+    """When this game's book stops being evidence: first pitch minus LOCK_LEAD,
+    the moment the board locks its pick. None if the start time is unusable."""
+    start = game.get("game_datetime")
+    if not isinstance(start, str):
+        return None
+    try:
+        return (dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
+                - LOCK_LEAD).timestamp()
+    except ValueError:
+        return None
+
+
 def book_metrics(date: str) -> dict:
     """{game_pk: {"drift", "imbalance"}} for the advantage side's token, from the
-    day's pre-game order-book log. {} when the log doesn't exist yet."""
+    day's order-book log, using only readings from BEFORE the pick locks.
+
+    The cut is what makes this honest. Live it changes nothing - a board built
+    at 4pm reads a file that only holds readings up to 4pm. A BACKTEST reads
+    the completed file, which logs straight through the game and past
+    settlement, so an uncut `reads[-1]` is often a dead market at 0.00 or 1.00.
+    Drift then reports which team won rather than where the money went, and
+    every gate built on it scores itself on the answer. Measured: backing the
+    drift was +9.9% uncut and -5.0% cut, on the same 714 games.
+
+    {} when the log doesn't exist yet.
+    """
     try:
         day = pm_books.load_day(date) or {}
     except Exception as exc:
@@ -113,11 +143,14 @@ def book_metrics(date: str) -> dict:
         return {}
     out: dict = {}
     for pk_s, g in (day.get("games") or {}).items():
+        cutoff = _freeze_ts(g)
         reads = []
         for r in g.get("readings") or []:
             if r.get("empty"):
                 continue
-            b, a = r.get("bid"), r.get("ask")
+            b, a, t = r.get("bid"), r.get("ask"), r.get("t")
+            if cutoff is not None and (not isinstance(t, (int, float)) or t > cutoff):
+                continue
             if (isinstance(b, (int, float)) and isinstance(a, (int, float))
                     and a > b and (a - b) <= MAX_SPREAD):
                 reads.append(r)
