@@ -41,6 +41,25 @@ _The honest version. A team's favourite rate is computed from its games before t
 | 2026-08 | 39-32 · exp 31.5 · **+23.5%** | 123-205 · exp 137.4 · **-12.1%** | **+35.5 pts** |
 | 2026-09 | 26-30 · exp 25.0 · **+0.4%** | 112-171 · exp 116.8 · **-6.9%** | **+7.3 pts** |
 
+## Leave August out — the test that killed the gate change
+
+_August was hot: `change_check` showed the gate change worth +9.6 points in August and −11.6 in September, and that is why it was reverted. This effect is +35.5 points in August against +7.0 and +7.3 either side, so it has to clear the same bar._
+
+| period | good dogs | other dogs | difference |
+|---|---|---|---|
+| all months | 80-79 · exp 70.6 · **+11.2%** | 270-425 · exp 289.2 · **-9.0%** | **+20.2 pts** (-1 to +42) |
+| **excluding August** | 41-47 · exp 39.2 · **+1.2%** | 147-220 · exp 151.8 · **-6.3%** | **+7.5 pts** (-21 to +35) |
+| August only | 39-32 · exp 31.5 · **+23.5%** | 123-205 · exp 137.4 · **-12.1%** | **+35.5 pts** (+2 to +68) |
+
+**Outside August it is worth +7.5 points.** The effect survives removing the hot month, so it is not the month talking.
+
+## Temporal holdout — cut chosen on the first half only
+
+_The split-half above assigns games at random, so both halves contain August. This picks the cut using only games before 2026-08-23 and scores it on games from 2026-08-23 on — the ordering a live rule actually faces._
+
+- best cut on the first half: **≥70%** (+27.7 pts there)
+- that cut on the held-out second half: 37-40 · exp 34.5 · **+3.9%** against 147-228 · exp 155.9 · **-8.4%** → **+12.3 pts**
+
 ## The bar
 
 - the **difference** against other underdogs is the number, not the ROI — underdogs generally returned −5.8%, so a positive ROI here is partly just "underdogs did alright"
