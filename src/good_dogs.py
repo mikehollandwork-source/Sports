@@ -249,12 +249,31 @@ def build() -> str:
         ex_b = [r for r in rest if r["date"][:7] != "2026-08"]
         if len(ex_a) >= 25 and len(ex_b) >= 25:
             d = (_roi(ex_a) - _roi(ex_b)) * 100
-            md += [f"**Outside August it is worth {d:+.1f} points.** "
-                   + ("The effect survives removing the hot month, so it is not "
-                      "the month talking." if d > 5 else
-                      "That is a long way below the +20.2 headline, so August is "
-                      "carrying most of it — the same shape as the gate change "
-                      "that was reverted."), ""]
+            lo, hi = _boot_diff(ex_a, ex_b)
+            # the sign of a point estimate is not survival. The interval has to
+            # exclude zero, and the TREATMENT has to beat its own price - a
+            # positive difference driven by the control losing the vig is just
+            # the vig.
+            exp_a = sum(r["p"] for r in ex_a)
+            act_a = sum(1 for r in ex_a if r["won"])
+            sd = (len(ex_a) * (exp_a / len(ex_a)) * (1 - exp_a / len(ex_a))) ** .5
+            z = (act_a - exp_a) / sd if sd else 0.0
+            ok = (lo == lo and lo > 0)
+            md += [f"**Outside August it is worth {d:+.1f} points** "
+                   f"(95% CI {lo:+.0f} to {hi:+.0f}).", "",
+                   f"- the good dogs themselves: {act_a} wins against "
+                   f"{exp_a:.1f} expected — **{z:+.1f} standard deviations**",
+                   f"- the other dogs: {_roi(ex_b):+.1%}, which is roughly the "
+                   "hold",
+                   "- " + ("**the effect survives August's removal** — the "
+                           "interval excludes zero and the good dogs beat their "
+                           "own price" if ok and z > 2 else
+                           "**it does not survive.** The interval spans zero and "
+                           f"the good dogs are only {z:+.1f} SD above their own "
+                           "price, so most of the difference is the CONTROL "
+                           "losing the vig rather than the picks winning. That is "
+                           "the same shape as the gate change that was "
+                           "reverted."), ""]
 
         # temporal holdout: fit the cut on the first half, score the second
         days = sorted({r["date"] for r in mine} | {r["date"] for r in rest})
