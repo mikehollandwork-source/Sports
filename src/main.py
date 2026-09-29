@@ -219,12 +219,17 @@ def run(date: str) -> dict:
         is_home = adv == gm.home.name
         team = gm.home if is_home else gm.away
         try:
-            prop = props.best_hit_prop(gm.game_pk, team.team_id, date, is_home)
+            # one fetch serves both: the prop (top bat) and the board's ranked
+            # hit-in-wins line. Calling best_hit_prop separately would re-pull
+            # the lineup and every game log.
+            ranked = props.hit_in_wins_ranked(gm.game_pk, team.team_id, date, is_home)
+            prop = ranked[0] if ranked else None
             if prop:
                 line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
                 if line is not None:
                     prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
                 r["pick_criteria"]["prop"] = prop
+                r["pick_criteria"]["hit_bats"] = ranked[:3]
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
@@ -1367,7 +1372,84 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
         txt = good_dog.split_text(bet_team, sp, applies)
         if txt:
             lines.append(f"     {txt}")
+    lines += _hit_lines(g)
     return "\n".join(lines)
+
+
+def _hit_lines(g: dict) -> list[str]:
+    """Who is most likely to get a hit if this pick wins, and the conditions.
+
+    The percentage is hit rate in the team's season WINS, with the hitter's
+    ALL-GAMES rate in brackets. That bracket is the point: the first number
+    conditions on the outcome, so every regular's rate rises inside wins and a
+    big gap mostly says "the team wins when he hits". A SMALL gap is the
+    dependable bat, so the gap is what to read.
+    """
+    pc = g.get("pick_criteria") or {}
+    bats = pc.get("hit_bats") or []
+    out = []
+    if bats:
+        hot, cold = _form_names(g, _bet_side(pc)[0])
+        parts = []
+        for b in bats:
+            ar = b.get("all_rate")
+            name = b.get("player") or ""
+            # the board's own last-5 form read, on the same hitters - a cold bat
+            # with a high hit-in-wins rate is the one to be careful with
+            form = " hot" if name in hot else " cold" if name in cold else ""
+            parts.append(f"{_surname(name)} {b['hit_rate']}%"
+                         + (f" ({ar}% all)" if ar is not None else "") + form)
+        out.append("     🔥 hit if they win: " + "  ·  ".join(parts))
+    cond = _conditions(g)
+    if cond and bats:
+        out.append(f"        {cond}")
+    return out
+
+
+def _form_names(g: dict, team: str | None) -> tuple[set, set]:
+    """The board's hot and cold bat names for one side of the matchup."""
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    side = "home" if team == home else "away" if team == away else None
+    f = ((g.get("form") or {}).get(side) or {}) if side else {}
+    return ({p.get("name") for p in (f.get("hot") or [])},
+            {p.get("name") for p in (f.get("cold") or [])})
+
+
+def _surname(name: str) -> str:
+    """Last name only - the board is read on a phone."""
+    parts = (name or "").split()
+    return parts[-1] if parts else name
+
+
+def _conditions(g: dict) -> str:
+    """Park, weather, umpire and BvP - the context behind the hit read."""
+    bits = []
+    pf = g.get("park_factor")
+    if isinstance(pf, (int, float)):
+        bits.append(f"park {pf:.2f}")
+    w = g.get("weather") or {}
+    if isinstance(w.get("temp_f"), int):
+        wind = (f", wind {w['wind_mph']} {w.get('wind_dir') or ''}".rstrip()
+                if isinstance(w.get("wind_mph"), int) else "")
+        roof = f", {w['roof']}" if w.get("roof") else ""
+        bits.append(f"{w['temp_f']}°F{wind}{roof}")
+    ump, tend = g.get("umpire_hp"), g.get("ump_tend") or {}
+    if ump:
+        r = tend.get("r_pg")
+        bits.append(f"ump {_surname(ump)}"
+                    + (f" {r:.1f} R/g" if isinstance(r, (int, float)) else ""))
+    bvp = g.get("bvp") or {}
+    if bvp.get("edge_team") and isinstance(bvp.get("gap"), (int, float)):
+        tag = "" if bvp.get("meaningful") else " (thin)"
+        bits.append(f"BvP {_abbr_of(g, bvp['edge_team'])} +{bvp['gap']:.3f}{tag}")
+    return " · ".join(bits)
+
+
+def _abbr_of(g: dict, team: str) -> str:
+    """The board's own abbreviation for a team name."""
+    aa, ha = _abbrs(g)
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    return ha if team == home else aa if team == away else team
 
 
 def _splits_or_empty(board: list) -> dict:

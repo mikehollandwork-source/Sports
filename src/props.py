@@ -71,31 +71,40 @@ def _game_log(player_id: int, season: int) -> list:
     return splits
 
 
-def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool,
-                  exclude_pk: int | None = None) -> dict | None:
-    """The picked team's most-consistent hitter-in-wins (see module doc).
+def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
+                       exclude_pk: int | None = None) -> list[dict]:
+    """Tonight's lineup ranked by hit rate in the team's season WINS.
+
+    Each entry also carries `all_rate` - the same hitter's hit rate across EVERY
+    game he played, not just the wins. That second number is what makes the
+    first one readable. `hit_rate` conditions on the outcome: a team that wins
+    usually hit well, so every regular's rate rises inside wins, and the
+    statistic partly measures "did the offence show up" - which is the thing
+    that caused the win. A hitter at 89% in wins and 74% overall is largely
+    telling you the team wins when he hits. One whose two numbers are CLOSE is
+    the dependable bat, and `gap` is that difference.
 
     exclude_pk drops one game from the season-wins sample - used by the backtest
     to reconstruct the pre-game prop without leaking the game being graded (live
-    callers leave it None, since tonight's game isn't final yet anyway)."""
+    callers leave it None, since tonight's game isn't final yet anyway).
+    """
     wins = _team_win_pks(team_id, date)
     if exclude_pk is not None:
         wins = wins - {exclude_pk}
     if len(wins) < MIN_WINS_PLAYED:
-        return None
+        return []
     try:
         bats = mlb_api.lineup(game_pk, team_id, date, home)[:MAX_LINEUP_BATS]
     except Exception as exc:
         log.warning("lineup fetch failed (%s): %s", game_pk, exc)
-        return None
+        return []
     season = int(date[:4])
-    best: dict | None = None
+    out: list[dict] = []
     for p in bats:
         played = with_hit = 0
+        all_played = all_with_hit = 0
         pa_total = 0.0
         for s in _game_log(p.player_id, season):
-            if (s.get("game") or {}).get("gamePk") not in wins:
-                continue
             st = s.get("stat") or {}
             try:
                 pa = float(st.get("plateAppearances", 0) or 0)
@@ -104,6 +113,13 @@ def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool,
                 continue
             if pa < 1:
                 continue
+            pk = (s.get("game") or {}).get("gamePk")
+            if pk == exclude_pk:
+                continue                  # never count the game being graded
+            all_played += 1
+            all_with_hit += 1 if hits >= 1 else 0
+            if pk not in wins:
+                continue
             played += 1
             pa_total += pa
             if hits >= 1:
@@ -111,9 +127,24 @@ def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool,
         if played < MIN_WINS_PLAYED or (pa_total / played) < MIN_AVG_PA:
             continue
         rate = with_hit / played
-        cand = {"player": p.name, "player_id": p.player_id,
-                "hit_rate": round(rate * 100),
-                "wins_played": played, "avg_pa": round(pa_total / played, 1)}
-        if best is None or (rate, cand["avg_pa"]) > (best["hit_rate"] / 100, best["avg_pa"]):
-            best = cand
-    return best
+        all_rate = (all_with_hit / all_played) if all_played else None
+        out.append({"player": p.name, "player_id": p.player_id,
+                    "hit_rate": round(rate * 100),
+                    "all_rate": round(all_rate * 100) if all_rate is not None else None,
+                    "gap": (round((rate - all_rate) * 100)
+                            if all_rate is not None else None),
+                    "wins_played": played, "games_played": all_played,
+                    "avg_pa": round(pa_total / played, 1)})
+    out.sort(key=lambda c: (c["hit_rate"], c["avg_pa"]), reverse=True)
+    return out
+
+
+def best_hit_prop(game_pk: int, team_id: int, date: str, home: bool,
+                  exclude_pk: int | None = None) -> dict | None:
+    """The picked team's most-consistent hitter-in-wins (see module doc).
+
+    Kept as the single-best entry point the prop ledger and grader already use;
+    the ranking and the all-games comparison live in hit_in_wins_ranked().
+    """
+    ranked = hit_in_wins_ranked(game_pk, team_id, date, home, exclude_pk)
+    return ranked[0] if ranked else None
