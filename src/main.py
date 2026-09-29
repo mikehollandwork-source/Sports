@@ -1300,7 +1300,7 @@ def build_summary(payload: dict) -> str:
     # No-plays are still recorded in the picks JSON (backend), just not shown.
     out = [f"# MLB Board — {date}", ""]
     if picks:
-        out += [_pick_line(g) for g in picks]
+        out += [_pick_line(g, _splits_or_empty(board)) for g in picks]
     else:
         out.append("_No plays on the board._")
     dogs = _good_dog_lines(board, picks)
@@ -1330,7 +1330,7 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
-def _pick_line(g: dict) -> str:
+def _pick_line(g: dict, sp: dict | None = None) -> str:
     """One board entry, written as an instruction rather than a notation.
 
     'BET Texas Rangers -125' leaves nothing to work out; the old
@@ -1358,7 +1358,26 @@ def _pick_line(g: dict) -> str:
     live = "🔴 LIVE · " if g.get("state") == "live" else ""
     st = _start_time(g)
     sub = f"     {live}{where}" + (f" · {st}" if st else "")
-    return f"{head}\n{sub}"
+    lines = [head, sub]
+    # how often this team wins at this kind of price - the same trust check the
+    # watch list carries, on the bet itself. `applies` marks which of the two
+    # numbers tonight's price puts in play.
+    if sp:
+        applies = "fav" if isinstance(ml, int) and ml < 0 else "dog"
+        txt = good_dog.split_text(bet_team, sp, applies)
+        if txt:
+            lines.append(f"     {txt}")
+    return "\n".join(lines)
+
+
+def _splits_or_empty(board: list) -> dict:
+    """Each team's win rate as favourite and as dog. Never raises - a missing
+    lookup costs a context line, and must not cost the board."""
+    try:
+        return good_dog.splits(_board_date(board))
+    except Exception as exc:
+        log.warning("fav/dog splits unavailable: %s", exc)
+        return {}
 
 
 def _board_date(board: list) -> str:
@@ -1384,11 +1403,7 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
     pick_pks = {g.get("game_pk") for g in picks}
     # how often each team actually wins as a dog and as a favourite - the trust
     # check, put where the decision is. Fails soft to no splits.
-    try:
-        sp = good_dog.splits(_board_date(board))
-    except Exception as exc:
-        log.warning("good-dog splits unavailable: %s", exc)
-        sp = {}
+    sp = _splits_or_empty(board)
     out = []
     for g in board:
         gd = (g.get("pick_criteria") or {}).get("good_dog") or {}
@@ -1443,6 +1458,7 @@ def telegram_text(payload: dict) -> str:
     games = payload.get("games", [])
     board = _board_games(games)
     picks = _by_win([g for g in board if _play(g) == "pick"])
+    sp_all = _splits_or_empty(board)   # computed once; the cache makes it cheap
 
     # Minimal board: only the plays, one clean line each (ranked by win chance).
     # No-plays stay recorded in the picks JSON (backend); they're not shown.
@@ -1451,7 +1467,7 @@ def telegram_text(payload: dict) -> str:
         L.append(f"{len(picks)} play{'s' if len(picks) != 1 else ''} today:")
         L.append("")
         for g in picks:
-            L.append(_pick_line(g))
+            L.append(_pick_line(g, sp_all))
             L.append("")
         L.pop()          # no trailing blank before the divider
     else:

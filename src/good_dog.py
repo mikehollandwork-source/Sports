@@ -187,8 +187,12 @@ def splits(before: str) -> dict[str, dict]:
     return dict(agg)
 
 
-def split_text(team: str, sp: dict) -> str:
-    """'as a dog 31% (9-20) · as a favourite 58% (32-23)', or '' when too thin."""
+def split_text(team: str, sp: dict, applies: str | None = None) -> str:
+    """'as a dog 31% (9-20) · as a favourite 58% (32-23)', or '' when too thin.
+
+    `applies` marks the side tonight's price puts them on ("fav" or "dog"), so
+    the number that bears on this bet is not left for the reader to work out.
+    """
     rec = sp.get(team)
     if not rec:
         return ""
@@ -196,5 +200,6 @@ def split_text(team: str, sp: dict) -> str:
     for key, label in (("dog", "as a dog"), ("fav", "as a favourite")):
         w, l = rec[key]
         if w + l >= MIN_SPLIT:
-            parts.append(f"{label} {w/(w+l):.0%} ({w}-{l})")
+            mark = "  ← tonight" if key == applies else ""
+            parts.append(f"{label} {w/(w+l):.0%} ({w}-{l}){mark}")
     return "  ·  ".join(parts)
