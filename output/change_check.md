@@ -7,24 +7,24 @@ _The gates were retuned on data including August, and August was hot. The valida
 | confirm | EITHER signal | **BOTH** signals |
 | line move | ≥1.0% | **≥0.5%** |
 
-- games reaching the book gate: **612**
+- games reaching the book gate: **655**
 
 ## Month by month
 
 | month | old record | old ROI | new record | new ROI | change |
 |---|---|---|---|---|---|
-| 2026-07 | 12-7 (19) | +14.8% | 10-6 (16) | +17.9% | **+3.1 pts** |
-| 2026-08 | 38-17 (55) | +20.1% | 25-4 (29) | +59.5% | **+39.4 pts** |
-| 2026-09 | 17-8 (25) | +14.1% | 13-9 (22) | -0.2% | **-14.3 pts** |
+| 2026-07 | 9-8 (17) | -2.6% | 8-6 (14) | +7.5% | **+10.2 pts** |
+| 2026-08 | 32-18 (50) | +10.4% | 24-12 (36) | +19.9% | **+9.6 pts** |
+| 2026-09 | 22-15 (37) | +2.7% | 18-17 (35) | -8.9% | **-11.6 pts** |
 
 ## Everything, and everything except August
 
 | period | old | new | change |
 |---|---|---|---|
-| all months | 67-32 · +17.6% (n=99) | 48-19 · +30.0% (n=67) | **+12.4 pts** |
-| **excluding August** | 29-15 · +14.4% (n=44) | 23-15 · +7.4% (n=38) | **-7.0 pts** |
+| all months | 63-41 · +5.5% (n=104) | 50-35 · +6.0% (n=85) | **+0.5 pts** |
+| **excluding August** | 31-23 · +1.0% (n=54) | 26-23 · -4.2% (n=49) | **-5.2 pts** |
 
-**The change does NOT survive August's removal.** Outside August it is worth -7.0 points, which means the improvement was the hot month. Revert it.
+**The change does NOT survive August's removal.** Outside August it is worth -5.2 points, which means the improvement was the hot month. Revert it.
 
 ## How to read this
 
