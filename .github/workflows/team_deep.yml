@@ -1,0 +1,48 @@
+name: Team deep dive
+
+# One team in depth: trend-versus-alternation across price, run differential,
+# actual wins over every graded game, judged against a re-simulation from the
+# standout cell.
+on:
+  workflow_dispatch:
+    inputs:
+      team:
+        description: "Full team name, e.g. Philadelphia Phillies"
+        required: true
+      team2:
+        description: "Optional second team in the same job"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: |
+          python -m src.team_deep "${{ inputs.team }}"
+          if [ -n "${{ inputs.team2 }}" ]; then
+            python -m src.team_deep "${{ inputs.team2 }}"
+          fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/team_deep_*.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Team deep dive ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
