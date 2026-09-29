@@ -1,0 +1,46 @@
+name: Signal sweep 2
+
+# The signals the first sweep left: Kalshi as a venue in its own right, each
+# crowd source alone rather than blended, each part of the stat model rather
+# than the blend, and the win-condition counts, which were built as reporting
+# and have never been scored against results. 39 signals, both directions,
+# corrected in both tails.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.signal_sweep2
+      - name: Post results issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Signal sweep 2 $(date -u +%Y-%m-%d)" \
+            --body-file output/signal_sweep2.md
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/signal_sweep2.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Signal sweep 2 ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
