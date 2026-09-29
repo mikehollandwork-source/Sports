@@ -251,12 +251,59 @@ def build() -> str:
         act = sum(1 for r in ex if r["won"])
         sd = (len(ex) * (exp / len(ex)) * (1 - exp / len(ex))) ** .5
         z = (act - exp) / sd if sd else 0.0
+        aug = [r for r in cell if r["date"][:7] == "2026-08"]
+        carried = bool(aug) and _roi(aug) > _roi(ex)
         md += [f"**Outside August: {act} wins against {exp:.1f} expected on "
                f"{len(ex)} games — {z:+.2f} standard deviations.**",
                "- " + ("that is a real beat of its own price" if z > 2 else
-                       "that is indistinguishable from correctly priced, so the "
-                       "combination is not adding anything August was not "
-                       "already providing"), ""]
+                       "that is indistinguishable from correctly priced"),
+               "- August " + ("IS carrying it — the effect is weaker without "
+                              "August, the shape that reverted the gate change"
+                              if carried else
+                              f"is NOT carrying it: {_roi(aug):+.1%} inside "
+                              f"August against {_roi(ex):+.1%} outside, so "
+                              "whatever this is, it is not the hot month")
+               if aug else "", ""]
+
+    # ---- main effects, which is where the power actually is --------------
+    cut = 0.55
+    good = [r for r in dogs if r["rate"] >= cut]
+    ord_ = [r for r in dogs if r["rate"] < cut]
+    ag = [r for r in dogs if r["against"] > 0]
+    no = [r for r in dogs if r["against"] <= 0]
+    md += ["## Main effects — where the power actually is", "",
+           "_Correcting for the best of sixteen cells is the right test for "
+           "cherry-picking ONE cell, and the wrong test for a gradient across "
+           "four. The 2×2 makes two claims that each use every underdog game "
+           "rather than a 124-game corner, so they are tested as two hypotheses "
+           "instead of sixteen._", "",
+           "| effect | with | without | difference |", "|---|---|---|---|",
+           f"| being a good dog (≥{cut:.0%}) | {_fmt(good)} | {_fmt(ord_)} | "
+           f"**{(_roi(good)-_roi(ord_))*100:+.1f} pts** |",
+           f"| line moved against | {_fmt(ag)} | {_fmt(no)} | "
+           f"**{(_roi(ag)-_roi(no))*100:+.1f} pts** |", ""]
+    rng = random.Random(2626)
+    prof = [grade.american_profit(r["odds"]) for r in dogs]
+    prob = [r["p"] for r in dogs]
+    pos = {id(r): i for i, r in enumerate(dogs)}
+    pairs = {"being a good dog": (good, ord_), "line moved against": (ag, no)}
+    ix = {k: ([pos[id(r)] for r in a], [pos[id(r)] for r in b])
+          for k, (a, b) in pairs.items()}
+    null = {k: [] for k in pairs}
+    for _ in range(TRIALS):
+        draw = [prof[i] if rng.random() < prob[i] else -1 for i in range(len(dogs))]
+        for k, (ia, ib) in ix.items():
+            null[k].append((sum(draw[i] for i in ia) / len(ia)
+                            - sum(draw[i] for i in ib) / len(ib)) * 100)
+    for k, (a, b) in pairs.items():
+        obs = (_roi(a) - _roi(b)) * 100
+        d = null[k]
+        pv = (sum(1 for x in d if abs(x) >= abs(obs)) + 1) / (TRIALS + 1)
+        md.append(f"- **{k}**: {obs:+.1f} pts · null within "
+                  f"±{sorted(abs(x) for x in d)[int(.95*TRIALS)]:.1f} · "
+                  f"**two-sided p = {pv:.3f}** (2 hypotheses, so Bonferroni "
+                  f"threshold is 0.025)")
+    md.append("")
 
     md += ["## The bar", "",
            "- the combination has to beat **good dogs alone** and **the line "
