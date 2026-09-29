@@ -14,8 +14,8 @@ _**A losing signal is not automatically a winning fade.** Both directions pay th
 | line moved TOWARD | 1022 | 506-516 · **-7.6%** | 516-506 · **+0.9%** | -6.7% |
 | ticket majority | 1212 | 706-506 · **+1.4%** | 506-706 · **-7.9%** | -6.5% |
 | handle majority | 890 | 513-377 · **-0.2%** | 377-513 · **-5.8%** | -6.1% |
-| Polymarket drift | 962 | 557-405 · **+10.5%** | 405-557 · **-16.2%** | -5.8% |
-| Polymarket size lean | 962 | 491-471 · **-2.1%** | 471-491 · **-3.7%** | -5.8% |
+| Polymarket drift | 958 | 496-462 · **-1.0%** | 462-496 · **-4.9%** | -5.8% |
+| Polymarket size lean | 958 | 485-473 · **-3.4%** | 473-485 · **-2.4%** | -5.8% |
 | PM quote beats book | 528 | 289-239 · **-4.6%** | 239-289 · **-3.5%** | -8.1% |
 | board's own fair price | 917 | 418-499 · **-3.1%** | 499-418 · **-2.3%** | -5.4% |
 | better record | 1196 | 656-540 · **-3.5%** | 540-656 · **-3.0%** | -6.4% |
@@ -30,13 +30,13 @@ _Median `sum` across all signals: **-6.4%**. That is the hold, paid twice. A sig
 _Hunting for losers to fade means the MINIMUM matters as much as the maximum, and choosing whichever tail looks better afterwards is the error `margin_form` caught. Both are corrected separately._
 
 - cells at n≥60: **32**
-- best: **back Polymarket drift** at +10.5% · redraws reach +4.0% median · **corrected p = 0.006**
-- worst: **fade Polymarket drift** at -16.2% · redraws reach -8.9% median · **corrected p = 0.003**
+- best: **back ticket majority** at +1.4% · redraws reach +4.0% median · **corrected p = 0.974**
+- worst: **fade ticket majority** at -7.9% · redraws reach -8.9% median · **corrected p = 0.758**
 
-**Something clears.**
+**Neither tail clears.** The extremes are what a sweep this wide produces from noise.
 
-- split-half of **back Polymarket drift**: 270-201 · **+8.6%** (n=471) against 287-204 · **+12.2%** (n=491)
-- split-half of **fade Polymarket drift**: 188-258 · **-16.3%** (n=446) against 217-299 · **-16.1%** (n=516)
+- split-half of **back ticket majority**: 364-243 · **+4.2%** (n=607) against 342-263 · **-1.4%** (n=605)
+- split-half of **fade ticket majority**: 258-357 · **-6.4%** (n=615) against 248-349 · **-9.4%** (n=597)
 
 ## How to read this
 
