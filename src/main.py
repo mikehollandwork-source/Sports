@@ -222,7 +222,12 @@ def run(date: str) -> dict:
             # one fetch serves both: the prop (top bat) and the board's ranked
             # hit-in-wins line. Calling best_hit_prop separately would re-pull
             # the lineup and every game log.
-            ranked = props.hit_in_wins_ranked(gm.game_pk, team.team_id, date, is_home)
+            opp_sp = (gm.away if is_home else gm.home).probable_pitcher
+            ranked = props.hit_in_wins_ranked(
+                gm.game_pk, team.team_id, date, is_home,
+                opp_pitcher_id=opp_sp.player_id if opp_sp else None)
+            if opp_sp:
+                r["pick_criteria"]["opp_starter"] = opp_sp.name
             prop = ranked[0] if ranked else None
             if prop:
                 line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
@@ -1387,32 +1392,38 @@ def _hit_lines(g: dict) -> list[str]:
     """
     pc = g.get("pick_criteria") or {}
     bats = pc.get("hit_bats") or []
-    out = []
-    if bats:
-        hot, cold = _form_names(g, _bet_side(pc)[0])
-        parts = []
-        for b in bats:
-            ar = b.get("all_rate")
-            name = b.get("player") or ""
-            # the board's own last-5 form read, on the same hitters - a cold bat
-            # with a high hit-in-wins rate is the one to be careful with
-            form = " hot" if name in hot else " cold" if name in cold else ""
-            parts.append(f"{_surname(name)} {b['hit_rate']}%"
-                         + (f" ({ar}% all)" if ar is not None else "") + form)
-        out.append("     🔥 hit if they win: " + "  ·  ".join(parts))
+    if not bats:
+        return []
+    sp = _surname(pc.get("opp_starter") or "") or "the starter"
+    out = ["     LIKELY HITS"]
+    for b in bats:
+        bits = [f"{b.get('player') or '?'}"]
+        f = b.get("form")
+        if f is not None:
+            bits.append(f"{f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
+        bits.append(_bvp_bit(b.get("bvp"), sp))
+        hr, ar = b.get("hit_rate"), b.get("all_rate")
+        bits.append(f"when they win {hr}%" + (f" (usually {ar}%)" if ar is not None else ""))
+        out.append("       • " + "  ·  ".join(x for x in bits if x))
     cond = _conditions(g)
-    if cond and bats:
-        out.append(f"        {cond}")
+    if cond:
+        out.append(f"       {cond}")
     return out
 
 
-def _form_names(g: dict, team: str | None) -> tuple[set, set]:
-    """The board's hot and cold bat names for one side of the matchup."""
-    away, home = (g.get("matchup") or " @ ").split(" @ ")
-    side = "home" if team == home else "away" if team == away else None
-    f = ((g.get("form") or {}).get(side) or {}) if side else {}
-    return ({p.get("name") for p in (f.get("hot") or [])},
-            {p.get("name") for p in (f.get("cold") or [])})
+def _bvp_bit(bvp: dict | None, pitcher: str) -> str:
+    """His career line against tonight's starter, or that he has not faced him.
+
+    Career rather than season because per-season BvP samples are near-zero, and
+    the PA count is always shown - a 1.200 OPS on 4 plate appearances is a
+    coincidence, not a matchup, and hiding the sample is how it gets read as one.
+    """
+    if not bvp:
+        return f"vs {pitcher} —"
+    pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
+    if pa < 1:
+        return f"never faced {pitcher}"
+    return f"vs {pitcher} {ops:.3f}".replace("0.", ".", 1) + f" OPS ({pa} PA)"
 
 
 def _surname(name: str) -> str:

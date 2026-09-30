@@ -48,7 +48,7 @@ import statistics as st
 import subprocess
 from pathlib import Path
 
-from . import grade, mlb_api
+from . import good_dog, grade, mlb_api
 
 log = logging.getLogger("record_audit")
 
@@ -186,6 +186,64 @@ def _fmt(rows, odds_key="first_odds", won_key="won_first") -> str:
         return "—"
     return f"{w}-{l} ({w/(w+l):.0%}) · {u:+.2f}u · **{roi:+.1%}** (n={w+l})"
 
+
+GOOD_DOG_SHIPPED = "2026-09-29"    # the date the watch tag went on the board
+
+
+def good_dog_guard() -> list[str]:
+    """Assert that watch-only good dogs never reach the record.
+
+    They are labelled "NOT BETS" on the board and must stay out of the ledger.
+    Structurally they already cannot get in - `settle_day` books only
+    play == "pick", a watch entry is stay_away, and nothing in grade.py,
+    pick_watch.py or announce.py reads the tag at all. This checks the invariant
+    holds in the data rather than trusting that reading.
+
+    Scoped to boards from GOOD_DOG_SHIPPED onward, deliberately. Before that the
+    tag did not exist, so an earlier ledger entry on a team the tag would NOW
+    label was booked for some other reason - two July reversal picks match that
+    description and are not leaks. Checking them would report a false positive
+    every run, which is how a guard gets ignored.
+    """
+    try:
+        led = json.loads((OUTPUT_DIR / "ledger.json").read_text())
+        entries = led["plays"]["entries"]
+    except (OSError, ValueError, KeyError):
+        return ["- _ledger unreadable; guard skipped._", ""]
+    booked = {(e["date"], e.get("matchup"), e.get("bet")) for e in entries}
+
+    watch = leaks = 0
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        date = Path(f).stem.split("picks_")[1]
+        if date < GOOD_DOG_SHIPPED:
+            continue
+        try:
+            day = json.loads(Path(f).read_text())
+            rates = good_dog.favourite_rates(date)
+        except Exception:
+            continue
+        for g in day.get("games", []):
+            pc = g.get("pick_criteria") or {}
+            tag = pc.get("good_dog") or good_dog.tag(g, rates)
+            if not tag:
+                continue
+            if pc.get("play") == "pick" and pc.get("bet_team") == tag["team"]:
+                continue          # the good dog IS the play; it belongs in the record
+            if pc.get("play") == "pick":
+                continue          # a play exists on the other side; unrelated
+            watch += 1
+            if (date, g.get("matchup"), tag["team"]) in booked:
+                leaks += 1
+    out = ["## Guard: watch-only good dogs stay out of the record", "",
+           f"_Boards from {GOOD_DOG_SHIPPED} on, when the tag shipped. Earlier "
+           "entries on teams the tag would now label were booked for other "
+           "reasons - two July reversal picks match that and are not leaks._", "",
+           f"- watch-only good dogs on those boards: **{watch}**",
+           f"- of those, present in the ledger: **{leaks}**"]
+    out.append("- " + ("**PASS** — none of them is in the record" if leaks == 0
+                       else f"**FAIL — {leaks} watch-only good dog(s) were "
+                            "booked. That is a record error, not a reporting one."))
+    return out + [""]
 
 def build() -> str:
     rows = collect()
@@ -397,6 +455,7 @@ def build() -> str:
     # price drift on the survivors
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
              and r["final_odds"] != r["first_odds"]]
+    md += good_dog_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "
