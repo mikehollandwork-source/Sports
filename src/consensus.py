@@ -138,14 +138,19 @@ REQUIRE_LINE_AGAINST = True
 
 def line_tag(result: dict, team: str) -> str:
     """How the line moved relative to `team`: 'against' (price drifted away from
-    it, so we buy at a discount), 'with' (price shortened on it), or 'flat'.
+    it, so we buy at a discount), 'with' (price shortened on it), 'flat', or
+    'unknown' when there is no usable line reading.
+
+    'unknown' is deliberately NOT 'flat'. Treating an unreadable line as a line
+    that did not move withdrew a qualifying pick on 2026-09-29 and handed the
+    fade rule the opposite side, off nothing but a parse failure.
 
     line_check.implied_shift is signed toward the ADVANTAGE side, so it is
     flipped when the team we are backing is the other one."""
     pc = result.get("pick_criteria") or {}
     shift = (pc.get("line_check") or {}).get("implied_shift")
     if not isinstance(shift, (int, float)):
-        return "flat"
+        return "unknown"
     toward = shift if team == pc.get("advantage_team") else -shift
     if toward <= -LINE_MOVE_MIN:
         return "against"
@@ -248,7 +253,7 @@ def evaluate(result: dict, metrics: dict) -> dict | None:
         return None
     tag = line_tag(result, maj)
     if REQUIRE_LINE_AGAINST and tag != "against":
-        return None                      # no price discount -> no play
+        return None                      # no price discount (or no reading)
     reason = ("handle+tickets agree, line moved against us"
               if not REQUIRE_BOOK_CONFIRM else
               "handle+tickets agree, order book confirms, line moved against us")
@@ -275,6 +280,9 @@ def reject_reason(result: dict, metrics: dict) -> str:
         return "order book does not confirm the consensus side — no play"
     if REQUIRE_LINE_AGAINST:
         tag = line_tag(result, maj)
+        if tag == "unknown":
+            # phrased so fade_rule can tell a DATA failure from a gate failure
+            return "line unavailable — cannot evaluate, no play"
         if tag != "against":
             return (f"line moved {tag} the money — no price discount, no play")
     return "no play"
