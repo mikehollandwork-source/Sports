@@ -1350,6 +1350,22 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
+def _when_picked(team: str | None) -> str:
+    """'when we pick BOS: 20-3 · +59.7%', or '' when we never have.
+
+    History, not a signal. It is on the board so a pick arrives with its own
+    track record rather than looking like a fresh idea, and so a team we have
+    been repeatedly wrong about is visible at the moment of betting it.
+    """
+    if not team:
+        return ""
+    rec = grade.record_when_picked(team)
+    if not rec:
+        return ""
+    w, l, roi = rec
+    return f"{w}-{l} · {roi:+.1%}"
+
+
 def _pick_line(g: dict, sp: dict | None = None) -> str:
     """One board entry, written as an instruction rather than a notation.
 
@@ -1379,6 +1395,9 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
     st = _start_time(g)
     sub = f"     {live}{where}" + (f" · {st}" if st else "")
     lines = [head, sub]
+    wp = _when_picked(bet_team)
+    if wp:
+        lines.append(f"     when we pick {ha if at_home else aa}: {wp}")
     # how often this team wins at this kind of price - the same trust check the
     # watch list carries, on the bet itself. `applies` marks which of the two
     # numbers tonight's price puts in play.
@@ -1658,6 +1677,9 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
         # BOTH teams' splits, labelled - the dog's record is only readable
         # against the side it is facing
         opp = away if at_home else home
+        wp = _when_picked(gd["team"])
+        if wp:
+            out.append(f"      when we pick {ha if at_home else aa}: {wp}")
         for team, ab in ((gd["team"], ha if at_home else aa),
                          (opp, aa if at_home else ha)):
             line = good_dog.split_text(team, sp)

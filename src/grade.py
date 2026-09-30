@@ -546,6 +546,26 @@ def _fmt_windows(rec: list) -> str:
     return " · ".join(f"{label} {w}-{l} {u:+.2f}u" for label, (w, l, u) in rec)
 
 
+
+def record_when_picked(team: str) -> tuple[int, int, float] | None:
+    """(wins, losses, ROI) from every graded pick this system has made on `team`.
+
+    Straight history, not a forecast. The rule already backs a team when it
+    qualifies, so this cannot be acted on separately - it is there so a pick
+    arrives with its own track record attached rather than looking new.
+    """
+    try:
+        entries = json.loads(LEDGER_PATH.read_text())["plays"]["entries"]
+    except (OSError, ValueError, KeyError):
+        return None
+    v = [x for x in entries
+         if x.get("bet") == team and x.get("result") in ("W", "L")]
+    if not v:
+        return None
+    w = sum(1 for x in v if x["result"] == "W")
+    u = sum(x.get("profit", 0.0) for x in v)
+    return w, len(v) - w, u / len(v)
+
 def records_block(ledger: dict | None = None, today: dt.date | None = None) -> str:
     """Multi-line Day/Week/Month/YTD records per book plus the all-plays combined
     row (markdown)."""
