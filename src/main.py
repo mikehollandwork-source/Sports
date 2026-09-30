@@ -239,7 +239,11 @@ def run(date: str) -> dict:
                 if line is not None:
                     prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
                 r["pick_criteria"]["prop"] = prop
-                r["pick_criteria"]["hit_bats"] = ranked[:3]
+                # display order is form + shrunk BvP; `prop` above keeps the
+                # hit-in-wins ordering it has always had, so the prop ledger and
+                # grader are untouched by this
+                r["pick_criteria"]["hit_bats"] = sorted(
+                    ranked, key=_hit_score, reverse=True)[:3]
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
@@ -1384,6 +1388,37 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
             lines.append(f"     {txt}")
     lines += _hit_lines(g)
     return "\n".join(lines)
+
+
+# Ranking the hit read. Form and BvP decide the order; hit-in-wins is context.
+#
+# BvP CANNOT be used raw. Career samples against one pitcher are tiny - tonight's
+# board carries a 1.333 OPS on 6 PA and a .083 on 12 - so a raw sort puts the
+# smallest samples on top, which is the error this project keeps catching
+# elsewhere. Each line is shrunk toward league-average OPS by its own sample:
+#
+#     weight = pa / (pa + BVP_PRIOR)
+#
+# so 6 PA keeps under a quarter of its deviation and 24 PA keeps over half. A
+# hitter who has never faced the starter contributes exactly zero rather than
+# being dropped - no information is not bad information.
+LEAGUE_OPS = 0.710     # roughly league-average OPS; the point BvP shrinks toward
+BVP_PRIOR = 20         # PA of imaginary league-average history added to each line
+
+
+def _hit_score(b: dict) -> float:
+    """Form plus sample-shrunk BvP, both on an OPS-ish scale.
+
+    Form is percentage points over the hitter's OWN season rate, divided by 100
+    to sit alongside an OPS delta. The two are added unweighted: with no evidence
+    that either predicts a hit better than the other, inventing a weighting would
+    be a free parameter tuned on nothing.
+    """
+    form = (b.get("form") or 0) / 100.0
+    bvp = b.get("bvp") or {}
+    pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
+    edge = ((ops - LEAGUE_OPS) * (pa / (pa + BVP_PRIOR))) if pa > 0 else 0.0
+    return form + edge
 
 
 def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
