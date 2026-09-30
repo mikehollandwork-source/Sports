@@ -22,6 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import consensus as consensus_rule
+from .park_factors import bearing_for
 from . import good_dog, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
@@ -1477,6 +1478,39 @@ def _surname(name: str) -> str:
     return parts[-1] if parts else name
 
 
+# Wind, made park-relative. A compass string cannot say whether wind helps: a
+# south wind blows OUT in a park facing north and IN in one facing south. The
+# weather APIs report the direction wind comes FROM (met.no literally calls the
+# field wind_from_direction), so the direction it blows TOWARD is that plus 180,
+# and the component along the home-to-centre axis is the cosine of the angle
+# between them.
+#
+# Only STRONG alignment is reported. The bearing table is approximate, so
+# requiring the wind within ~60 degrees of the axis means a bearing wrong by
+# 20-30 degrees weakens the read rather than reversing it. Light wind is
+# ignored outright - 4 mph does not move a baseball whatever way it points.
+WIND_MIN_MPH = 8
+WIND_ALIGN = 0.5        # cos(60 degrees): how squarely the wind must run the axis
+
+
+def _wind_component(g: dict, park_team: str | None) -> tuple[str, float] | None:
+    """("out"|"in", strength 0-1) for tonight's wind, or None when unreadable."""
+    w = g.get("weather") or {}
+    if (w.get("roof") or "") == "closed":
+        return None
+    deg, mph = w.get("wind_deg"), w.get("wind_mph")
+    bearing = bearing_for(park_team) if park_team else None
+    if bearing is None or not isinstance(deg, (int, float)) \
+            or not isinstance(mph, (int, float)) or mph < WIND_MIN_MPH:
+        return None
+    import math
+    toward = (deg + 180) % 360                 # from-direction -> blowing-toward
+    comp = math.cos(math.radians(bearing - toward))
+    if abs(comp) < WIND_ALIGN:
+        return None                            # crosswind: says nothing
+    return ("out" if comp > 0 else "in", abs(comp))
+
+
 # Contact conditions. Weather on its own says nothing about hits - what matters
 # is whether the park, the umpire and the STARTER combine to put balls in play.
 # A hot night in a big park is irrelevant behind a 12 K/9 arm and a wide-zone
@@ -1517,6 +1551,14 @@ def _contact_conditions(g: dict, hitting_team: str | None) -> str:
         elif t <= TEMP_COLD:
             against.append(f"{t}°F")
 
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    wind = _wind_component(g, home)            # the park is the home team's
+    if wind:
+        way, strength = wind
+        mph = (g.get("weather") or {}).get("wind_mph")
+        txt = f"wind {mph} mph {way}" + ("" if strength >= 0.8 else " (angled)")
+        (for_ if way == "out" else against).append(txt)
+
     tend = g.get("ump_tend") or {}
     ke, ump = tend.get("k_extra"), g.get("umpire_hp")
     if isinstance(ke, (int, float)) and ump:
@@ -1526,7 +1568,6 @@ def _contact_conditions(g: dict, hitting_team: str | None) -> str:
             against.append(f"ump {_surname(ump)} {ke:+.1f} K/g")
 
     # the starter the hitting side actually faces
-    away, home = (g.get("matchup") or " @ ").split(" @ ")
     opp_side = "home" if hitting_team == away else "away" if hitting_team == home else None
     sa = ((g.get("statistical_advantage") or {}).get(opp_side) or {}) if opp_side else {}
     k9, name = sa.get("starter_k9"), sa.get("probable_pitcher")
