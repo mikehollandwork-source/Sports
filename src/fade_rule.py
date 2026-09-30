@@ -139,6 +139,15 @@ def apply(results: list[dict], date: str) -> int:
             continue                      # still a play; nothing was withdrawn
         if _started(r, now):
             continue                      # locked: the fade was never available
+        # A pick that stopped qualifying because a FEED FAILED has not been
+        # withdrawn on the evidence - nothing was learned, so there is nothing
+        # to fade. On 2026-09-29 covers substituted the opening price for an
+        # unreadable current one, the shift went to exactly 0.000, the Yankees
+        # pick was withdrawn and Boston was bet at +126 off a parse failure.
+        # _apply_consensus has already written the rejection reason here.
+        if "unavailable" in (pc.get("reason") or "").lower():
+            log.info("skipping fade on %s: withdrawal was a data failure", pk)
+            continue
         # A fade is triggered by the CONSENSUS rule withdrawing. If the posted
         # pick is itself a fade, taking "the other side" flips the bet back to
         # the team the rule withdrew - and because pick_watch then records THAT
