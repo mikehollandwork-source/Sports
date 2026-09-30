@@ -161,6 +161,9 @@ def run(date: str) -> dict:
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
     # can't flip a pick to a lean or move the price after the game is underway.
+    # a feed failure must not delete a posted pick; a started game's freeze
+    # still wins, so this runs first
+    _hold_on_missing_data(date, results)
     results = _lock_started_games(date, results)
 
     # Operator-entered picks go AFTER the lock, which is the only place they are
@@ -321,6 +324,50 @@ def _dedupe_same_market(results: list) -> int:
     if dropped:
         log.warning("dropped %d duplicate-market pick(s)", dropped)
     return dropped
+
+
+def _hold_on_missing_data(date: str, results: list) -> int:
+    """Keep an announced pick alive when a FEED failed, not when a gate failed.
+
+    Changes nothing about what qualifies. A game the rule never picked stays a
+    no-play, and a pick whose gate genuinely stopped passing - the money split,
+    the line moved the wrong way - is still withdrawn exactly as before. The
+    only case touched is the one where this board cannot evaluate the game at
+    all because data is missing, and the previous committed board had it as a
+    pick. Then the last good evaluation stands instead of the pick vanishing.
+
+    This is the other half of the 2026-09-29 bug. Not substituting the opening
+    price stopped a feed failure from looking like a flat line; this stops it
+    from silently removing a bet that was already posted to Telegram.
+
+    Reuses the committed board as the snapshot, the same source
+    _lock_started_games uses, and runs BEFORE it so a started game's freeze
+    still wins.
+    """
+    prev_path = OUTPUT_DIR / f"picks_{date}.json"
+    if not prev_path.exists():
+        return 0
+    try:
+        prev = {g["game_pk"]: g
+                for g in json.loads(prev_path.read_text()).get("games", [])}
+    except (OSError, ValueError):
+        return 0
+    held = 0
+    for r in results:
+        pc = r.get("pick_criteria") or {}
+        if pc.get("play") == "pick":
+            continue                       # still qualifying; nothing to hold
+        if "unavailable" not in (pc.get("reason") or "").lower():
+            continue                       # a real gate failure, not a feed one
+        snap = prev.get(r.get("game_pk")) or {}
+        spc = snap.get("pick_criteria") or {}
+        if spc.get("play") != "pick":
+            continue                       # was never a pick; nothing to hold
+        r["pick_criteria"] = {**spc, "held_stale": True}
+        held += 1
+    if held:
+        log.info("held %d pick(s) at their last good reading (feed unavailable)", held)
+    return held
 
 
 def _lock_started_games(date: str, results: list) -> list:
@@ -1389,6 +1436,8 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
     # only label it when the team we are BACKING is the good dog
     if gd.get("team") == bet_team:
         tag += "  ·  good dog"
+    if pc.get("held_stale"):
+        tag += "  ·  ⚠ held (line feed down)"
     head = f"✅ BET {bet_team}{mls}{star}{tag}"
     where = f"{'vs' if at_home else 'at'} {opp_ab}"
     live = "🔴 LIVE · " if g.get("state") == "live" else ""
