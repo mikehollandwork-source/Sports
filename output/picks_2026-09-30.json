@@ -1,6 +1,6 @@
 {
   "date": "2026-09-30",
-  "generated_at": "2026-09-30T21:03:25.818401+00:00",
+  "generated_at": "2026-09-30T22:03:19.224599+00:00",
   "games": [
     {
       "game_pk": 849841,
@@ -603,7 +603,7 @@
           "losses": 36
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 849846,
@@ -1113,8 +1113,8 @@
       "park_factor": 1.02,
       "statistical_advantage": {
         "team": "New York Yankees",
-        "home_score": 0.4432577777777778,
-        "away_score": 0.10089800000000004,
+        "home_score": 0.3901,
+        "away_score": 0.09411500000000003,
         "home": {
           "name": "New York Yankees",
           "probable_pitcher": "Max Fried",
@@ -1205,7 +1205,7 @@
         }
       },
       "public_majority": {
-        "team": "New York Yankees",
+        "team": "Boston Red Sox",
         "detail": {
           "consensus": {
             "pick": "Nyy",
@@ -1216,13 +1216,13 @@
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 17,
-            "away": 22
+            "home": 15,
+            "away": 39
           },
           "agree": false,
-          "forum_lean": -0.128,
+          "forum_lean": -0.444,
           "consensus_lean": 0.2,
-          "blended_lean": 0.118,
+          "blended_lean": -0.01,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1237,9 +1237,9 @@
               "lean": 0.12
             },
             "scoresodds_bets": {
-              "away": 22,
-              "home": 78,
-              "lean": 0.56
+              "away": 21,
+              "home": 79,
+              "lean": 0.58
             }
           }
         }
@@ -1249,60 +1249,62 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 3,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/4 sources agree (forum differ)",
-        "flags": [],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 3,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets, polymarket_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "home",
-        "money_pct": 75
+        "money_pct": 76
       },
       "bvp": {
         "home_eff": 0.801,
-        "away_eff": 0.667,
+        "away_eff": 0.72,
         "home_ops": 0.851,
-        "away_ops": 0.627,
+        "away_ops": 0.712,
         "home_pa": 87,
-        "away_pa": 83,
+        "away_pa": 89,
         "home_hand_ops": 0.714,
         "away_hand_ops": 0.734,
         "home_hand_pa": 4034,
         "away_hand_pa": 1686,
-        "total_pa": 5890,
+        "total_pa": 5896,
         "edge_team": "New York Yankees",
-        "gap": 0.134,
+        "gap": 0.081,
         "meaningful": true
       },
       "bvp_pen": {
         "home_ops": 0.605,
-        "away_ops": 0.565,
+        "away_ops": 0.653,
         "home_pa": 202,
-        "away_pa": 266,
-        "total_pa": 468,
-        "edge_team": "New York Yankees",
-        "gap": 0.04,
+        "away_pa": 305,
+        "total_pa": 507,
+        "edge_team": "Boston Red Sox",
+        "gap": 0.048,
         "meaningful": false
       },
       "form": {
@@ -1355,14 +1357,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "New York Yankees",
-          "consensus_pct": 60.0,
-          "moneyline": "-125"
-        },
-        "non_majority": {
           "team": "Boston Red Sox",
           "consensus_pct": 40.0,
-          "moneyline": "+122"
+          "moneyline": "+121"
+        },
+        "non_majority": {
+          "team": "New York Yankees",
+          "consensus_pct": 60.0,
+          "moneyline": "-128"
         }
       },
       "consistency": {
@@ -1513,22 +1515,22 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "New York Yankees",
-        "public_edge": false,
-        "public_trusted": true,
+        "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.471,
+        "confidence": 0.408,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.342,
-            "strength": 0.856,
+            "margin": 0.296,
+            "strength": 0.74,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.118,
-            "strength": 0.0,
+            "blended_lean": -0.01,
+            "strength": 0.003,
             "weight": 0.45
           },
           "consistency": {
@@ -1538,7 +1540,7 @@
         },
         "consistency_hits": 1,
         "advantage_moneyline": -130,
-        "opponent_moneyline": 120,
+        "opponent_moneyline": 123,
         "line_check": {
           "open": -132,
           "current": -130,
@@ -1549,23 +1551,27 @@
         },
         "form_edge": true,
         "form_gap": 0.04,
-        "sharp_money": false,
+        "sharp_money": true,
         "sp_dog_edge": 0.826,
         "pitching_dog": false,
-        "signals_hit": 3,
+        "signals_hit": 4,
+        "public_pct_against": 44,
+        "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
-          "side": null,
+          "side": "New York Yankees",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Boston Red Sox",
-          "odds": 120,
+          "odds": 123,
           "basis": "money %",
-          "hold_home": -2288462,
-          "hold_away": 3150000
+          "hold_home": -2412308,
+          "hold_away": 3253600
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -1577,8 +1583,8 @@
           "vs_book": "same"
         },
         "projected": {
-          "win_prob": 60.3,
-          "fair_american": -152
+          "win_prob": 58.9,
+          "fair_american": -143
         },
         "line_vs_money": "flat",
         "bet_team": null,
@@ -1587,7 +1593,7 @@
         "good_dog": {
           "team": "Boston Red Sox",
           "rate": 0.8,
-          "odds": 120
+          "odds": 123
         },
         "opp_starter": "Max Fried",
         "prop": {
@@ -1633,8 +1639,8 @@
             "form": 22,
             "super_hot": true,
             "bvp": {
-              "pa": 12,
-              "ops": 0.083
+              "pa": 18,
+              "ops": 0.686
             },
             "wins_played": 20,
             "games_played": 99,
@@ -1662,11 +1668,11 @@
       "pick": null,
       "game_datetime": "2026-10-01T00:00:00Z",
       "weather": {
-        "temp_f": 64,
+        "temp_f": 65,
         "wind_mph": 3,
         "wind_dir": "SE",
-        "wind_deg": 126,
-        "precip_pct": 0,
+        "wind_deg": 132,
+        "precip_pct": 1,
         "roof": "open"
       },
       "umpire_hp": "Scott Barry",
@@ -1700,28 +1706,28 @@
       "park_factor": 0.96,
       "statistical_advantage": {
         "team": "San Diego Padres",
-        "home_score": 0.36306000000000005,
+        "home_score": 0.402046,
         "away_score": 0.1549,
         "home": {
           "name": "San Diego Padres",
           "probable_pitcher": "Nick Pivetta",
           "starter_hand": "R",
           "offense": {
-            "avg": 0.29,
-            "obp": 0.355,
-            "slg": 0.479,
-            "ops": 0.834,
-            "iso": 0.189,
-            "woba": 0.363,
-            "bb_pct": 0.076,
-            "k_pct": 0.213,
-            "sb_rate": 0.0254,
-            "pa": 511,
+            "avg": 0.31,
+            "obp": 0.371,
+            "slg": 0.51,
+            "ops": 0.881,
+            "iso": 0.199,
+            "woba": 0.382,
+            "bb_pct": 0.07,
+            "k_pct": 0.219,
+            "sb_rate": 0.0263,
+            "pa": 342,
             "park_factor": 1.008,
-            "woba_neutral": 0.36,
-            "iso_neutral": 0.187
+            "woba_neutral": 0.38,
+            "iso_neutral": 0.198
           },
-          "platoon_factor": 0.9911,
+          "platoon_factor": 0.9967,
           "starter_fip_last5": 2.625,
           "starter_k9": 10.9,
           "starter_fip_season": 2.206,
@@ -1731,20 +1737,20 @@
           "pen_arms_down": 0,
           "combined_fip_sos_adj": 3.322,
           "strength_of_schedule": {
-            "bat_opp_pitching_factor": 0.978,
+            "bat_opp_pitching_factor": 0.989,
             "arm_opp_offense_factor": 0.989,
             "raw": {
-              "bat_opp_fip": 4.232193410533759,
-              "bat_opp_win": 0.5012485322896283,
+              "bat_opp_fip": 4.200899418748692,
+              "bat_opp_win": 0.5111491228070176,
               "sp_opp_woba": 0.3229273921121503,
               "sp_opp_win": 0.47147115384615385,
               "bp_opp_woba": 0.32310270031404253,
               "bp_opp_win": 0.5001545741324921
             }
           },
-          "offense_index": 0.07,
+          "offense_index": 0.1076,
           "pitching_index": 0.1897,
-          "score": 0.2597
+          "score": 0.2973
         },
         "away": {
           "name": "Chicago Cubs",
@@ -1803,13 +1809,13 @@
           },
           "forum": {
             "pick": "San Diego Padres",
-            "home": 25,
-            "away": 14
+            "home": 24,
+            "away": 12
           },
           "agree": true,
-          "forum_lean": 0.282,
+          "forum_lean": 0.333,
           "consensus_lean": 0.26,
-          "blended_lean": 0.296,
+          "blended_lean": 0.318,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1866,37 +1872,37 @@
         "line": "flat",
         "money": "against public",
         "money_side": "away",
-        "money_pct": 59
+        "money_pct": 56
       },
       "bvp": {
-        "home_eff": 0.757,
+        "home_eff": 0.758,
         "away_eff": 0.768,
-        "home_ops": 0.766,
+        "home_ops": 0.767,
         "away_ops": 0.773,
-        "home_pa": 197,
+        "home_pa": 192,
         "away_pa": 97,
         "home_hand_ops": 0.722,
         "away_hand_ops": 0.757,
         "home_hand_pa": 4544,
         "away_hand_pa": 4683,
-        "total_pa": 9521,
+        "total_pa": 9516,
         "edge_team": "Chicago Cubs",
-        "gap": 0.011,
+        "gap": 0.01,
         "meaningful": false
       },
       "bvp_pen": {
-        "home_ops": 0.844,
+        "home_ops": 0.807,
         "away_ops": 0.74,
-        "home_pa": 302,
+        "home_pa": 278,
         "away_pa": 207,
-        "total_pa": 509,
+        "total_pa": 485,
         "edge_team": "San Diego Padres",
-        "gap": 0.104,
+        "gap": 0.067,
         "meaningful": true
       },
       "form": {
         "home": {
-          "delta": 0.024,
+          "delta": 0.038,
           "hot": [
             {
               "name": "Xander Bogaerts",
@@ -1909,12 +1915,12 @@
           ],
           "cold": [
             {
-              "name": "Manny Machado",
-              "delta": -0.095
+              "name": "Ty France",
+              "delta": -0.005
             },
             {
-              "name": "Luis Campusano",
-              "delta": -0.106
+              "name": "Manny Machado",
+              "delta": -0.095
             }
           ]
         },
@@ -1946,12 +1952,12 @@
         "majority": {
           "team": "San Diego Padres",
           "consensus_pct": 63.0,
-          "moneyline": "-150"
+          "moneyline": "-152"
         },
         "non_majority": {
           "team": "Chicago Cubs",
           "consensus_pct": 37.0,
-          "moneyline": "+120"
+          "moneyline": "+118"
         }
       },
       "consistency": {
@@ -2107,16 +2113,16 @@
         "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.286,
+        "confidence": 0.34,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.208,
-            "strength": 0.52,
+            "margin": 0.247,
+            "strength": 0.618,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.296,
+            "blended_lean": 0.318,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -2127,7 +2133,7 @@
         },
         "consistency_hits": 3,
         "advantage_moneyline": -140,
-        "opponent_moneyline": 125,
+        "opponent_moneyline": 128,
         "line_check": {
           "open": -132,
           "current": -140,
@@ -2137,7 +2143,7 @@
           "pinny_morning": -141
         },
         "form_edge": true,
-        "form_gap": 0.027,
+        "form_gap": 0.041,
         "sharp_money": false,
         "sp_dog_edge": 1.536,
         "pitching_dog": false,
@@ -2155,8 +2161,8 @@
           "bet": "San Diego Padres",
           "odds": -140,
           "basis": "money %",
-          "hold_home": 2080000,
-          "hold_away": -2292500
+          "hold_home": 1720000,
+          "hold_away": -1937600
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -2168,8 +2174,8 @@
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 56.2,
-          "fair_american": -129
+          "win_prob": 57.4,
+          "fair_american": -135
         },
         "line_vs_money": "with",
         "bet_team": null,
@@ -2178,7 +2184,7 @@
         "good_dog": {
           "team": "Chicago Cubs",
           "rate": 0.783,
-          "odds": 125
+          "odds": 128
         },
         "opp_starter": "Nick Pivetta",
         "prop": {
@@ -2260,8 +2266,14 @@
         "precip_pct": 0,
         "roof": "open"
       },
-      "umpire_hp": null,
-      "ump_tend": null,
+      "umpire_hp": "Erich Bacchus",
+      "ump_tend": {
+        "games": 15,
+        "k_pg": 16.67,
+        "bb_pg": 6.67,
+        "r_pg": 10.4,
+        "k_extra": -0.08
+      },
       "situational": {
         "home": {
           "abbr": "SD",
