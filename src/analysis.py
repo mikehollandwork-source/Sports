@@ -1093,6 +1093,7 @@ def _team_stats(team: Team) -> dict:
         "offense": offense_line(team.offense),
         "platoon_factor": team.platoon_factor,
         "starter_fip_last5": team.starter_fip_last5,
+        "starter_k9": team.starter_k9,
         "starter_fip_season": team.starter_fip_season,   # season-to-date (pitching-dog signal)
         "starter_ip_last5": team.starter_ip_last5,
         "bullpen_fip_last5": team.bullpen_fip_last5,

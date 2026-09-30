@@ -79,6 +79,7 @@ class Team:
     starter_proj_ip: float | None = None     # projected innings (season IP per start)
     bullpen_fip_last5: float | None = None
     starter_ip_last5: float = 0.0   # innings behind the starter FIP (sample size)
+    starter_k9: float | None = None  # strikeouts per 9, for contact-conditions reads
     bullpen_ip_last5: float = 0.0   # innings behind the bullpen FIP (sample size)
     platoon_factor: float = 1.0
     games_last5: list = field(default_factory=list)  # per-game results + opp strength
@@ -430,6 +431,11 @@ def _fip_from_acc(acc: dict) -> dict:
     fip = (13 * hr + 3 * (acc["bb"] + acc["hbp"]) - 2 * acc["k"]) / acc["ip"] + FIP_CONSTANT
     return {
         "fip": round(fip, 3),
+        # K/9 falls out of the same accumulator FIP already uses, so it costs
+        # nothing to carry. It is what says whether a starter lets the ball be
+        # put in play, which FIP alone does not - a low-FIP contact pitcher and
+        # a low-FIP strikeout pitcher are very different nights for a hitter.
+        "k9": round(acc["k"] * 9 / acc["ip"], 2) if acc["ip"] else None,
         "opp_woba": (acc["opp_woba_ip"] / acc["opp_woba_w"]) if acc["opp_woba_w"] else None,
         "opp_win": (acc["opp_win_ip"] / acc["ip"]) if acc["ip"] else 0.5,
         "ip": round(acc["ip"], 2),
@@ -824,6 +830,7 @@ def enrich_with_stats(game: Game, date: str, as_of: str | None = None,
                 sp = pitcher_last5(team.probable_pitcher.player_id, season, as_of=as_of, n=n)
                 team.starter_fip_last5 = sp["fip"]
                 team.starter_ip_last5 = sp["ip"]
+                team.starter_k9 = sp.get("k9")
                 sos["sp_opp_woba"], sos["sp_opp_win"] = sp["opp_woba"], sp["opp_win"]
             except Exception as exc:
                 log.warning("starter FIP failed for %s: %s", team.name, exc)

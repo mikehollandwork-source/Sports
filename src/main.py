@@ -1450,7 +1450,7 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
-    cond = _conditions(g)
+    cond = _contact_conditions(g, winner or _bet_side(pc)[0])
     if cond:
         out.append(f"       {cond}")
     return out
@@ -1477,28 +1477,79 @@ def _surname(name: str) -> str:
     return parts[-1] if parts else name
 
 
-def _conditions(g: dict) -> str:
-    """Park, weather, umpire and BvP - the context behind the hit read."""
-    bits = []
+# Contact conditions. Weather on its own says nothing about hits - what matters
+# is whether the park, the umpire and the STARTER combine to put balls in play.
+# A hot night in a big park is irrelevant behind a 12 K/9 arm and a wide-zone
+# umpire, because the ball never gets hit.
+#
+# Wind is deliberately excluded. Turning a direction into "blowing out" needs
+# each park's orientation, which this repo does not have, and guessing would
+# manufacture a signal out of a compass reading.
+#
+# The thresholds below are conventional judgement calls, NOT fitted - nothing in
+# this project has shown contact conditions predict hits, so this is labelled
+# context and ranks nothing.
+PARK_HOT, PARK_COLD = 1.02, 0.98
+TEMP_HOT, TEMP_COLD = 80, 55
+UMP_K_LOOSE, UMP_K_TIGHT = -0.5, 0.5     # ump_tend.k_extra: Ks above/below average
+K9_CONTACT, K9_POWER = 7.5, 9.5
+
+
+def _contact_conditions(g: dict, hitting_team: str | None) -> str:
+    """Whether tonight favours the bat, from the things that decide contact.
+
+    `hitting_team` is the side whose hitters are being read, so the STARTER
+    considered is the one they face.
+    """
+    for_, against = [], []
     pf = g.get("park_factor")
     if isinstance(pf, (int, float)):
-        bits.append(f"park {pf:.2f}")
+        if pf >= PARK_HOT:
+            for_.append(f"park {pf:.2f}")
+        elif pf <= PARK_COLD:
+            against.append(f"park {pf:.2f}")
+
     w = g.get("weather") or {}
-    if isinstance(w.get("temp_f"), int):
-        wind = (f", wind {w['wind_mph']} {w.get('wind_dir') or ''}".rstrip()
-                if isinstance(w.get("wind_mph"), int) else "")
-        roof = f", {w['roof']}" if w.get("roof") else ""
-        bits.append(f"{w['temp_f']}°F{wind}{roof}")
-    ump, tend = g.get("umpire_hp"), g.get("ump_tend") or {}
-    if ump:
-        r = tend.get("r_pg")
-        bits.append(f"ump {_surname(ump)}"
-                    + (f" {r:.1f} R/g" if isinstance(r, (int, float)) else ""))
-    bvp = g.get("bvp") or {}
-    if bvp.get("edge_team") and isinstance(bvp.get("gap"), (int, float)):
-        tag = "" if bvp.get("meaningful") else " (thin)"
-        bits.append(f"BvP {_abbr_of(g, bvp['edge_team'])} +{bvp['gap']:.3f}{tag}")
-    return " · ".join(bits)
+    t, roof = w.get("temp_f"), (w.get("roof") or "")
+    if isinstance(t, int) and roof != "closed":     # a closed roof neutralises it
+        if t >= TEMP_HOT:
+            for_.append(f"{t}°F")
+        elif t <= TEMP_COLD:
+            against.append(f"{t}°F")
+
+    tend = g.get("ump_tend") or {}
+    ke, ump = tend.get("k_extra"), g.get("umpire_hp")
+    if isinstance(ke, (int, float)) and ump:
+        if ke <= UMP_K_LOOSE:
+            for_.append(f"ump {_surname(ump)} {ke:+.1f} K/g")
+        elif ke >= UMP_K_TIGHT:
+            against.append(f"ump {_surname(ump)} {ke:+.1f} K/g")
+
+    # the starter the hitting side actually faces
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    opp_side = "home" if hitting_team == away else "away" if hitting_team == home else None
+    sa = ((g.get("statistical_advantage") or {}).get(opp_side) or {}) if opp_side else {}
+    k9, name = sa.get("starter_k9"), sa.get("probable_pitcher")
+    if isinstance(k9, (int, float)) and name:
+        if k9 <= K9_CONTACT:
+            for_.append(f"{_surname(name)} {k9:.1f} K/9")
+        elif k9 >= K9_POWER:
+            against.append(f"{_surname(name)} {k9:.1f} K/9")
+
+    # A single mild factor is not a verdict - that is the whole point of
+    # combining them. One input alone gets "slightly"; the strong wording needs
+    # at least two pointing the same way with nothing pointing back.
+    if not for_ and not against:
+        return "contact conditions: neutral"
+    if for_ and not against:
+        lead = "FAVOUR THE BAT" if len(for_) >= 2 else "slightly favour the bat"
+        return f"contact conditions: {lead} — " + " · ".join(for_)
+    if against and not for_:
+        lead = ("AGAINST THE BAT" if len(against) >= 2
+                else "slightly against the bat")
+        return f"contact conditions: {lead} — " + " · ".join(against)
+    return ("contact conditions: mixed — for: " + " · ".join(for_)
+            + "  ·  against: " + " · ".join(against))
 
 
 def _abbr_of(g: dict, team: str) -> str:
