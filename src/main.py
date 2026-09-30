@@ -208,13 +208,18 @@ def run(date: str) -> dict:
     # season wins). Only upcoming/live plays; fails soft so it never blocks the board.
     gbypk = {g.game_pk: g for g in games}
     for r in results:
-        if _play(r) != "pick" or r.get("state") == "final":
+        if r.get("state") == "final":
+            continue
+        pc0 = r.get("pick_criteria") or {}
+        gd = pc0.get("good_dog") or {}
+        # the read is computed for PLAYS and for watch-listed good dogs, since
+        # "who gets a hit when they win" is asked of both. For a watch entry the
+        # team is the good dog itself, not a bet side.
+        adv = (_bet_side(pc0)[0] if _play(r) == "pick" else None) or gd.get("team")
+        if not adv:
             continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
-            continue
-        adv = _bet_side(r["pick_criteria"])[0]
-        if not adv:
             continue
         is_home = adv == gm.home.name
         team = gm.home if is_home else gm.away
@@ -1381,7 +1386,7 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
     return "\n".join(lines)
 
 
-def _hit_lines(g: dict) -> list[str]:
+def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     """Who is most likely to get a hit if this pick wins, and the conditions.
 
     The percentage is hit rate in the team's season WINS, with the hitter's
@@ -1395,15 +1400,20 @@ def _hit_lines(g: dict) -> list[str]:
     if not bats:
         return []
     sp = _surname(pc.get("opp_starter") or "") or "the starter"
-    out = ["     LIKELY HITS"]
+    who = _abbr_of(g, winner) if winner else "they"
+    out = [f"     LIKELY HITS (if {who} win{'s' if winner else ''})"]
     for b in bats:
         bits = [f"{b.get('player') or '?'}"]
         f = b.get("form")
         if f is not None:
-            bits.append(f"{f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
+            bits.append(f"form {f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
         bits.append(_bvp_bit(b.get("bvp"), sp))
         hr, ar = b.get("hit_rate"), b.get("all_rate")
-        bits.append(f"when they win {hr}%" + (f" (usually {ar}%)" if ar is not None else ""))
+        # spelled out rather than "(usually X%)", which read as a hedge on the
+        # first number instead of what it is: the same hitter across ALL games,
+        # which is the only thing that makes the wins figure meaningful
+        bits.append(f"hits in {hr}% of wins"
+                    + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
     cond = _conditions(g)
     if cond:
@@ -1513,9 +1523,17 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
         out.append(f"👀 {gd['team']} {gd['odds']:+d} "
                    f"{'vs' if at_home else 'at'} {ha if not at_home else aa}"
                    f"  ·  favoured {gd['rate']:.0%} of its games{clash}")
-        line = good_dog.split_text(gd["team"], sp)
-        if line:
-            out.append(f"      {line}")
+        # BOTH teams' splits, labelled - the dog's record is only readable
+        # against the side it is facing
+        opp = away if at_home else home
+        for team, ab in ((gd["team"], ha if at_home else aa),
+                         (opp, aa if at_home else ha)):
+            line = good_dog.split_text(team, sp)
+            if line:
+                out.append(f"      {ab}  {line}")
+        # one extra space so the hit block nests under this watch entry rather
+        # than sitting at the same level as the 👀 line
+        out += [" " + x for x in _hit_lines(g, winner=gd["team"])]
     return out
 
 
