@@ -22,6 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import consensus as consensus_rule
+from .park_factors import bearing_for
 from . import good_dog, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
@@ -208,13 +209,18 @@ def run(date: str) -> dict:
     # season wins). Only upcoming/live plays; fails soft so it never blocks the board.
     gbypk = {g.game_pk: g for g in games}
     for r in results:
-        if _play(r) != "pick" or r.get("state") == "final":
+        if r.get("state") == "final":
+            continue
+        pc0 = r.get("pick_criteria") or {}
+        gd = pc0.get("good_dog") or {}
+        # the read is computed for PLAYS and for watch-listed good dogs, since
+        # "who gets a hit when they win" is asked of both. For a watch entry the
+        # team is the good dog itself, not a bet side.
+        adv = (_bet_side(pc0)[0] if _play(r) == "pick" else None) or gd.get("team")
+        if not adv:
             continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
-            continue
-        adv = _bet_side(r["pick_criteria"])[0]
-        if not adv:
             continue
         is_home = adv == gm.home.name
         team = gm.home if is_home else gm.away
@@ -234,7 +240,11 @@ def run(date: str) -> dict:
                 if line is not None:
                     prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
                 r["pick_criteria"]["prop"] = prop
-                r["pick_criteria"]["hit_bats"] = ranked[:3]
+                # display order is form + shrunk BvP; `prop` above keeps the
+                # hit-in-wins ordering it has always had, so the prop ledger and
+                # grader are untouched by this
+                r["pick_criteria"]["hit_bats"] = sorted(
+                    ranked, key=_hit_score, reverse=True)[:3]
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
@@ -1373,15 +1383,51 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
     # watch list carries, on the bet itself. `applies` marks which of the two
     # numbers tonight's price puts in play.
     if sp:
+        # both sides, same as the watch list: the bet team's record only reads
+        # against the side it is facing
         applies = "fav" if isinstance(ml, int) and ml < 0 else "dog"
-        txt = good_dog.split_text(bet_team, sp, applies)
-        if txt:
-            lines.append(f"     {txt}")
+        opp = home if bet_team == away else away
+        for team, ab, mark in ((bet_team, ha if at_home else aa, applies),
+                               (opp, aa if at_home else ha, None)):
+            txt = good_dog.split_text(team, sp, mark)
+            if txt:
+                lines.append(f"     {ab}  {txt}")
     lines += _hit_lines(g)
     return "\n".join(lines)
 
 
-def _hit_lines(g: dict) -> list[str]:
+# Ranking the hit read. Form and BvP decide the order; hit-in-wins is context.
+#
+# BvP CANNOT be used raw. Career samples against one pitcher are tiny - tonight's
+# board carries a 1.333 OPS on 6 PA and a .083 on 12 - so a raw sort puts the
+# smallest samples on top, which is the error this project keeps catching
+# elsewhere. Each line is shrunk toward league-average OPS by its own sample:
+#
+#     weight = pa / (pa + BVP_PRIOR)
+#
+# so 6 PA keeps under a quarter of its deviation and 24 PA keeps over half. A
+# hitter who has never faced the starter contributes exactly zero rather than
+# being dropped - no information is not bad information.
+LEAGUE_OPS = 0.710     # roughly league-average OPS; the point BvP shrinks toward
+BVP_PRIOR = 20         # PA of imaginary league-average history added to each line
+
+
+def _hit_score(b: dict) -> float:
+    """Form plus sample-shrunk BvP, both on an OPS-ish scale.
+
+    Form is percentage points over the hitter's OWN season rate, divided by 100
+    to sit alongside an OPS delta. The two are added unweighted: with no evidence
+    that either predicts a hit better than the other, inventing a weighting would
+    be a free parameter tuned on nothing.
+    """
+    form = (b.get("form") or 0) / 100.0
+    bvp = b.get("bvp") or {}
+    pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
+    edge = ((ops - LEAGUE_OPS) * (pa / (pa + BVP_PRIOR))) if pa > 0 else 0.0
+    return form + edge
+
+
+def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     """Who is most likely to get a hit if this pick wins, and the conditions.
 
     The percentage is hit rate in the team's season WINS, with the hitter's
@@ -1395,17 +1441,22 @@ def _hit_lines(g: dict) -> list[str]:
     if not bats:
         return []
     sp = _surname(pc.get("opp_starter") or "") or "the starter"
-    out = ["     LIKELY HITS"]
+    who = _abbr_of(g, winner) if winner else "they"
+    out = [f"     LIKELY HITS (if {who} win{'s' if winner else ''})"]
     for b in bats:
         bits = [f"{b.get('player') or '?'}"]
         f = b.get("form")
         if f is not None:
-            bits.append(f"{f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
+            bits.append(f"form {f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
         bits.append(_bvp_bit(b.get("bvp"), sp))
         hr, ar = b.get("hit_rate"), b.get("all_rate")
-        bits.append(f"when they win {hr}%" + (f" (usually {ar}%)" if ar is not None else ""))
+        # spelled out rather than "(usually X%)", which read as a hedge on the
+        # first number instead of what it is: the same hitter across ALL games,
+        # which is the only thing that makes the wins figure meaningful
+        bits.append(f"hits in {hr}% of wins"
+                    + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
-    cond = _conditions(g)
+    cond = _contact_conditions(g, winner or _bet_side(pc)[0])
     if cond:
         out.append(f"       {cond}")
     return out
@@ -1432,28 +1483,119 @@ def _surname(name: str) -> str:
     return parts[-1] if parts else name
 
 
-def _conditions(g: dict) -> str:
-    """Park, weather, umpire and BvP - the context behind the hit read."""
-    bits = []
+# Wind, made park-relative. A compass string cannot say whether wind helps: a
+# south wind blows OUT in a park facing north and IN in one facing south. The
+# weather APIs report the direction wind comes FROM (met.no literally calls the
+# field wind_from_direction), so the direction it blows TOWARD is that plus 180,
+# and the component along the home-to-centre axis is the cosine of the angle
+# between them.
+#
+# Only STRONG alignment is reported. The bearing table is approximate, so
+# requiring the wind within ~60 degrees of the axis means a bearing wrong by
+# 20-30 degrees weakens the read rather than reversing it. Light wind is
+# ignored outright - 4 mph does not move a baseball whatever way it points.
+WIND_MIN_MPH = 8
+WIND_ALIGN = 0.5        # cos(60 degrees): how squarely the wind must run the axis
+
+
+def _wind_component(g: dict, park_team: str | None) -> tuple[str, float] | None:
+    """("out"|"in", strength 0-1) for tonight's wind, or None when unreadable."""
+    w = g.get("weather") or {}
+    if (w.get("roof") or "") == "closed":
+        return None
+    deg, mph = w.get("wind_deg"), w.get("wind_mph")
+    bearing = bearing_for(park_team) if park_team else None
+    if bearing is None or not isinstance(deg, (int, float)) \
+            or not isinstance(mph, (int, float)) or mph < WIND_MIN_MPH:
+        return None
+    import math
+    toward = (deg + 180) % 360                 # from-direction -> blowing-toward
+    comp = math.cos(math.radians(bearing - toward))
+    if abs(comp) < WIND_ALIGN:
+        return None                            # crosswind: says nothing
+    return ("out" if comp > 0 else "in", abs(comp))
+
+
+# Contact conditions. Weather on its own says nothing about hits - what matters
+# is whether the park, the umpire and the STARTER combine to put balls in play.
+# A hot night in a big park is irrelevant behind a 12 K/9 arm and a wide-zone
+# umpire, because the ball never gets hit.
+#
+# Wind is deliberately excluded. Turning a direction into "blowing out" needs
+# each park's orientation, which this repo does not have, and guessing would
+# manufacture a signal out of a compass reading.
+#
+# The thresholds below are conventional judgement calls, NOT fitted - nothing in
+# this project has shown contact conditions predict hits, so this is labelled
+# context and ranks nothing.
+PARK_HOT, PARK_COLD = 1.02, 0.98
+TEMP_HOT, TEMP_COLD = 80, 55
+UMP_K_LOOSE, UMP_K_TIGHT = -0.5, 0.5     # ump_tend.k_extra: Ks above/below average
+K9_CONTACT, K9_POWER = 7.5, 9.5
+
+
+def _contact_conditions(g: dict, hitting_team: str | None) -> str:
+    """Whether tonight favours the bat, from the things that decide contact.
+
+    `hitting_team` is the side whose hitters are being read, so the STARTER
+    considered is the one they face.
+    """
+    for_, against = [], []
     pf = g.get("park_factor")
     if isinstance(pf, (int, float)):
-        bits.append(f"park {pf:.2f}")
+        if pf >= PARK_HOT:
+            for_.append(f"park {pf:.2f}")
+        elif pf <= PARK_COLD:
+            against.append(f"park {pf:.2f}")
+
     w = g.get("weather") or {}
-    if isinstance(w.get("temp_f"), int):
-        wind = (f", wind {w['wind_mph']} {w.get('wind_dir') or ''}".rstrip()
-                if isinstance(w.get("wind_mph"), int) else "")
-        roof = f", {w['roof']}" if w.get("roof") else ""
-        bits.append(f"{w['temp_f']}°F{wind}{roof}")
-    ump, tend = g.get("umpire_hp"), g.get("ump_tend") or {}
-    if ump:
-        r = tend.get("r_pg")
-        bits.append(f"ump {_surname(ump)}"
-                    + (f" {r:.1f} R/g" if isinstance(r, (int, float)) else ""))
-    bvp = g.get("bvp") or {}
-    if bvp.get("edge_team") and isinstance(bvp.get("gap"), (int, float)):
-        tag = "" if bvp.get("meaningful") else " (thin)"
-        bits.append(f"BvP {_abbr_of(g, bvp['edge_team'])} +{bvp['gap']:.3f}{tag}")
-    return " · ".join(bits)
+    t, roof = w.get("temp_f"), (w.get("roof") or "")
+    if isinstance(t, int) and roof != "closed":     # a closed roof neutralises it
+        if t >= TEMP_HOT:
+            for_.append(f"{t}°F")
+        elif t <= TEMP_COLD:
+            against.append(f"{t}°F")
+
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    wind = _wind_component(g, home)            # the park is the home team's
+    if wind:
+        way, strength = wind
+        mph = (g.get("weather") or {}).get("wind_mph")
+        txt = f"wind {mph} mph {way}" + ("" if strength >= 0.8 else " (angled)")
+        (for_ if way == "out" else against).append(txt)
+
+    tend = g.get("ump_tend") or {}
+    ke, ump = tend.get("k_extra"), g.get("umpire_hp")
+    if isinstance(ke, (int, float)) and ump:
+        if ke <= UMP_K_LOOSE:
+            for_.append(f"ump {_surname(ump)} {ke:+.1f} K/g")
+        elif ke >= UMP_K_TIGHT:
+            against.append(f"ump {_surname(ump)} {ke:+.1f} K/g")
+
+    # the starter the hitting side actually faces
+    opp_side = "home" if hitting_team == away else "away" if hitting_team == home else None
+    sa = ((g.get("statistical_advantage") or {}).get(opp_side) or {}) if opp_side else {}
+    k9, name = sa.get("starter_k9"), sa.get("probable_pitcher")
+    if isinstance(k9, (int, float)) and name:
+        if k9 <= K9_CONTACT:
+            for_.append(f"{_surname(name)} {k9:.1f} K/9")
+        elif k9 >= K9_POWER:
+            against.append(f"{_surname(name)} {k9:.1f} K/9")
+
+    # A single mild factor is not a verdict - that is the whole point of
+    # combining them. One input alone gets "slightly"; the strong wording needs
+    # at least two pointing the same way with nothing pointing back.
+    if not for_ and not against:
+        return "contact conditions: neutral"
+    if for_ and not against:
+        lead = "FAVOUR THE BAT" if len(for_) >= 2 else "slightly favour the bat"
+        return f"contact conditions: {lead} — " + " · ".join(for_)
+    if against and not for_:
+        lead = ("AGAINST THE BAT" if len(against) >= 2
+                else "slightly against the bat")
+        return f"contact conditions: {lead} — " + " · ".join(against)
+    return ("contact conditions: mixed — for: " + " · ".join(for_)
+            + "  ·  against: " + " · ".join(against))
 
 
 def _abbr_of(g: dict, team: str) -> str:
@@ -1513,9 +1655,17 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
         out.append(f"👀 {gd['team']} {gd['odds']:+d} "
                    f"{'vs' if at_home else 'at'} {ha if not at_home else aa}"
                    f"  ·  favoured {gd['rate']:.0%} of its games{clash}")
-        line = good_dog.split_text(gd["team"], sp)
-        if line:
-            out.append(f"      {line}")
+        # BOTH teams' splits, labelled - the dog's record is only readable
+        # against the side it is facing
+        opp = away if at_home else home
+        for team, ab in ((gd["team"], ha if at_home else aa),
+                         (opp, aa if at_home else ha)):
+            line = good_dog.split_text(team, sp)
+            if line:
+                out.append(f"      {ab}  {line}")
+        # one extra space so the hit block nests under this watch entry rather
+        # than sitting at the same level as the 👀 line
+        out += [" " + x for x in _hit_lines(g, winner=gd["team"])]
     return out
 
 

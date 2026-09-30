@@ -9,7 +9,8 @@ is ALREADY inside the offense index (park_factors.py); this adds the day's
 conditions: temperature, wind speed/direction, and rain chance at first pitch.
 Roofed parks report their roof instead of wind.
 
-forecast_for(venue, iso_start) -> {temp_f, wind_mph, wind_dir, precip_pct, roof}
+forecast_for(venue, iso_start) -> {temp_f, wind_mph, wind_dir, wind_deg,
+precip_pct, roof}
 or None (fail soft - board just omits the line).
 """
 
@@ -105,6 +106,9 @@ def _open_meteo(lat: float, lon: float, start: dt.datetime) -> dict:
         "temp_f": round(h["temperature_2m"][idx]),
         "wind_mph": round(h["wind_speed_10m"][idx]),
         "wind_dir": _compass(h["wind_direction_10m"][idx]),
+        # raw degrees kept alongside the compass string: the 16-point rose
+        # throws away up to 11 degrees, and an out/in read needs the angle
+        "wind_deg": round(h["wind_direction_10m"][idx]),
         "precip_pct": int(h["precipitation_probability"][idx] or 0),
     }
 
@@ -130,6 +134,7 @@ def _met_norway(lat: float, lon: float, start: dt.datetime) -> dict:
         "temp_f": round(inst["air_temperature"] * 9 / 5 + 32),
         "wind_mph": round(inst["wind_speed"] * 2.23694),
         "wind_dir": _compass(inst.get("wind_from_direction", 0)),
+        "wind_deg": round(inst.get("wind_from_direction", 0)),
         "precip_pct": int(precip or 0),
     }
 
