@@ -1383,10 +1383,15 @@ def _pick_line(g: dict, sp: dict | None = None) -> str:
     # watch list carries, on the bet itself. `applies` marks which of the two
     # numbers tonight's price puts in play.
     if sp:
+        # both sides, same as the watch list: the bet team's record only reads
+        # against the side it is facing
         applies = "fav" if isinstance(ml, int) and ml < 0 else "dog"
-        txt = good_dog.split_text(bet_team, sp, applies)
-        if txt:
-            lines.append(f"     {txt}")
+        opp = home if bet_team == away else away
+        for team, ab, mark in ((bet_team, ha if at_home else aa, applies),
+                               (opp, aa if at_home else ha, None)):
+            txt = good_dog.split_text(team, sp, mark)
+            if txt:
+                lines.append(f"     {ab}  {txt}")
     lines += _hit_lines(g)
     return "\n".join(lines)
 
