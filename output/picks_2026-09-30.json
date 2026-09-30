@@ -1,6 +1,6 @@
 {
   "date": "2026-09-30",
-  "generated_at": "2026-09-30T16:32:55.231524+00:00",
+  "generated_at": "2026-09-30T16:42:14.795051+00:00",
   "games": [
     {
       "game_pk": 849841,
@@ -114,13 +114,13 @@
           },
           "forum": {
             "pick": "Atlanta Braves",
-            "home": 40,
+            "home": 41,
             "away": 20
           },
           "agree": false,
-          "forum_lean": 0.333,
+          "forum_lean": 0.344,
           "consensus_lean": -0.1,
-          "blended_lean": 0.028,
+          "blended_lean": 0.032,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -187,7 +187,7 @@
         "line": "flat",
         "money": "against public",
         "money_side": "away",
-        "money_pct": 53
+        "money_pct": 54
       },
       "bvp": {
         "home_eff": 0.765,
@@ -267,12 +267,12 @@
         "majority": {
           "team": "Atlanta Braves",
           "consensus_pct": 45.0,
-          "moneyline": "-105"
+          "moneyline": "-104"
         },
         "non_majority": {
           "team": "Philadelphia Phillies",
           "consensus_pct": 55.0,
-          "moneyline": "-115"
+          "moneyline": "-122"
         }
       },
       "consistency": {
@@ -437,7 +437,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.028,
+            "blended_lean": 0.032,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -476,8 +476,8 @@
           "bet": "Atlanta Braves",
           "odds": 102,
           "basis": "money %",
-          "hold_home": 354200,
-          "hold_away": 63913
+          "hold_home": 495600,
+          "hold_away": -66957
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -704,18 +704,18 @@
         }
       },
       "public_majority": {
-        "team": "Houston Astros",
+        "team": "Chicago White Sox",
         "detail": {
           "consensus": null,
           "forum": {
             "pick": "Chicago White Sox",
-            "home": 16,
-            "away": 19
+            "home": 13,
+            "away": 22
           },
           "agree": null,
-          "forum_lean": -0.086,
+          "forum_lean": -0.257,
           "consensus_lean": null,
-          "blended_lean": 0.038,
+          "blended_lean": -0.051,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -742,28 +742,30 @@
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 2,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "2/3 sources agree (forum differ)",
-        "flags": [],
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (scoresodds_bets, polymarket_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "home",
         "money_pct": 53
       },
@@ -990,12 +992,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved with the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Houston Astros",
-        "public_edge": false,
-        "public_trusted": true,
+        "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.536,
+        "confidence": 0.544,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1004,8 +1006,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.038,
-            "strength": 0.0,
+            "blended_lean": -0.051,
+            "strength": 0.017,
             "weight": 0.45
           },
           "consistency": {
@@ -1026,16 +1028,20 @@
         },
         "form_edge": null,
         "form_gap": 0.0,
-        "sharp_money": false,
+        "sharp_money": true,
         "sp_dog_edge": -0.149,
         "pitching_dog": false,
-        "signals_hit": 3,
+        "signals_hit": 4,
+        "public_pct_against": 49,
+        "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
-          "side": null,
+          "side": "Houston Astros",
           "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Houston Astros",
@@ -1057,7 +1063,7 @@
           "win_prob": 61.7,
           "fair_american": -161
         },
-        "line_vs_money": "with",
+        "line_vs_money": "against",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": [],
@@ -1067,11 +1073,11 @@
       "pick": null,
       "game_datetime": "2026-09-30T21:00:00Z",
       "weather": {
-        "temp_f": 89,
-        "wind_mph": 12,
-        "wind_dir": "SE",
-        "wind_deg": 138,
-        "precip_pct": 0,
+        "temp_f": 91,
+        "wind_mph": 11,
+        "wind_dir": "SSE",
+        "wind_deg": 152,
+        "precip_pct": 4,
         "roof": "retract"
       },
       "umpire_hp": null,
@@ -1100,7 +1106,7 @@
       "statistical_advantage": {
         "team": "New York Yankees",
         "home_score": 0.3491411111111112,
-        "away_score": 0.04462,
+        "away_score": 0.03370000000000001,
         "home": {
           "name": "New York Yankees",
           "probable_pitcher": "Max Fried",
@@ -1202,13 +1208,13 @@
           },
           "forum": {
             "pick": "Boston Red Sox",
-            "home": 15,
-            "away": 18
+            "home": 20,
+            "away": 22
           },
           "agree": false,
-          "forum_lean": -0.091,
+          "forum_lean": -0.048,
           "consensus_lean": 0.22,
-          "blended_lean": 0.122,
+          "blended_lean": 0.14,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1343,12 +1349,12 @@
         "majority": {
           "team": "New York Yankees",
           "consensus_pct": 61.0,
-          "moneyline": "-137"
+          "moneyline": "-150"
         },
         "non_majority": {
           "team": "Boston Red Sox",
           "consensus_pct": 39.0,
-          "moneyline": "+114"
+          "moneyline": "+125"
         }
       },
       "consistency": {
@@ -1504,16 +1510,16 @@
         "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.419,
+        "confidence": 0.434,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.305,
-            "strength": 0.761,
+            "margin": 0.315,
+            "strength": 0.789,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.122,
+            "blended_lean": 0.14,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1563,8 +1569,8 @@
           "vs_book": "same"
         },
         "projected": {
-          "win_prob": 59.2,
-          "fair_american": -145
+          "win_prob": 59.5,
+          "fair_american": -147
         },
         "line_vs_money": "flat",
         "bet_team": null,
@@ -1648,10 +1654,10 @@
       "pick": null,
       "game_datetime": "2026-10-01T00:00:00Z",
       "weather": {
-        "temp_f": 63,
-        "wind_mph": 2,
-        "wind_dir": "SE",
-        "wind_deg": 135,
+        "temp_f": 65,
+        "wind_mph": 6,
+        "wind_dir": "SSW",
+        "wind_deg": 192,
         "precip_pct": 0,
         "roof": "open"
       },
@@ -1680,8 +1686,8 @@
       "park_factor": 0.96,
       "statistical_advantage": {
         "team": "San Diego Padres",
-        "home_score": 0.36306000000000005,
-        "away_score": 0.1549,
+        "home_score": 0.3597,
+        "away_score": 0.15658000000000002,
         "home": {
           "name": "San Diego Padres",
           "probable_pitcher": "Nick Pivetta",
@@ -1777,19 +1783,19 @@
           "consensus": {
             "pick": "Sd",
             "pcts": {
-              "Chc": 39.0,
-              "Sd": 61.0
+              "Chc": 38.0,
+              "Sd": 62.0
             }
           },
           "forum": {
             "pick": "San Diego Padres",
-            "home": 24,
+            "home": 25,
             "away": 12
           },
           "agree": true,
-          "forum_lean": 0.333,
-          "consensus_lean": 0.22,
-          "blended_lean": 0.298,
+          "forum_lean": 0.351,
+          "consensus_lean": 0.24,
+          "blended_lean": 0.31,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1923,13 +1929,13 @@
       "betting_lines": {
         "majority": {
           "team": "San Diego Padres",
-          "consensus_pct": 61.0,
-          "moneyline": "-145"
+          "consensus_pct": 62.0,
+          "moneyline": "-137"
         },
         "non_majority": {
           "team": "Chicago Cubs",
-          "consensus_pct": 39.0,
-          "moneyline": "+122"
+          "consensus_pct": 38.0,
+          "moneyline": "+126"
         }
       },
       "consistency": {
@@ -2080,21 +2086,21 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved with the money \u2014 no price discount, no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "San Diego Padres",
         "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.286,
+        "confidence": 0.279,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.208,
-            "strength": 0.52,
+            "margin": 0.203,
+            "strength": 0.508,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.298,
+            "blended_lean": 0.31,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -2104,14 +2110,14 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -140,
+        "advantage_moneyline": -135,
         "opponent_moneyline": 125,
         "line_check": {
           "open": -132,
-          "current": -140,
-          "implied_shift": 0.014,
+          "current": -135,
+          "implied_shift": 0.006,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-132\u2192-140, +1.4%)",
+          "reason": "only a slight move our way, below the 2% signal floor (-132\u2192-135, +0.6%)",
           "pinny_morning": -141
         },
         "form_edge": true,
@@ -2131,7 +2137,7 @@
           "bet": "Chicago Cubs",
           "odds": 125,
           "basis": "money %",
-          "hold_home": -1280000,
+          "hold_home": -1407778,
           "hold_away": 2117500
         },
         "play": "stay_away",
@@ -2141,14 +2147,14 @@
         "pm_quote": {
           "pm_pct": 56,
           "pm_american": -127,
-          "edge_pts": 2.3,
+          "edge_pts": 1.4,
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 56.2,
-          "fair_american": -129
+          "win_prob": 56.1,
+          "fair_american": -128
         },
-        "line_vs_money": "with",
+        "line_vs_money": "flat",
         "bet_team": null,
         "bet_moneyline": null,
         "good_dog": {
@@ -2229,10 +2235,10 @@
       "pick": null,
       "game_datetime": "2026-10-01T02:00:00Z",
       "weather": {
-        "temp_f": 72,
+        "temp_f": 69,
         "wind_mph": 3,
         "wind_dir": "SSW",
-        "wind_deg": 199,
+        "wind_deg": 210,
         "precip_pct": 0,
         "roof": "open"
       },
