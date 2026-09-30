@@ -176,14 +176,23 @@ def slate_lines() -> list[dict]:
         seen.add((abbr[0], abbr[1]))
         out.append({"away_abbr": abbr[0], "home_abbr": abbr[1],
                     "away_open": ao, "home_open": ho,
-                    # NEVER substitute the opening price for a missing current
-                    # one. It makes current == open, which reads as "the line
-                    # hasn't moved" and is indistinguishable from a real flat
-                    # line - so a transient parse failure withdrew a qualifying
-                    # pick and the fade rule bet the other side (2026-09-29,
-                    # BOS@NYY: -128 -> "-139" -> -124 in fifty minutes).
-                    "away_current": ca,
-                    "home_current": ch})
+                    # A missing current price still falls back to the opening
+                    # one, because `*_current` is also the board's PRICE source
+                    # (main sets advantage_moneyline from it) and a game with no
+                    # price cannot be evaluated or displayed at all.
+                    #
+                    # But the fallback is FLAGGED, because a substituted price
+                    # makes current == open, which reads as "the line hasn't
+                    # moved" and is indistinguishable from a real flat line.
+                    # That is how a parse failure withdrew a qualifying pick and
+                    # handed the fade rule the other side on 2026-09-29
+                    # (BOS@NYY: -128 -> "-139" -> -124 in fifty minutes).
+                    # line_confirms() reads the flag and reports "unknown"
+                    # instead of computing a zero shift.
+                    "away_current": ca if ca is not None else ao,
+                    "home_current": ch if ch is not None else ho,
+                    "away_current_stale": ca is None,
+                    "home_current_stale": ch is None})
     log.info("slate: parsed %d game line(s) from the odds page", len(out))
     return out
 

@@ -615,6 +615,12 @@ def line_confirms(side: str, lm: dict | None) -> tuple[bool | None, dict]:
     Returns (confirms, detail). confirms is None when the line is unavailable."""
     if not lm or lm.get(f"{side}_open") is None or lm.get(f"{side}_current") is None:
         return None, {"status": "unknown", "reason": "no line data"}
+    if lm.get(f"{side}_current_stale"):
+        # the current price is the OPENING price standing in for one that could
+        # not be parsed. It is fine as a price and useless as a movement read:
+        # the shift would be exactly zero and look like a line that held.
+        return None, {"status": "unknown",
+                      "reason": "current line unavailable — movement unknown"}
     o, c = lm[f"{side}_open"], lm[f"{side}_current"]
     shift = round(_implied(c) - _implied(o), 3)
     arrow = f"{o:+d}→{c:+d}"
