@@ -46,7 +46,26 @@ def dates_for(player_id: int, season: int, game_type: str | None) -> list[str]:
     return sorted(out)
 
 
-def build(player_id: int, name: str, season: int) -> str:
+def team_dates(team_id: int, season: int, game_type: str | None) -> dict:
+    """{group: [dates]} from the TEAM gameLog endpoint, which is a different
+    endpoint with a different parameter set - it must be checked separately
+    before anything relies on gameType working there."""
+    kw = {"stats": "gameLog", "group": "hitting,pitching", "season": season}
+    if game_type:
+        kw["gameType"] = game_type
+    try:
+        data = mlb_api._get(f"teams/{team_id}/stats", **kw)
+    except Exception as exc:
+        return {"ERROR": [str(exc)]}
+    out: dict = {}
+    for st in data.get("stats", []):
+        grp = st.get("group", {}).get("displayName", "?")
+        out.setdefault(grp, []).extend(
+            sp.get("date") for sp in st.get("splits", []) if sp.get("date"))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def build(player_id: int, name: str, season: int, team_id: int = 0) -> str:
     md = [f"# gameLog probe — {name} ({player_id}), {season}", "",
           "_Does the hitting gameLog include postseason games?_", ""]
     for label, gt in (("no gameType (what props._game_log sends)", None),
@@ -57,6 +76,20 @@ def build(player_id: int, name: str, season: int) -> str:
         md += [f"## {label}", "",
                f"- games returned: **{len(ds)}**",
                f"- last 6: {' · '.join(ds[-6:]) if ds else '—'}", ""]
+    if team_id:
+        md += ["# TEAM gameLog endpoint", "",
+               "_Different endpoint. The advantage metric's last-5 wOBA/ISO/FIP "
+               "comes through here, so gameType must be confirmed to work before "
+               "anything depends on it._", ""]
+        for label, gt in (("no gameType (what _team_gamelog sends)", None),
+                          ("gameType=R", "R"), ("gameType=P", "P"),
+                          ("gameType=R,P", "R,P")):
+            res = team_dates(team_id, season, gt)
+            md += [f"## team: {label}", ""]
+            for grp, ds in res.items():
+                md.append(f"- **{grp}**: {len(ds)} game(s), last 4: "
+                          f"{' · '.join(ds[-4:]) if ds else '—'}")
+            md.append("")
     return "\n".join(md)
 
 
@@ -73,7 +106,8 @@ def main() -> None:
     if not a.player:
         print("pass --player <mlb id>")
         return
-    md = build(a.player, a.name, a.season)
+    md = build(a.player, a.name, a.season,
+               int(os.environ.get("PROBE_TEAM") or 0))
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "gamelog_probe.md").write_text(md)
     print(md)
