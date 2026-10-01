@@ -321,7 +321,10 @@ def _full_gamelog(player_id: int, group: str, season: int) -> list[dict]:
     Caching lets the backtest reuse one fetch across every as-of date."""
     key = (player_id, group, season)
     if key not in _GAMELOG_CACHE:
-        data = _get(f"people/{player_id}/stats", stats="gameLog", group=group, season=season)
+        # gameType="R,P" - without it the log ends with the regular season, so
+        # the last-5 stats behind the advantage metric freeze every October.
+        data = _get(f"people/{player_id}/stats", stats="gameLog", group=group,
+                    season=season, gameType="R,P")
         splits: list[dict] = []
         for s in data.get("stats", []):
             splits.extend(s.get("splits", []))
@@ -594,17 +597,31 @@ def _team_gamelog(team_id: int, season: int) -> tuple[list[dict], dict[str, dict
     """(hitting splits, pitching-by-date) for a team-season, fetched once & cached."""
     key = (team_id, season)
     if key not in _TEAM_GAMELOG_CACHE:
-        data = _get(f"teams/{team_id}/stats", stats="gameLog",
-                    group="hitting,pitching", season=season)
         hit_splits: list[dict] = []
         pit_by_date: dict[str, dict] = {}
-        for s in data.get("stats", []):
-            grp = s.get("group", {}).get("displayName", "")
-            for sp in s.get("splits", []):
-                if grp == "hitting":
-                    hit_splits.append(sp)
-                elif grp == "pitching":
-                    pit_by_date[sp.get("date", "")] = sp
+        # TWO calls, not gameType="R,P". Unlike the player endpoint, this one
+        # IGNORES the comma list: probed 2026-10-01, teams/144 returned 162 games
+        # ending 09-27 for no gameType, for R, AND for "R,P", while P alone
+        # returned the 2 postseason games. Sending only "R,P" here would look
+        # fixed and silently keep dropping October.
+        for gt in ("R", "P"):
+            try:
+                data = _get(f"teams/{team_id}/stats", stats="gameLog",
+                            group="hitting,pitching", season=season, gameType=gt)
+            except Exception as exc:
+                # a missing postseason is normal for 28 teams; never let it cost
+                # the regular season we already have
+                log.warning("team gamelog %s gameType=%s failed: %s",
+                            team_id, gt, exc)
+                continue
+            for s in data.get("stats", []):
+                grp = s.get("group", {}).get("displayName", "")
+                for sp in s.get("splits", []):
+                    if grp == "hitting":
+                        hit_splits.append(sp)
+                    elif grp == "pitching":
+                        pit_by_date[sp.get("date", "")] = sp
+        hit_splits.sort(key=lambda sp: sp.get("date", ""))
         _TEAM_GAMELOG_CACHE[key] = (hit_splits, pit_by_date)
     return _TEAM_GAMELOG_CACHE[key]
 

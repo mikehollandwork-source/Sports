@@ -61,8 +61,13 @@ def _game_log(player_id: int, season: int) -> list:
         return _LOG_CACHE[key]
     splits: list = []
     try:
+        # gameType="R,P" or the log stops at the end of the REGULAR SEASON.
+        # Probed 2026-10-01: no gameType and gameType=R both returned 162 games
+        # ending 09-27; P returned the 2 postseason games; R,P returned all 164.
+        # Without this every form number freezes once October starts - Albies read
+        # 0-for-2 on "the last game" when he had gone 1-for-4 two days later.
         data = mlb_api._get(f"people/{player_id}/stats", stats="gameLog",
-                            group="hitting", season=season)
+                            group="hitting", season=season, gameType="R,P")
         for s in (data.get("stats") or [{}])[0].get("splits", []) or []:
             splits.append(s)
     except Exception as exc:
