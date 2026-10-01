@@ -16,21 +16,21 @@ _Both lineups against the opposing starter, and the full price record. Read-only
 
 | bat | form (last 5) | vs this SP | hits in wins | in all games |
 |---|---|---|---|---|
-| Bryce Harper 🔥 | +17% | 1.000 OPS in 3 PA (shrunk 0.748) | 7100% | 6300% |
-| Bryson Stott 🔥 | +16% | 0.000 OPS in 2 PA (shrunk 0.645) | 6700% | 6400% |
-| Edmundo Sosa | -11% | 0.666 OPS in 3 PA (shrunk 0.704) | 7000% | 5100% |
-| J.T. Realmuto | -31% | 0.000 OPS in 2 PA (shrunk 0.645) | 5600% | 5100% |
-| Alec Bohm | -41% | 0.000 OPS in 3 PA (shrunk 0.617) | 7300% | 6100% |
+| Bryce Harper 🔥 | +17% | 1.000 OPS in 3 PA (shrunk 0.748) | 71% | 63% |
+| Bryson Stott 🔥 | +16% | 0.000 OPS in 2 PA (shrunk 0.645) | 67% | 64% |
+| Edmundo Sosa | -11% | 0.666 OPS in 3 PA (shrunk 0.704) | 70% | 51% |
+| J.T. Realmuto | -31% | 0.000 OPS in 2 PA (shrunk 0.645) | 56% | 51% |
+| Alec Bohm | -41% | 0.000 OPS in 3 PA (shrunk 0.617) | 73% | 61% |
 
 **Atlanta Braves** vs Aaron Nola
 
 | bat | form (last 5) | vs this SP | hits in wins | in all games |
 |---|---|---|---|---|
-| Mauricio Dubón | +11% | 0.696 OPS in 15 PA (shrunk 0.704) | 6900% | 6900% |
-| Ha-Seong Kim | -7% | 0.533 OPS in 6 PA (shrunk 0.669) | 4800% | 2700% |
-| Drake Baldwin | -11% | 0.955 OPS in 12 PA (shrunk 0.802) | 7100% | 7100% |
-| Austin Riley | -13% | 1.163 OPS in 68 PA (shrunk 1.060) | 6200% | 5300% |
-| Matt Olson | -29% | 1.075 OPS in 48 PA (shrunk 0.968) | 7700% | 6900% |
+| Mauricio Dubón | +11% | 0.696 OPS in 15 PA (shrunk 0.704) | 69% | 69% |
+| Ha-Seong Kim | -7% | 0.533 OPS in 6 PA (shrunk 0.669) | 48% | 27% |
+| Drake Baldwin | -11% | 0.955 OPS in 12 PA (shrunk 0.802) | 71% | 71% |
+| Austin Riley | -13% | 1.163 OPS in 68 PA (shrunk 1.060) | 62% | 53% |
+| Matt Olson | -29% | 1.075 OPS in 48 PA (shrunk 0.968) | 77% | 69% |
 
 ### Line movement
 
