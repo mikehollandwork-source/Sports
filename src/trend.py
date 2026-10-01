@@ -34,6 +34,7 @@ log = logging.getLogger("trend")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 WINDOW = 3
 LONG_WINDOW = props.RECENT_GAMES      # the board's own window, for contrast
+AUDIT_GAMES = 8        # dated games printed raw, so the window is checkable
 
 
 def _f(st: dict, key: str) -> float:
@@ -76,9 +77,13 @@ def _games_before(player_id: int, season: int, date: str) -> list[dict]:
     return [{**st, "_date": d} for d, st in rows]
 
 
-def _line(g: dict) -> str:
+def _line(g: dict, with_date: bool = True) -> str:
+    """'09-30 0-2 2B' - the date is NOT optional detail. Without it a per-game
+    line cannot be checked against what actually happened, which is exactly the
+    gap that made the first version of this report unverifiable."""
     h, ab = int(_f(g, "hits")), int(_f(g, "atBats"))
-    bits = f"{h}-{ab}"
+    d = (g.get("_date") or "")[5:]
+    bits = (f"{d} " if with_date and d else "") + f"{h}-{ab}"
     for key, tag in (("doubles", "2B"), ("triples", "3B"), ("homeRuns", "HR"),
                      ("baseOnBalls", "BB")):
         n = int(_f(g, key))
@@ -113,17 +118,18 @@ def build(team_name: str, date: str, window: int = WINDOW) -> str:
     rows = []
     for p in bats:
         logs = _games_before(p.player_id, season, date)
+        audit = [_line(g) for g in logs[-AUDIT_GAMES:]]
         if len(logs) < window:
-            rows.append({"name": p.name, "thin": len(logs)})
+            rows.append({"name": p.name, "thin": len(logs), "audit": audit})
             continue
         short = _slash(logs[-window:])
         longw = _slash(logs[-LONG_WINDOW:]) if len(logs) >= LONG_WINDOW else None
         allg = _slash(logs)
         if not short or not allg:
-            rows.append({"name": p.name, "thin": len(logs)})
+            rows.append({"name": p.name, "thin": len(logs), "audit": audit})
             continue
         rows.append({"name": p.name, "short": short, "long": longw, "all": allg,
-                     "delta": short["ops"] - allg["ops"],
+                     "delta": short["ops"] - allg["ops"], "audit": audit,
                      "per_game": [_line(g) for g in logs[-window:]]})
     ranked = sorted([r for r in rows if "delta" in r], key=lambda r: -r["delta"])
 
@@ -141,6 +147,14 @@ def build(team_name: str, date: str, window: int = WINDOW) -> str:
     if thin:
         md += [f"_Too few games logged to window ({window} needed): "
                + ", ".join(thin) + "._", ""]
+    md += ["## The raw log these numbers come from", "",
+           f"_Last {AUDIT_GAMES} dated games per hitter, newest last. The window "
+           f"above is the final {window}. Check any row against the box score._",
+           "", "| hitter | games (oldest → newest) |", "|---|---|"]
+    for r in sorted(rows, key=lambda x: x["name"]):
+        md.append(f"| {r['name']} | {' · '.join(r.get('audit') or []) or '—'} |")
+    md.append("")
+
     up = [r for r in ranked if r["delta"] > 0.050]
     md += ["## Trending up", ""]
     if up:
