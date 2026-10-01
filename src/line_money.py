@@ -112,8 +112,11 @@ def record(before: str) -> dict:
     money" - a claim about the condition, not about the rule's leftovers - so
     excluding the overlap would measure something else.
 
-    Days are cached once fully final, for the same reason good_dog.splits does
-    it: a board built mid-afternoon must not freeze the day half-graded.
+    A day is cached once every TAGGED game in it is final, so a board built
+    mid-afternoon cannot freeze the day half-graded. Deliberately narrower than
+    good_dog.splits, which waits for the whole slate: an untagged game that never
+    finals - a postponement - is nothing to grade here and must not stall a day
+    that is otherwise complete.
 
     Fails soft - an unfetchable date is skipped, so the board prints without the
     record rather than not printing.
@@ -139,16 +142,17 @@ def record(before: str) -> dict:
         except Exception as exc:
             log.warning("record: results unavailable for %s (%s)", date, exc)
             continue
-        if not res or not all(v.get("final") for v in res.values()):
-            continue                               # don't freeze a half-played day
         rows = []
         for g, t in tagged:
             r = res.get(g.get("game_pk")) or {}
             w = r.get("winner")
             if not r.get("final") or not w:
-                continue
+                rows = None                        # don't freeze a half-graded day
+                break
             rows.append({"won": w == t["team"], "odds": t["odds"],
                          "strong": t["strong"]})
+        if rows is None:
+            continue
         days[date] = rows
         dirty = True
     if dirty:
