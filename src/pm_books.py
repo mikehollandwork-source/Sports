@@ -211,13 +211,31 @@ def run(date: str | None = None) -> int:
         ref = _implied(ml) if ml is not None else None
         start = str(g.get("game_datetime", ""))
         pregame = True
+        start_ok = False
         try:
             st = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
             pregame = now < int(st.timestamp())
+            start_ok = True
         except Exception:
             pass
 
         entry = day["games"].get(pk)
+        # A game's start time can MOVE after it was first logged - a postseason
+        # slot change, a rain reschedule. The entry is created once and the two
+        # creation sites below stamp `start` into it, so without this refresh the
+        # log keeps the ORIGINAL time for the rest of the day.
+        #
+        # That matters because `consensus._freeze_ts` reads THIS field to decide
+        # where the series stops being evidence. A stale LATER time puts the
+        # freeze after first pitch and re-admits the look-ahead that cost
+        # +9.9% against -5.0% on 714 games; a stale EARLIER one throws away
+        # legitimate pre-lock readings. Observed live on 2026-10-01: PHI @ ATL
+        # moved from 18:00Z to 00:00Z and the log held 18:00Z all day.
+        #
+        # Only overwritten when the new value actually parses, so a feed hiccup
+        # returning "" or junk cannot wipe a good timestamp.
+        if entry is not None and start_ok:
+            entry["game_datetime"] = start
         book = None
         if entry is None or not entry.get("token"):
             if index is None:
