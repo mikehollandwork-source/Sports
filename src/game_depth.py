@@ -96,9 +96,13 @@ def _bats_block(gm, is_home: bool, date: str) -> list[str]:
     # hit well, so every regular looks good there.
     for b in sorted(ranked, key=lambda x: -(x.get("form") or 0))[:TOP_BATS]:
         hot = " 🔥" if b.get("super_hot") else ""
-        out.append(f"| {b['player']}{hot} | {b.get('form', 0):+.0f}% | "
-                   f"{_bvp_text(b.get('bvp'))} | {b.get('hit_rate', 0):.0%} | "
-                   f"{b.get('all_rate', 0):.0%} |")
+        # hit_rate / all_rate are already 0-100 (props.py rounds rate * 100),
+        # so they take a plain %, not a percent format.
+        hr, ar = b.get("hit_rate"), b.get("all_rate")
+        out.append(f"| {b['player']}{hot} | {b.get('form') or 0:+.0f}% | "
+                   f"{_bvp_text(b.get('bvp'))} | "
+                   f"{f'{hr:.0f}%' if isinstance(hr, (int, float)) else '—'} | "
+                   f"{f'{ar:.0f}%' if isinstance(ar, (int, float)) else '—'} |")
     return out + [""]
 
 
