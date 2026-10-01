@@ -266,14 +266,30 @@ def run(date: str | None = None) -> int:
                          "play": grade._play(g) == "pick", "ref": ref,
                          "game_datetime": start, "readings": []}
                 day["games"][pk] = entry
+        # A stored ticker is never re-resolved, so one captured wrong stays wrong
+        # for the rest of the day. The ticker carries its own start, so it can be
+        # checked here for free - no extra API call - and dropped if it belongs to
+        # a different game, letting the normal path below re-resolve it.
+        kt_have = entry.get("k_ticker")
+        if kt_have and start_ok:
+            kt_start = kalshi.event_start(kt_have)
+            if kt_start is not None and abs(kt_start - st) > kalshi.EVENT_TOL:
+                log.warning("%s: stored kalshi ticker %s starts %s, game starts "
+                            "%s - dropping it", g.get("matchup"), kt_have,
+                            kt_start.isoformat(), start)
+                entry.pop("k_ticker", None)
         if not entry.get("k_ticker"):
             if kindex is None:
-                kindex = kalshi.game_markets()
+                kindex = kalshi.game_market_index()
             # kalshi's index is keyed by CANONICAL abbrs (from the ticker); our
             # a_ab/h_ab come from _name_abbr, so canonicalize before matching.
             ca, ch = _canon_abbr(a_ab or ""), _canon_abbr(h_ab or "")
             cadv, copp = _canon_abbr(adv_ab or ""), _canon_abbr(opp_ab or "")
-            pair = kindex.get((ca, ch)) if ca and ch else None
+            # resolved with THIS game's start: a pair can have several open
+            # events (tonight's and last night's, still open until it settles,
+            # or both halves of a doubleheader) and the pair alone cannot tell
+            # them apart. See kalshi.pick.
+            pair = kalshi.pick(kindex, ca, ch, start) if ca and ch else None
             kt = (pair or {}).get(cadv)
             if kt:
                 kb = kalshi.top_of_book(kt)

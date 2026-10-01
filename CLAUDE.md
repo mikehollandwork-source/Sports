@@ -139,6 +139,17 @@ unit-testable with mock `Game`/`Team` objects.
   re-create the selection bias the tags exist to escape. `line_money.SHIPPED`
   marks where forward evidence starts; boards before it are the selection data
   and are deliberately excluded from the tag's record.
+- **Kalshi markets are chosen per GAME, not per team pair** (`kalshi.game_market_index`
+  + `kalshi.pick`). A pair can have several OPEN events at once — tonight's game and
+  last night's, which Kalshi leaves open until it settles, or both halves of a
+  doubleheader — so the old pair-keyed index kept whichever paginated last. That put
+  the wrong event on 97 logged entries, and 38 of 100 such entries opened on an
+  already-DECIDED market (mid ≤ 0.05 or ≥ 0.95) against 0 of 704 correct ones. The
+  ticker carries its own start in EASTERN time (`kalshi.event_start`), so validity is
+  checkable offline. **Those 97 entries are marked `k_ticker_stale: true` and their
+  `k_readings` must be skipped — the readings are another game's and cannot be
+  repaired.** Affects `venue_signal`, `venue_cross`, `venue_swap`, `best_execution`,
+  `signal_sweep2`, `triple_check`; none of them filters on the flag yet.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`

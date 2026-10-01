@@ -14,11 +14,14 @@ run (set KALSHI_DEBUG=1 to dump raw JSON) and everything fails soft.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -60,6 +63,45 @@ def _abbr(ticker: str) -> str | None:
     return _canon_abbr(tail) if tail else None
 
 
+_ET = ZoneInfo("America/New_York")
+_MONTHS = {m: i + 1 for i, m in enumerate(
+    ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT",
+     "NOV", "DEC"])}
+_START_RE = re.compile(r"^[A-Z]+-(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})")
+EVENT_TOL = dt.timedelta(minutes=90)
+
+
+def event_start(ticker: str) -> dt.datetime | None:
+    """First pitch encoded in a ticker, as UTC.
+
+    'KXMLBGAME-26SEP242140HOUATH-HOU' -> 2026-09-25 01:40Z. The clock is
+    EASTERN, not UTC: read as ET, 704 of 804 logged tickers match their game's
+    start to the minute; read as UTC, none of them do.
+
+    None when the ticker does not carry a parseable date, so a caller can tell
+    "cannot check" apart from "does not match".
+    """
+    m = _START_RE.match((ticker or "").upper())
+    if not m:
+        return None
+    yy, mon, dd, hh, mi = m.groups()
+    try:
+        return dt.datetime(2000 + int(yy), _MONTHS[mon], int(dd), int(hh),
+                           int(mi), tzinfo=_ET).astimezone(dt.timezone.utc)
+    except (KeyError, ValueError):
+        return None
+
+
+def _as_utc(iso: str | None) -> dt.datetime | None:
+    if not isinstance(iso, str) or not iso:
+        return None
+    try:
+        d = dt.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+
+
 def _book(m: dict) -> dict:
     """Top-of-book for a market row: YES bid/ask (dollars, 0-1) + sizes, straight
     off the market object. Empty book -> {'empty': True}."""
@@ -74,11 +116,20 @@ def _book(m: dict) -> dict:
     return out
 
 
-def game_markets(series: str | None = None) -> dict:
-    """{(abbr1, abbr2): {abbr: ticker}} for OPEN game markets in a series, keyed
-    in both orders (a game's two 'TEAM wins' markets share an event_ticker).
-    Caches each market row's inline prices for same-tick reads via
-    top_of_book(). Defaults to MLB so existing callers are unaffected."""
+def game_market_index(series: str | None = None) -> dict:
+    """{(abbr1, abbr2): [{"start": utc datetime|None, "tickers": {abbr: ticker}}]}
+    for every OPEN game market in a series, keyed in both orders.
+
+    Every open event is kept, because a team pair can legitimately have more than
+    one: tonight's game and last night's (Kalshi leaves a game open until it
+    settles), or both halves of a doubleheader. Collapsing them is what the
+    pair-keyed index used to do, and it kept whichever paginated last - 100 of 804
+    logged tickers pointed at the wrong event, and 38 of those opened on an
+    already-decided market against 0 of the 704 correct ones.
+
+    Caches each market row's inline prices for same-tick reads via top_of_book().
+    Use `pick()` to choose the event for a particular game.
+    """
     series = series or SERIES
     global _MARKET_CACHE
     _MARKET_CACHE = {}
@@ -107,14 +158,78 @@ def game_markets(series: str | None = None) -> dict:
         if not cursor or not mkts:
             break
         time.sleep(0.2)
+
     index: dict = {}
     for tick_by_team in events.values():
-        abbrs = list(tick_by_team)
-        if len(abbrs) == 2:
-            index[(abbrs[0], abbrs[1])] = tick_by_team
-            index[(abbrs[1], abbrs[0])] = tick_by_team
-    log.info("kalshi[%s]: %d open game market pair(s)", series, len(index) // 2)
+        abbrs = sorted(tick_by_team)
+        if len(abbrs) != 2:
+            continue
+        cand = {"start": next((event_start(t) for t in tick_by_team.values()
+                               if event_start(t)), None),
+                "tickers": tick_by_team}
+        for key in ((abbrs[0], abbrs[1]), (abbrs[1], abbrs[0])):
+            index.setdefault(key, []).append(cand)
+    multi = sum(1 for v in index.values() if len(v) > 1) // 2
+    log.info("kalshi[%s]: %d open game pair(s), %d with several open events",
+             series, len(index) // 2, multi)
     return index
+
+
+def pick(index: dict, a: str, b: str, start: str | None = None,
+         tol: dt.timedelta = EVENT_TOL) -> dict | None:
+    """{abbr: ticker} for the (a, b) event matching `start`, else None.
+
+    A pair with ONE open event needs no start and is returned as-is. With several,
+    the event starting within `tol` of `start` wins; if `start` is missing or
+    matches none of them the answer is None, NOT a guess. Reading the wrong
+    game's market is silently wrong - 38 of 100 such readings in this project's
+    logs opened on an already-decided market - and no reading at all is
+    recoverable.
+    """
+    cands = (index or {}).get((a, b)) or []
+    if not cands:
+        return None
+    if len(cands) == 1:
+        return cands[0]["tickers"]
+    want = _as_utc(start)
+    if want is None:
+        log.warning("kalshi: %s/%s has %d open events and no start given",
+                    a, b, len(cands))
+        return None
+    near = [(abs(c["start"] - want), c) for c in cands
+            if c["start"] is not None and abs(c["start"] - want) <= tol]
+    if not near:
+        log.warning("kalshi: %s/%s has %d open events, none within %s of %s",
+                    a, b, len(cands), tol, start)
+        return None
+    return min(near, key=lambda x: x[0])[1]["tickers"]
+
+
+def game_markets(series: str | None = None,
+                 tol: dt.timedelta = EVENT_TOL) -> dict:
+    """{(abbr1, abbr2): {abbr: ticker}} - the flat, one-event-per-pair view.
+
+    Kept for callers that only need a lookup by team pair. It CANNOT represent a
+    doubleheader (two games, one pair, one key), so anything logging per game
+    should use game_market_index() + pick() with that game's own start.
+
+    A pair with several open events is OMITTED rather than guessed at, so a
+    caller that cannot say which game it means gets nothing instead of the wrong
+    market.
+    """
+    index = game_market_index(series)
+    flat: dict = {}
+    dropped = 0
+    for key, cands in index.items():
+        got = pick(index, key[0], key[1], None, tol)
+        if got is None:
+            dropped += 1
+            continue
+        flat[key] = got
+    if dropped:
+        log.info("kalshi: %d ambiguous pair key(s) omitted from the flat index",
+                 dropped)
+    return flat
 
 
 _MARKET_CACHE: dict = {}

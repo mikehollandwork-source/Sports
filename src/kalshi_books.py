@@ -62,7 +62,7 @@ def run(date: str | None = None) -> int:
     except ValueError:
         return 0
     try:
-        markets = kalshi.game_markets()
+        markets = kalshi.game_market_index()
     except Exception as exc:
         log.warning("kalshi markets fetch failed: %s", exc)
         return 0
@@ -85,7 +85,8 @@ def run(date: str | None = None) -> int:
         aa, ha = _canon_abbr(g.get("away_abbr") or ""), _canon_abbr(g.get("home_abbr") or "")
         if not aa or not ha:
             continue
-        pair = markets.get((aa, ha))
+        # resolved with this game's start - see kalshi.pick
+        pair = kalshi.pick(markets, aa, ha, g.get("game_datetime"))
         if not pair:
             missed.append((aa, ha))
             continue

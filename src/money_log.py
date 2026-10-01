@@ -97,7 +97,7 @@ def run(date: str | None = None) -> int:
         return 0
 
     try:
-        kmarkets = kalshi.game_markets()
+        kmarkets = kalshi.game_market_index()
     except Exception as exc:
         log.warning("kalshi markets failed: %s", exc)
         kmarkets = {}
@@ -131,7 +131,8 @@ def run(date: str | None = None) -> int:
             "kalshi": {}, "pm": {}, "readings": [],
         })
 
-        ktick = kmarkets.get((aa, ha)) or {}
+        # resolved with this game's start - see kalshi.pick
+        ktick = kalshi.pick(kmarkets, aa, ha, g.get("game_datetime")) or {}
         if ktick:
             entry["kalshi"] = {"away_ticker": ktick.get(aa), "home_ticker": ktick.get(ha)}
         ptok = pindex.get((aa, ha)) or {}
