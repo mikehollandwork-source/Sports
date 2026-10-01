@@ -1,0 +1,49 @@
+name: gameLog probe
+
+# Does the hitting gameLog return postseason games? Read-only diagnostic.
+on:
+  workflow_dispatch:
+    inputs:
+      player:
+        description: "MLB player id"
+        required: true
+      name:
+        description: "Player name (label only)"
+        required: false
+      season:
+        description: "Season (default 2026)"
+        required: false
+        default: "2026"
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
+        env:
+          PROBE_PLAYER: ${{ github.event.inputs.player }}
+          PROBE_NAME: ${{ github.event.inputs.name }}
+          PROBE_SEASON: ${{ github.event.inputs.season }}
+        run: python -m src.gamelog_probe
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/gamelog_probe.md
+          if ! git diff --staged --quiet; then
+            git commit -m "gameLog probe ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
