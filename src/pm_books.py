@@ -278,6 +278,11 @@ def run(date: str | None = None) -> int:
                             "%s - dropping it", g.get("matchup"), kt_have,
                             kt_start.isoformat(), start)
                 entry.pop("k_ticker", None)
+                # the readings already collected under it are another game's.
+                # Flag rather than delete - destroying data is worse than marking
+                # it - so consumers can skip them. See CLAUDE.md.
+                if entry.get("k_readings"):
+                    entry["k_ticker_stale"] = True
         if not entry.get("k_ticker"):
             if kindex is None:
                 kindex = kalshi.game_market_index()

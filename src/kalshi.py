@@ -179,30 +179,41 @@ def pick(index: dict, a: str, b: str, start: str | None = None,
          tol: dt.timedelta = EVENT_TOL) -> dict | None:
     """{abbr: ticker} for the (a, b) event matching `start`, else None.
 
-    A pair with ONE open event needs no start and is returned as-is. With several,
-    the event starting within `tol` of `start` wins; if `start` is missing or
-    matches none of them the answer is None, NOT a guess. Reading the wrong
-    game's market is silently wrong - 38 of 100 such readings in this project's
-    logs opened on an already-decided market - and no reading at all is
+    Whenever `start` is given it is CHECKED, even if the pair has only one open
+    event. A lone event 6h from the game is not this game's market, and returning
+    it is the whole bug: it also silently undid pm_books' drop of a stale stored
+    ticker, re-admitting it on the same poll.
+
+    Without a `start`, a single event is returned (nothing to check it against)
+    and several are refused. An event whose own start cannot be parsed cannot be
+    checked either, so it is returned rather than discarded.
+
+    None means "no market I can confirm belongs to this game" - never a guess.
+    Reading the wrong game's market is silently wrong: 38 of 100 such readings in
+    this project's logs opened on an already-decided market. No reading at all is
     recoverable.
     """
     cands = (index or {}).get((a, b)) or []
     if not cands:
         return None
-    if len(cands) == 1:
-        return cands[0]["tickers"]
     want = _as_utc(start)
     if want is None:
+        if len(cands) == 1:
+            return cands[0]["tickers"]
         log.warning("kalshi: %s/%s has %d open events and no start given",
                     a, b, len(cands))
         return None
+    # an unparseable event start cannot be checked - keep it rather than lose it
+    unchecked = [c for c in cands if c["start"] is None]
     near = [(abs(c["start"] - want), c) for c in cands
             if c["start"] is not None and abs(c["start"] - want) <= tol]
-    if not near:
-        log.warning("kalshi: %s/%s has %d open events, none within %s of %s",
-                    a, b, len(cands), tol, start)
-        return None
-    return min(near, key=lambda x: x[0])[1]["tickers"]
+    if near:
+        return min(near, key=lambda x: x[0])[1]["tickers"]
+    if unchecked:
+        return unchecked[0]["tickers"]
+    log.warning("kalshi: %s/%s has %d open event(s), none within %s of %s - "
+                "no market confirmed for this game", a, b, len(cands), tol, start)
+    return None
 
 
 def game_markets(series: str | None = None,
