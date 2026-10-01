@@ -48,7 +48,7 @@ import statistics as st
 import subprocess
 from pathlib import Path
 
-from . import good_dog, grade, mlb_api
+from . import good_dog, grade, line_money, mlb_api
 
 log = logging.getLogger("record_audit")
 
@@ -244,6 +244,53 @@ def good_dog_guard() -> list[str]:
                        else f"**FAIL — {leaks} watch-only good dog(s) were "
                             "booked. That is a record error, not a reporting one."))
     return out + [""]
+
+def line_money_guard() -> list[str]:
+    """Assert that watch-only line-against-the-money games never reach the record.
+
+    Same invariant as `good_dog_guard`, same reason to check it in the data
+    rather than trust the reading: the tag is labelled "NOT BETS" and nothing in
+    grade.py, pick_watch.py or announce.py reads it, but the tag fires on 18% of
+    board games, so a leak would be large rather than marginal.
+
+    Scoped to boards from line_money.SHIPPED on. Earlier boards are the data the
+    candidate was selected over, and plenty of their games were legitimately
+    picked by the consensus rule on the same side the tag would now flag - those
+    are not leaks, and reporting them would make the guard noise.
+    """
+    try:
+        led = json.loads((OUTPUT_DIR / "ledger.json").read_text())
+        entries = led["plays"]["entries"]
+    except (OSError, ValueError, KeyError):
+        return ["- _ledger unreadable; guard skipped._", ""]
+    booked = {(e["date"], e.get("matchup"), e.get("bet")) for e in entries}
+
+    watch = leaks = 0
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        date = Path(f).stem.split("picks_")[1]
+        if date < line_money.SHIPPED:
+            continue
+        try:
+            day = json.loads(Path(f).read_text())
+        except (OSError, ValueError):
+            continue
+        for g in day.get("games", []):
+            pc = g.get("pick_criteria") or {}
+            tag = pc.get("line_money") or line_money.tag(g)
+            if not tag or pc.get("play") == "pick":
+                continue          # a play in this game is the rule's, not the tag's
+            watch += 1
+            if (date, g.get("matchup"), tag["team"]) in booked:
+                leaks += 1
+    out = ["## Guard: watch-only line-vs-money games stay out of the record", "",
+           f"_Boards from {line_money.SHIPPED} on, when the tag shipped._", "",
+           f"- watch-only tagged games on those boards: **{watch}**",
+           f"- of those, present in the ledger: **{leaks}**"]
+    out.append("- " + ("**PASS** — none of them is in the record" if leaks == 0
+                       else f"**FAIL — {leaks} watch-only tagged game(s) were "
+                            "booked. That is a record error, not a reporting one."))
+    return out + [""]
+
 
 def build() -> str:
     rows = collect()
@@ -456,6 +503,7 @@ def build() -> str:
     drift = [r for r in kept if isinstance(r.get("final_odds"), int)
              and r["final_odds"] != r["first_odds"]]
     md += good_dog_guard()
+    md += line_money_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "

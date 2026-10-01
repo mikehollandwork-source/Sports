@@ -132,6 +132,13 @@ unit-testable with mock `Game`/`Team` objects.
   change the flagged pick. `team_last5_gamelog` supplies the per-game data.
 - Match the existing defensive style: degrade gracefully on network/parse errors;
   never let one game's failure abort the whole run.
+- **Watch tags (`good_dog.py`, `line_money.py`) change no pick and must stay out
+  of the ledger.** `record_audit` asserts the invariant for both. Their
+  thresholds are PRE-REGISTERED (`FAV_RATE`; `MOVE_MIN` and `STRONG`) and must
+  not be re-tuned against the forward record they are accumulating — that would
+  re-create the selection bias the tags exist to escape. `line_money.SHIPPED`
+  marks where forward evidence starts; boards before it are the selection data
+  and are deliberately excluded from the tag's record.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`

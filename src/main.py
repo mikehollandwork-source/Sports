@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import good_dog, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import good_dog, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -157,6 +157,17 @@ def run(date: str) -> dict:
             (r.setdefault("pick_criteria", {}))["good_dog"] = good_dog.tag(r, dog_rates)
     except Exception as exc:                     # never let a tag break a board
         log.warning("good-dog tag failed: %s", exc)
+
+    # LINE-AGAINST-THE-MONEY TAG: the price moved away from where the dollars
+    # are. Reporting only - it changes no pick. It is the one candidate with a
+    # mechanism that survived a walk-forward (6/8 blocks, median +10.2%), but its
+    # 95% CI spans zero and the cell was selected over this same data, so only
+    # games played from here on can settle it. See src/line_money.py.
+    for r in results:
+        try:
+            (r.setdefault("pick_criteria", {}))["line_money"] = line_money.tag(r)
+        except Exception as exc:                 # never let a tag break a board
+            log.warning("line-money tag failed on %s: %s", r.get("game_pk"), exc)
 
     # Lock games that have already started: a started game keeps the pick/lean
     # status and the odds it had at first pitch (the closing line), so later polls
@@ -1740,6 +1751,54 @@ def _good_dog_lines(board: list, picks: list) -> list[str]:
     return out
 
 
+def _line_money_record() -> dict:
+    """The tag's own forward record. Never raises - it costs a line, not the board."""
+    try:
+        return line_money.record(dt.datetime.now(EASTERN).date().isoformat())
+    except Exception as exc:
+        log.warning("line-money record unavailable: %s", exc)
+        return {"all": [0, 0, 0.0], "strong": [0, 0, 0.0]}
+
+
+def _line_money_lines(board: list, picks: list) -> list[str]:
+    """Tonight's line-against-the-money games that are NOT plays, as a watch list.
+
+    Worded so it cannot be mistaken for a bet. Its 95% CI runs -4.8 to +25.5 and
+    the cell was selected over the same data it was measured on, so these are
+    labelled and left alone to accumulate. A game already being played is skipped
+    for the same reason good dogs are - it is a bet, not a thing being watched.
+    """
+    bet_teams = {(_bet_side(g["pick_criteria"]) or (None,))[0] for g in picks}
+    pick_pks = {g.get("game_pk") for g in picks}
+    out = []
+    for g in board:
+        lm = (g.get("pick_criteria") or {}).get("line_money") or {}
+        if not lm or lm.get("team") in bet_teams:
+            continue
+        aa, ha = _abbrs(g)
+        at_home = lm["team"] == g["matchup"].split(" @ ")[1]
+        # There are only two sides, so the line moved toward the opponent named
+        # on this same line - "the other way" says it without repeating them.
+        # The flagged side is also the OTHER side of any play in this game, and
+        # saying so beats printing two opposing teams as if they were two picks.
+        clash = ("  ·  ⚠ opposes tonight's play — the rule and the tag disagree"
+                 if g.get("game_pk") in pick_pks else "")
+        # The two tags are independent questions that can land on the same side.
+        # When they have, the good-dog block above already carries this team's
+        # history, so say they agree instead of reprinting it.
+        gd = (g.get("pick_criteria") or {}).get("good_dog") or {}
+        dup = gd.get("team") == lm["team"]
+        out.append(f"👁 {lm['team']} {lm['odds']:+d} "
+                   f"{'vs' if at_home else 'at'} {aa if at_home else ha}"
+                   f"  ·  price moved {lm['move']:.1%} the other way"
+                   f"{' (big)' if lm.get('strong') else ''}{clash}"
+                   f"{'  ·  same side as the good-dog tag above' if dup else ''}")
+        wp = "" if dup else _when_picked(lm["team"])
+        if wp:
+            out.append(f"      when we pick {_short(g, lm['team'])}: {wp}")
+    return out
+
+
 def _telegram_records_lines() -> list[str]:
     """Day/Week/Month/YTD records per book plus the all-time combined row, laid
     out one window per line."""
@@ -1788,10 +1847,19 @@ def telegram_text(payload: dict) -> str:
         L.append("No plays on the board.")
 
     dogs = _good_dog_lines(board, picks)
-    if dogs:
+    money = _line_money_lines(board, picks)
+    if dogs or money:
         L += ["", "👀 WATCHING — NOT BETS", "",
-              "Usually-favoured teams priced as dogs tonight. Tracking only —",
-              "do not bet these.", ""] + dogs
+              "Open questions the backtest could not close. Tracking only —",
+              "do not bet these."]
+        if dogs:
+            L += ["", "Usually-favoured teams priced as dogs tonight:", ""] + dogs
+        if money:
+            L += ["", "Line moved against the money — flagged side is the money:",
+                  ""] + money
+            rt = line_money.record_text(_line_money_record())
+            if rt:
+                L.append(f"      {rt}")
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)
