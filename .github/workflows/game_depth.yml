@@ -1,0 +1,44 @@
+name: Game depth
+
+# Both lineups against the opposing starter, and the full price record, for every
+# game on a date's board. Read-only: changes no pick and writes no ledger entry.
+# The board itself only computes the hot-bat block for one side (the play, or the
+# watch-listed good dog), so this is the two-sided read.
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Board date (YYYY-MM-DD). Blank = today, US/Eastern."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  depth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run
+        env:
+          PICKS_DATE: ${{ github.event.inputs.date }}
+        run: python -m src.game_depth
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/game_depth.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Game depth ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
