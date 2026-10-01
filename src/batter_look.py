@@ -23,7 +23,7 @@ import os
 from pathlib import Path
 
 from . import analysis, mlb_api
-from .mlb_api import lineup, schedule_for
+from .mlb_api import lineup, probable_hands, schedule_for
 
 log = logging.getLogger("batter_look")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
@@ -104,6 +104,14 @@ def build(player: str, date: str) -> str:
         return "\n".join(md + [f"{player} is not in a posted lineup on {date}.", ""])
     gm, is_home, team, p = found
     opp = gm.away if is_home else gm.home
+    # schedule_for does NOT fill the probable pitchers' throwing hand, so without
+    # this the hand reads "?" and - worse - the vs-hand lookup silently misses,
+    # leaving the "two put together" blend as the raw exact line while claiming a
+    # weight that was never applied.
+    try:
+        probable_hands(gm)
+    except Exception as exc:
+        log.warning("probable hands unavailable: %s", exc)
     sp = opp.probable_pitcher
     md += [f"- **{team.name}** {'vs' if is_home else 'at'} {opp.name}",
            f"- he bats **{HAND_NAME.get(p.hand, p.hand or '?')}**"]
@@ -128,7 +136,8 @@ def build(player: str, date: str) -> str:
     else:
         md += ["- never faced him", ""]
 
-    md += [f"## Against {HAND_NAME.get(sp.hand, '?')} pitching this season", ""]
+    hand_label = HAND_NAME.get(sp.hand) or "unknown-handed"
+    md += [f"## Against {hand_label} pitching this season", ""]
     for hand in ("R", "L"):
         st = hands.get(hand)
         tag = "  ← tonight" if hand == (sp.hand or "") else ""
@@ -151,14 +160,23 @@ def build(player: str, date: str) -> str:
     except (TypeError, ValueError):
         h_ops, h_pa = None, 0
     eff, eff_pa = analysis._bvp_effective(ex_ops, ex_pa, h_ops, h_pa)
-    if eff is not None:
-        w = ex_pa / (ex_pa + analysis.BVP_SHRINK_PA) if ex_pa else 0.0
-        md += ["## The two put together", "",
-               f"- shrunk expectation **{eff:.3f} OPS** over {eff_pa} PA, using "
+    md += ["## The two put together", ""]
+    if eff is None:
+        md += ["- neither sample is readable, so there is nothing to blend.", ""]
+    elif h_ops is None or not ex_pa:
+        # say so rather than print a weight that was not applied
+        md += [f"- **{eff:.3f} OPS** over {eff_pa} PA — but this is ONE sample, "
+               "not a blend: "
+               + ("the vs-hand split is missing (starter's hand unknown?)"
+                  if h_ops is None else "he has never faced this pitcher") + ".", ""]
+    else:
+        w = ex_pa / (ex_pa + analysis.BVP_SHRINK_PA)
+        md += [f"- shrunk expectation **{eff:.3f} OPS** over {eff_pa} PA, using "
                f"`analysis._bvp_effective` - the board's own method",
                f"- the exact line carries **{w:.0%}** of that "
                f"({ex_pa} PA against a {analysis.BVP_SHRINK_PA}-PA half-weight "
-               f"point); the vs-hand split carries the rest", ""]
+               f"point); the vs-hand split carries the remaining "
+               f"**{1-w:.0%}**", ""]
     return "\n".join(md + [""])
 
 
