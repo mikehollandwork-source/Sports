@@ -1408,12 +1408,32 @@ def _ml_str(pc: dict) -> str:
     return f" ({ml:+d})" if isinstance(ml, int) else ""
 
 
+# Scan markers on a team's own when-picked record. The BAR IS NOT FITTED to our
+# results: +/-10% is about two units of bookmaker hold, i.e. the margin at which a
+# record is doing something other than paying the vig. Picking the cut by eye off
+# our own table is how this project produced three thresholds that flattered a
+# candidate, so it is derived from market structure instead.
+#
+# These mark HISTORY, not skill. A permutation test shuffling which team each
+# settled bet belonged to puts the spread of per-team ROI at p = 0.10 (n >= 8),
+# 0.20 (n >= 10) and 0.015 (n >= 5) - significant at exactly one of three cuts,
+# which is noise with a threshold attached. So a star does not mean the team is a
+# better bet; it means we have won money on it so far.
+PICK_REC_MIN = 8          # same bar good_dog uses before it will show a split
+PICK_REC_HOT = 0.10
+PICK_REC_COLD = -0.10
+
+
 def _when_picked(team: str | None) -> str:
-    """'when we pick BOS: 20-3 · +59.7%', or '' when we never have.
+    """'20-3 · +59.7% ⭐', or '' when we never have. Callers add the label.
 
     History, not a signal. It is on the board so a pick arrives with its own
     track record rather than looking like a fresh idea, and so a team we have
     been repeatedly wrong about is visible at the moment of betting it.
+
+    The star/ice is a scan aid on that same number, shown only once there are
+    PICK_REC_MIN picks. Below that the record still prints unmarked - a thin
+    sample is worth reading, just not worth flagging.
     """
     if not team:
         return ""
@@ -1421,7 +1441,11 @@ def _when_picked(team: str | None) -> str:
     if not rec:
         return ""
     w, l, roi = rec
-    return f"{w}-{l} · {roi:+.1%}"
+    mark = ""
+    if w + l >= PICK_REC_MIN:
+        mark = (" ⭐" if roi >= PICK_REC_HOT else
+                " 🧊" if roi <= PICK_REC_COLD else "")
+    return f"{w}-{l} · {roi:+.1%}{mark}"
 
 
 def _pick_line(g: dict, sp: dict | None = None) -> str:
@@ -1860,6 +1884,15 @@ def telegram_text(payload: dict) -> str:
             rt = line_money.record_text(_line_money_record())
             if rt:
                 L.append(f"      {rt}")
+    # Legend, printed only when a marker actually appears above - an unexplained
+    # emoji is worse than none, and a legend for symbols that are not on tonight's
+    # board is clutter.
+    if any("⭐" in x or "🧊" in x for x in L):
+        L += ["", f"⭐ we are up more than {PICK_REC_HOT:.0%} betting this team  ·  "
+                  f"🧊 down more than {-PICK_REC_COLD:.0%}",
+              f"   (our own record on it, {PICK_REC_MIN}+ picks. History, not a "
+              "forecast — team-by-team", "   differences here are not "
+              "distinguishable from luck.)"]
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)
