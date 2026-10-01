@@ -1,0 +1,45 @@
+name: Batter look
+
+# One hitter: his line vs tonight's starter, his splits vs that starter's hand,
+# and the shrunk blend of the two. Read-only.
+on:
+  workflow_dispatch:
+    inputs:
+      player:
+        description: "Player name (substring match against the posted lineup)"
+        required: true
+      date:
+        description: "Board date (YYYY-MM-DD). Blank = today, US/Eastern."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
+        env:
+          LOOK_PLAYER: ${{ github.event.inputs.player }}
+          PICKS_DATE: ${{ github.event.inputs.date }}
+        run: python -m src.batter_look
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/batter_look.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Batter look ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
