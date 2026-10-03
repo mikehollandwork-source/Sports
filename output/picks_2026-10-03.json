@@ -1,6 +1,6 @@
 {
   "date": "2026-10-03",
-  "generated_at": "2026-10-03T04:06:00.578942+00:00",
+  "generated_at": "2026-10-03T05:05:29.124815+00:00",
   "games": [
     {
       "game_pk": 849829,
@@ -103,18 +103,18 @@
         }
       },
       "public_majority": {
-        "team": "Cleveland Guardians",
+        "team": "Chicago White Sox",
         "detail": {
           "consensus": null,
           "forum": {
-            "pick": "Cleveland Guardians",
+            "pick": "Chicago White Sox",
             "home": 4,
-            "away": 4
+            "away": 5
           },
           "agree": null,
-          "forum_lean": 0.0,
+          "forum_lean": -0.111,
           "consensus_lean": null,
-          "blended_lean": 0.085,
+          "blended_lean": -0.028,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -129,9 +129,9 @@
               "lean": 0.15
             },
             "vsin_bets": {
-              "away": 49,
-              "home": 51,
-              "lean": 0.02
+              "away": 50,
+              "home": 50,
+              "lean": 0.0
             }
           }
         }
@@ -139,25 +139,32 @@
       "public_check": {
         "sources": [
           {
+            "name": "forum",
+            "side": "away",
+            "agrees": true
+          },
+          {
             "name": "vsin_bets",
-            "side": "home",
+            "side": "away",
             "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
+        "majority_side": "away",
         "agree": 2,
-        "dissent": 0,
+        "dissent": 1,
         "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 2 sources agree on the public side",
-        "flags": [],
+        "verdict": "mostly agrees",
+        "note": "2/3 sources agree (polymarket_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "home",
         "money_pct": 52
       },
@@ -384,12 +391,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Chicago White Sox",
-        "public_edge": true,
+        "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.056,
+        "confidence": 0.018,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -398,8 +405,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.085,
-            "strength": 0.085,
+            "blended_lean": -0.028,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -423,13 +430,14 @@
         "sp_dog_edge": 0.71,
         "pitching_dog": true,
         "signals_hit": 3,
-        "public_pct_against": 53,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Cleveland Guardians",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Cleveland Guardians",
@@ -439,8 +447,10 @@
           "hold_away": -694400
         },
         "play": "stay_away",
-        "stay_bet": null,
-        "stay_odds": null,
+        "starred": [],
+        "stance_warning": "book's informed money is on Cleveland Guardians",
+        "win_prob": 75,
+        "win_driver": "bvp + consistency",
         "pm_quote": {
           "pm_pct": 42,
           "pm_american": 138,
@@ -454,7 +464,6 @@
         "line_vs_money": "flat",
         "bet_team": null,
         "bet_moneyline": null,
-        "starred": [],
         "good_dog": null,
         "line_money": null
       },
@@ -463,9 +472,9 @@
       "game_datetime": "2026-10-03T17:00:00Z",
       "weather": {
         "temp_f": 64,
-        "wind_mph": 6,
+        "wind_mph": 7,
         "wind_dir": "NE",
-        "wind_deg": 50,
+        "wind_deg": 45,
         "precip_pct": 0,
         "roof": "open"
       },
@@ -710,7 +719,7 @@
         "non_majority": {
           "team": "Atlanta Braves",
           "consensus_pct": 37.0,
-          "moneyline": "+178"
+          "moneyline": "+185"
         }
       },
       "consistency": {
@@ -1272,12 +1281,12 @@
         "majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 55.0,
-          "moneyline": "-129"
+          "moneyline": "-137"
         },
         "non_majority": {
           "team": "New York Yankees",
           "consensus_pct": 45.0,
-          "moneyline": "+120"
+          "moneyline": "+114"
         }
       },
       "consistency": {
@@ -1581,7 +1590,7 @@
         "wind_mph": 4,
         "wind_dir": "WSW",
         "wind_deg": 247,
-        "precip_pct": 35,
+        "precip_pct": 25,
         "roof": "dome"
       },
       "umpire_hp": null,
@@ -1839,12 +1848,12 @@
         "majority": {
           "team": "Milwaukee Brewers",
           "consensus_pct": 61.0,
-          "moneyline": "-200"
+          "moneyline": "-208"
         },
         "non_majority": {
           "team": "San Diego Padres",
           "consensus_pct": 39.0,
-          "moneyline": "+165"
+          "moneyline": "+166"
         }
       },
       "consistency": {
@@ -2019,14 +2028,14 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": -204,
-        "opponent_moneyline": 167,
+        "advantage_moneyline": -203,
+        "opponent_moneyline": 166,
         "line_check": {
           "open": -227,
-          "current": -204,
-          "implied_shift": -0.023,
+          "current": -203,
+          "implied_shift": -0.024,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-227\u2192-204, -2.3%)"
+          "reason": "line moved away from the pick (-227\u2192-203, -2.4%)"
         },
         "form_edge": false,
         "form_gap": -0.054,
@@ -2045,10 +2054,10 @@
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": -204,
+          "odds": -203,
           "basis": "ticket %",
-          "hold_home": 915033,
-          "hold_away": -787500
+          "hold_home": 905172,
+          "hold_away": -758333
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -2056,7 +2065,7 @@
         "pm_quote": {
           "pm_pct": 64,
           "pm_american": -178,
-          "edge_pts": 3.1,
+          "edge_pts": 3.0,
           "vs_book": "better"
         },
         "projected": {
@@ -2070,7 +2079,7 @@
         "good_dog": {
           "team": "San Diego Padres",
           "rate": 0.624,
-          "odds": 167
+          "odds": 166
         },
         "line_money": null,
         "opp_starter": "Jacob Misiorowski",
