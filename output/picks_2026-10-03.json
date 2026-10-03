@@ -1,6 +1,6 @@
 {
   "date": "2026-10-03",
-  "generated_at": "2026-10-03T19:46:48.640087+00:00",
+  "generated_at": "2026-10-03T20:03:39.712051+00:00",
   "games": [
     {
       "game_pk": 849829,
@@ -512,7 +512,7 @@
           "losses": 45
         }
       },
-      "state": "live"
+      "state": "final"
     },
     {
       "game_pk": 849828,
@@ -1245,7 +1245,7 @@
         }
       },
       "public_majority": {
-        "team": "New York Yankees",
+        "team": "Tampa Bay Rays",
         "detail": {
           "consensus": {
             "pick": "Tb",
@@ -1255,14 +1255,14 @@
             }
           },
           "forum": {
-            "pick": "New York Yankees",
-            "home": 10,
-            "away": 13
+            "pick": "Tampa Bay Rays",
+            "home": 15,
+            "away": 14
           },
-          "agree": false,
-          "forum_lean": -0.13,
+          "agree": true,
+          "forum_lean": 0.034,
           "consensus_lean": 0.12,
-          "blended_lean": -0.023,
+          "blended_lean": 0.045,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1289,33 +1289,35 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "forum",
-            "side": "away",
+            "side": "home",
             "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "away",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           }
         ],
-        "majority_side": "away",
-        "agree": 2,
-        "dissent": 2,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (covers, polymarket_bets differ)",
-        "flags": [],
+        "majority_side": "home",
+        "agree": 3,
+        "dissent": 1,
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "3/4 sources agree (scoresodds_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "away",
         "money_pct": 59
       },
@@ -1395,14 +1397,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "New York Yankees",
-          "consensus_pct": 44.0,
-          "moneyline": "+105"
-        },
-        "non_majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 56.0,
-          "moneyline": "-150"
+          "moneyline": "-147"
+        },
+        "non_majority": {
+          "team": "New York Yankees",
+          "consensus_pct": 44.0,
+          "moneyline": "+114"
         }
       },
       "consistency": {
@@ -1553,12 +1555,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Tampa Bay Rays",
-        "public_edge": true,
-        "public_trusted": false,
+        "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.278,
+        "confidence": 0.273,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -1567,8 +1569,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.023,
-            "strength": 0.011,
+            "blended_lean": 0.045,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -1597,13 +1599,14 @@
         "sp_dog_edge": 1.112,
         "pitching_dog": false,
         "signals_hit": 3,
-        "public_pct_against": 50,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "New York Yankees",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Tampa Bay Rays",
@@ -1748,7 +1751,7 @@
         "temp_f": 87,
         "wind_mph": 6,
         "wind_dir": "SW",
-        "wind_deg": 233,
+        "wind_deg": 219,
         "precip_pct": 16,
         "roof": "dome"
       },
@@ -1886,13 +1889,13 @@
           },
           "forum": {
             "pick": "Milwaukee Brewers",
-            "home": 6,
-            "away": 6
+            "home": 11,
+            "away": 9
           },
-          "agree": null,
-          "forum_lean": 0.0,
+          "agree": true,
+          "forum_lean": 0.1,
           "consensus_lean": 0.24,
-          "blended_lean": 0.34,
+          "blended_lean": 0.24,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1922,6 +1925,11 @@
             "agrees": true
           },
           {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "scoresodds_bets",
             "side": "home",
             "agrees": true
@@ -1933,11 +1941,11 @@
           }
         ],
         "majority_side": "home",
-        "agree": 3,
+        "agree": 4,
         "dissent": 0,
         "trusted": true,
         "verdict": "corroborated",
-        "note": "all 3 sources agree on the public side",
+        "note": "all 4 sources agree on the public side",
         "flags": [],
         "line": "flat",
         "money": "with public",
@@ -2022,12 +2030,12 @@
         "majority": {
           "team": "Milwaukee Brewers",
           "consensus_pct": 62.0,
-          "moneyline": "-210"
+          "moneyline": "-215"
         },
         "non_majority": {
           "team": "San Diego Padres",
           "consensus_pct": 38.0,
-          "moneyline": "+175"
+          "moneyline": "+170"
         }
       },
       "consistency": {
@@ -2192,7 +2200,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.34,
+            "blended_lean": 0.24,
             "strength": 0.0,
             "weight": 0.45
           },
