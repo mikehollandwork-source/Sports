@@ -20,6 +20,7 @@ Writes output/prop_markets.md.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import statistics as st
@@ -47,12 +48,39 @@ CANDIDATES = [
 ]
 
 
+def _upcoming_pairs(date: str) -> list[tuple[str, str]]:
+    """(away, home) for board games that have NOT started."""
+    try:
+        board = json.loads(
+            (OUTPUT_DIR / f"picks_{date}.json").read_text())
+    except (OSError, ValueError):
+        return []
+    out = []
+    for g in board.get("games", []):
+        m = g.get("matchup") or ""
+        if g.get("state") == "upcoming" and " @ " in m:
+            a, h = m.split(" @ ")
+            out.append((a, h))
+    return out
+
+
 def probe(date: str, markets: list[str]) -> tuple[str, dict]:
-    """(event label, {market: [{player, point, side, price}]}) for one event."""
+    """(event label, {market: [...]}) for one UPCOMING event.
+
+    It must be upcoming. The first run of this probe took evs[0], the earliest
+    event, which had been live for two hours - so Over 0.5 hits came back at
+    +208 instead of the -200 that market actually prices pre-game, because the
+    hitters had at-bats behind them. In-game prices answer a different question
+    entirely.
+    """
     evs = prop_odds._events(date)
     if not evs:
         return "", {}
-    ev = evs[0]
+    pairs = _upcoming_pairs(date)
+    ev = next((e for e in evs if (e["away"], e["home"]) in pairs), None)
+    if ev is None:
+        log.warning("no upcoming event matched the board; not spending credits")
+        return "", {}
     label = f"{ev['away']} @ {ev['home']}"
     data = prop_odds._get(f"/events/{ev['id']}/odds", regions="us",
                           markets=",".join(markets), oddsFormat="american")
@@ -84,8 +112,10 @@ def build(date: str) -> str:
                                "cannot probe. Nothing was spent.", ""])
     label, found = probe(date, CANDIDATES)
     if not label:
-        return "\n".join(md + ["No events listed for this date.", ""])
-    md += [f"- event probed: **{label}**", ""]
+        return "\n".join(md + ["No UPCOMING event matched the board, so nothing "
+                               "was probed and no credits were spent.", ""])
+    md += [f"- event probed: **{label}** (upcoming — in-game prices "
+           "would answer a different question)", ""]
     if "batter_hits" not in found:
         md += ["⚠ **The control market `batter_hits` came back empty**, so treat "
                "every 'not quoted' below as unproven - the probe may be at "
