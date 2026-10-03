@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import batter_look, good_dog, hitter_type, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -270,7 +270,16 @@ def run(date: str) -> dict:
                 # Stamped so the prop ledger stays separable: entries before this
                 # were chosen by hit-rate-in-wins, which is a different population.
                 prop["selector"] = PROP_SELECTOR
-                r["pick_criteria"]["prop"] = prop
+                # The gate applies to a POSTED prop, i.e. a play. A good-dog
+                # watch entry's hit block is context, not a bet, so it is left
+                # alone - it is already labelled NOT A BET.
+                held = _prop_withheld(prop, r) if _play(r) == "pick" else None
+                if held:
+                    r["pick_criteria"]["prop_withheld"] = held
+                    log.info("prop withheld on %s: %s", r.get("game_pk"),
+                             held["reason"])
+                else:
+                    r["pick_criteria"]["prop"] = prop
                 for b in scored:
                     b["fit"] = fits.get(b.get("player_id"), 0)
                 r["pick_criteria"]["hit_bats"] = scored[:3]
@@ -1609,6 +1618,46 @@ def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
     return out
 
 
+def _break_even(odds: int) -> float:
+    """The hit rate a 1+ hit bet needs at this price just to break even."""
+    o = int(odds)
+    return abs(o) / (abs(o) + 100.0) if o < 0 else 100.0 / (o + 100.0)
+
+
+def _prop_withheld(prop: dict, game: dict) -> dict | None:
+    """Why this prop should NOT be posted, or None to post it.
+
+    THE BAR IS THE PRICE, NOT A THRESHOLD I CHOSE. `_prop_score` is already on a
+    hit-probability scale, so it is compared against the hit rate the actual price
+    demands. A 1+ hit line at -213 needs 68.1%; at -335 it needs 77%, which
+    nothing on these boards reaches.
+
+    Applied ONLY when the night suppresses batted balls - cold, wind in, or a
+    high-strikeout starter. On a neutral night the prop posts as before, because
+    withholding there would be this gate inventing an opinion it has not earned.
+
+    Why it exists: the posted props have hit 62.6% against a 68.1% break-even on
+    the 91 entries with a real captured line, for -5.63u. The hit rate is not the
+    problem; paying through it is.
+    """
+    score = prop.get("prop_score")
+    if not isinstance(score, (int, float)) or not _conditions_against(game):
+        return None
+    odds = prop.get("odds", prop_grade.PROP_PRICE)
+    try:
+        need = _break_even(odds)
+    except (TypeError, ValueError):
+        return None
+    if score >= need:
+        return None
+    return {"player": prop.get("player"), "score": round(score, 4),
+            "need": round(need, 4), "odds": odds,
+            "real_line": "odds" in prop,
+            "reason": f"conditions against the bat and the read "
+                      f"({score:.0%}) is under the {need:.0%} that "
+                      f"{odds:+d} needs"}
+
+
 def _platoon_for(bats: list, opp_hand: str | None, season: int) -> dict:
     """{player_id: {"hand", "avg", "pa", "delta", "shrunk"}} vs tonight's starter.
 
@@ -1678,6 +1727,14 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     dependable bat, so the gap is what to read.
     """
     pc = g.get("pick_criteria") or {}
+    held = pc.get("prop_withheld")
+    if held:
+        # the conditions line is the justification, so it stays
+        out = [f"     NO PROP — {held['reason']}"]
+        cond = _contact_conditions(g, winner or _bet_side(pc)[0])
+        if cond:
+            out.append(f"       {cond}")
+        return out
     bats = pc.get("hit_bats") or []
     if not bats:
         return []

@@ -100,6 +100,15 @@ def grade_date(date: str) -> tuple[list, list]:
         res = results.get(g.get("game_pk"))
         if not prop or not pid or not adv or not res or not res.get("final"):
             continue
+        # Book only a game that was actually a PLAY. A prop is also computed for
+        # watch-listed good dogs so their hit block can be shown, and without
+        # this those were booked as bets: 4 of the first 142 singles came from
+        # non-pick games, three of them good-dog watch entries on 2026-09-30.
+        # Same invariant CLAUDE.md sets for the moneyline ledger - a watch tag
+        # must never reach the record. Entries already settled are left as they
+        # are; this stops it happening again.
+        if pc.get("play") != "pick":
+            continue
         hits = mlb_api.player_hits(g.get("game_pk"), pid)
         if hits is None:
             continue                       # can't confirm the prop -> skip, retry later
