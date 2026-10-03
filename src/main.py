@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import good_dog, hitter_type, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -250,6 +250,12 @@ def run(date: str) -> dict:
                 r["pick_criteria"]["opp_starter"] = opp_sp.name
             # the conditions term, per hitter, from his batted-ball profile
             fits = _fits_for(r, ranked, team.team_id, date)
+            # the platoon term: his AVG against THIS starter's hand, a
+            # several-hundred-PA sample, against BvP's handful
+            plat = _platoon_for(ranked, getattr(opp_sp, "hand", None), int(date[:4]))
+            for b in ranked:
+                if b.get("player_id") in plat:
+                    b["platoon"] = plat[b["player_id"]]
             scored = sorted(ranked,
                             key=lambda b: _prop_score(b, fits.get(b.get("player_id"), 0)),
                             reverse=True)
@@ -1545,7 +1551,18 @@ BVP_PRIOR = 20         # PA of imaginary league-average history added to each li
 # The one scaling judgement is fit/100, which caps conditions at about +/-5
 # points of hit probability - stated as a judgement, not a fit.
 PROP_FIT_SCALE = 100.0
-PROP_SELECTOR = "all_rate+form+bvp+fit"   # stamped on each prop so the ledger stays separable
+# Individual platoon splits are noisy and regress hard - far harder than their
+# sample size alone suggests - so a hitter's own vs-hand delta is shrunk toward
+# ZERO, i.e. toward "he is the same against both hands". Half weight at 300 PA is
+# a conservative stated judgement, NOT fitted to our results; the alternative, no
+# shrinkage at all, would let a 60-PA split swing the pick.
+#
+# The delta is on BATTING AVERAGE, not OPS, because the prop asks for a HIT.
+# (The older BvP term is still an OPS delta. It is pre-existing and feeds the
+# display, so it is left alone, but the two matchup terms are not on the same
+# scale and that is worth knowing.)
+PLATOON_PRIOR_PA = 300
+PROP_SELECTOR = "all_rate+form+bvp+fit+platoon"   # stamped so the ledger stays separable
 
 
 def _prop_score(b: dict, fit: int = 0) -> float:
@@ -1565,7 +1582,8 @@ def _prop_score(b: dict, fit: int = 0) -> float:
     bvp = b.get("bvp") or {}
     pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
     edge = ((ops - LEAGUE_OPS) * (pa / (pa + BVP_PRIOR))) if pa > 0 else 0.0
-    return base + form + edge + (fit / PROP_FIT_SCALE)
+    platoon = (b.get("platoon") or {}).get("shrunk") or 0.0
+    return base + form + edge + platoon + (fit / PROP_FIT_SCALE)
 
 
 def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
@@ -1588,6 +1606,46 @@ def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
     except Exception as exc:
         log.warning("conditions fit unavailable: %s", exc)
         return {}
+    return out
+
+
+def _platoon_for(bats: list, opp_hand: str | None, season: int) -> dict:
+    """{player_id: {"hand", "avg", "pa", "delta", "shrunk"}} vs tonight's starter.
+
+    `delta` is his AVG against that hand minus his OWN overall average, so it is
+    the platoon swing rather than his quality. The overall average is the PA-
+    weighted blend of his two hand splits, which costs no extra request.
+
+    Fails soft to {} - a missing split costs the term, never the board.
+    """
+    out: dict = {}
+    if opp_hand not in ("L", "R"):
+        return out
+    other_hand = "L" if opp_hand == "R" else "R"
+    for b in bats:
+        pid = b.get("player_id")
+        if not pid:
+            continue
+        try:
+            hands = batter_look.player_vs_hand(pid, season)
+        except Exception as exc:
+            log.warning("vs-hand split failed for %s: %s", pid, exc)
+            continue
+        same, other = hands.get(opp_hand) or {}, hands.get(other_hand) or {}
+        try:
+            a_s, pa_s = float(same.get("avg")), float(same.get("plateAppearances"))
+        except (TypeError, ValueError):
+            continue
+        try:
+            a_o, pa_o = float(other.get("avg")), float(other.get("plateAppearances"))
+        except (TypeError, ValueError):
+            a_o, pa_o = a_s, 0.0
+        tot = pa_s + pa_o
+        overall = ((a_s * pa_s + a_o * pa_o) / tot) if tot else a_s
+        delta = a_s - overall
+        w = pa_s / (pa_s + PLATOON_PRIOR_PA) if pa_s > 0 else 0.0
+        out[pid] = {"hand": opp_hand, "avg": round(a_s, 3), "pa": int(pa_s),
+                    "delta": round(delta, 3), "shrunk": round(delta * w, 4)}
     return out
 
 
@@ -1632,6 +1690,11 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         if f is not None:
             bits.append(f"form {f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
         bits.append(_bvp_bit(b.get("bvp"), sp))
+        # the vs-hand line, which is the big sample next to BvP's handful
+        pl = b.get("platoon") or {}
+        if pl.get("pa"):
+            bits.append(f"vs {pl['hand']}HP {pl['avg']:.3f}".replace("0.", ".", 1)
+                        + f" ({pl['pa']} PA, {pl['delta']:+.3f} vs himself)")
         hr, ar = b.get("hit_rate"), b.get("all_rate")
         # spelled out rather than "(usually X%)", which read as a hedge on the
         # first number instead of what it is: the same hitter across ALL games,
