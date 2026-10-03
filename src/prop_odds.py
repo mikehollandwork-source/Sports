@@ -1,5 +1,5 @@
 """
-Real 1+ HIT prop lines from The Odds API (batter_hits market).
+Real 1+ HIT prop lines from The Odds API (batter_hits market), both sides.
 
 A player's "1+ hit" price is the OVER 0.5 hits outcome. We only need lines for
 the games that become PLAYS (~5-8/day), and a per-day cache
@@ -83,22 +83,47 @@ def _event_id(date: str, away_name: str, home_name: str) -> str | None:
 
 
 def _fetch_game_lines(event_id: str) -> dict:
-    """{player_name_lower: over_0.5_american} for a game's batter_hits market,
-    median across books. {} on failure/none."""
+    """{player_name_lower: {"over": american, "under": american}} for a game's
+    batter_hits 0.5 line, median across books. {} on failure/none.
+
+    BOTH SIDES, because the same response already contains them and the UNDER
+    costs no extra credit. Without it the question "what would fading these
+    return" can only be answered from an ASSUMED hold, and the answer swings from
+    break-even at a 4% hold to -5% at 6% - i.e. the assumption decides it.
+    """
     data = _get(f"/events/{event_id}/odds", regions="us", markets="batter_hits",
                 oddsFormat="american")
-    prices: dict = {}
+    sides: dict = {}
     for bk in (data or {}).get("bookmakers", []) or []:
         for mk in bk.get("markets", []) or []:
             if mk.get("key") != "batter_hits":
                 continue
             for o in mk.get("outcomes", []) or []:
-                if str(o.get("name")).lower() != "over" or o.get("point") != 0.5:
+                side = str(o.get("name")).lower()
+                if side not in ("over", "under") or o.get("point") != 0.5:
                     continue
                 who = str(o.get("description") or "").strip().lower()
                 if who and isinstance(o.get("price"), (int, float)):
-                    prices.setdefault(who, []).append(int(o["price"]))
-    return {who: int(sorted(v)[len(v) // 2]) for who, v in prices.items() if v}
+                    sides.setdefault(who, {}).setdefault(side, []).append(
+                        int(o["price"]))
+    out: dict = {}
+    for who, bysides in sides.items():
+        row = {}
+        for side, v in bysides.items():
+            if v:
+                row[side] = int(sorted(v)[len(v) // 2])
+        if row.get("over") is not None:
+            out[who] = row
+    return out
+
+
+def _as_row(v) -> dict:
+    """Tolerate the OLD cache shape, which stored the over price as a bare int."""
+    if isinstance(v, dict):
+        return v
+    if isinstance(v, (int, float)):
+        return {"over": int(v)}
+    return {}
 
 
 def hit_line(date: str, player: str, away_name: str, home_name: str) -> int | None:
@@ -112,4 +137,21 @@ def hit_line(date: str, player: str, away_name: str, home_name: str) -> int | No
         eid = _event_id(date, away_name, home_name)
         cache[game_key] = _fetch_game_lines(eid) if eid else {}
         _save_cache(date, cache)
-    return cache[game_key].get(player.strip().lower())
+    return _as_row(cache[game_key].get(player.strip().lower())).get("over")
+
+
+def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
+    """{"over": american, "under": american} for a player's 0.5 hits line.
+
+    Same cached fetch `hit_line` uses, so asking for both costs nothing extra.
+    {} when there is no key, no line, or the player is not quoted.
+    """
+    if not _key():
+        return {}
+    cache = _load_cache(date)
+    game_key = f"{away_name}@{home_name}"
+    if game_key not in cache:
+        eid = _event_id(date, away_name, home_name)
+        cache[game_key] = _fetch_game_lines(eid) if eid else {}
+        _save_cache(date, cache)
+    return _as_row(cache[game_key].get(player.strip().lower()))

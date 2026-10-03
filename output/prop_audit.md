@@ -32,6 +32,27 @@ _Fields the CURRENT selector uses - all_rate, form, BvP, platoon, fit - were add
 
 - **nothing here is distinguishable from noise.** At 142 props, twelve looks produce a gap this size routinely.
 
+## Fading the prop — betting NO hit
+
+_The posted hitter failed to get a hit in the complement of the hit rate. The question is whether the UNDER price covers that._
+
+- posted hitters went **89-53**, so the fade would be **53-89** = **37.3%**
+
+_The under price was never captured: `prop_odds` only ever requested Over 0.5. So it is derived from the over price plus an assumed hold, and shown across a range rather than at one invented figure._
+
+| assumed hold | implied under price | under needs | fade ROI |
+|---|---|---|---|
+| 4% | +168 | 37.3% | **-0.0%** |
+| 5% | +161 | 38.3% | **-2.6%** |
+| 6% | +154 | 39.3% | **-5.1%** |
+| 8% | +142 | 41.3% | **-9.7%** |
+| 10% | +131 | 43.3% | **-13.9%** |
+
+- the fade needs a no-hit rate above the under's implied probability; the actual rate is **37.3%**
+- **backing and fading the same bets both lose.** Their ROIs sum to roughly minus twice the hold, which is the whole reason a losing record is not a signal to take the other side
+
+- the −199 to −150 band did go **53.8%** no-hit on 26 props, which is the cell that would tempt. It is the same cell the max-statistic correction above already rejected (corrected p = 0.44), so it is a 26-game stretch, not a rule.
+
 ## Price, which is arithmetic rather than a discovery
 
 _Break-even rises with the price, so this needs no significance test - it is what the numbers mean._

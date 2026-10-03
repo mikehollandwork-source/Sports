@@ -192,6 +192,53 @@ def build() -> str:
             "- this survives the correction and is worth a second look on new "
             "games before it is acted on"), ""]
 
+    # ---- fading the prop: betting the posted hitter does NOT get a hit ----
+    md += ["## Fading the prop — betting NO hit", "",
+           "_The posted hitter failed to get a hit in the complement of the hit "
+           "rate. The question is whether the UNDER price covers that._", ""]
+    no_hit = 1 - _rate(rows)
+    md += [f"- posted hitters went **{sum(1 for r in rows if r['won'])}-"
+           f"{sum(1 for r in rows if not r['won'])}**, so the fade would be "
+           f"**{sum(1 for r in rows if not r['won'])}-"
+           f"{sum(1 for r in rows if r['won'])}** = **{no_hit:.1%}**", ""]
+    # The under price was never captured - prop_odds only ever asked for Over 0.5
+    # - so it is DERIVED from the over price plus an assumed hold, and the answer
+    # is shown across a range of holds rather than at one invented number.
+    md += ["_The under price was never captured: `prop_odds` only ever requested "
+           "Over 0.5. So it is derived from the over price plus an assumed hold, "
+           "and shown across a range rather than at one invented figure._", "",
+           "| assumed hold | implied under price | under needs | fade ROI |",
+           "|---|---|---|---|"]
+    med_over = st.median([r["odds"] for r in rows
+                          if isinstance(r.get("odds"), int)])
+    over_imp = (abs(med_over) / (abs(med_over) + 100) if med_over < 0
+                else 100 / (med_over + 100))
+    for hold in (0.04, 0.05, 0.06, 0.08, 0.10):
+        under_imp = (1 + hold) - over_imp
+        if under_imp <= 0 or under_imp >= 1:
+            continue
+        price = (round(100 * (1 - under_imp) / under_imp) if under_imp < 0.5
+                 else round(-100 * under_imp / (1 - under_imp)))
+        roi = no_hit * ((1 - under_imp) / under_imp) - (1 - no_hit)
+        md.append(f"| {hold:.0%} | {price:+d} | {under_imp:.1%} | "
+                  f"**{roi:+.1%}** |")
+    md += ["",
+           f"- the fade needs a no-hit rate above the under's implied "
+           f"probability; the actual rate is **{no_hit:.1%}**",
+           "- **backing and fading the same bets both lose.** Their ROIs sum to "
+           "roughly minus twice the hold, which is the whole reason a losing "
+           "record is not a signal to take the other side", ""]
+    # the one cell that would tempt, and why it is not one
+    band = [r for r in rows if isinstance(r.get("odds"), int)
+            and -199 <= r["odds"] <= -150]
+    if band:
+        bn = 1 - _rate(band)
+        md += [f"- the −199 to −150 band did go **{bn:.1%}** no-hit on "
+               f"{len(band)} props, which is the cell that would tempt. It is "
+               "the same cell the max-statistic correction above already "
+               "rejected (corrected p = 0.44), so it is a 26-game stretch, not "
+               "a rule.", ""]
+
     md += ["## Price, which is arithmetic rather than a discovery", "",
            "_Break-even rises with the price, so this needs no significance "
            "test - it is what the numbers mean._", "",
