@@ -1,18 +1,19 @@
 # Source health — 2026-10-03
 
-- board generated: `2026-10-03T05:05:29.124815+00:00`
-- games on slate: **4** · picks: **0**
+- board generated: `2026-10-03T19:00:13.310138+00:00`
+- games on slate: **4** · picks: **1**
 
 | input | games covered | state |
 |---|---|---|
 | covers tickets | 3/4 (75%) | ✅ ok |
-| handle (usable) | 1/4 (25%) | ⚠️ degraded |
+| handle (usable) | 4/4 (100%) | ✅ ok |
 | line movement | 4/4 (100%) | ✅ ok |
 | moneylines | 4/4 (100%) | ✅ ok |
 | PM order book | 4/4 (100%) | ✅ ok |
 | src: covers | 3/4 (75%) | ✅ ok |
-| src: forum | 1/4 (25%) | ⚠️ degraded |
+| src: forum | 4/4 (100%) | ✅ ok |
 | src: polymarket_bets | 4/4 (100%) | ✅ ok |
+| src: scoresodds_bets | 4/4 (100%) | ✅ ok |
 | src: vsin_bets | 1/4 (25%) | ⚠️ degraded |
 
-## ⚠️ Degraded: handle (usable), src: forum, src: vsin_bets
+## ⚠️ Degraded: src: vsin_bets
