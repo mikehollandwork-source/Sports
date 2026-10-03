@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import batter_look, good_dog, hitter_type, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hrr_shadow, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -280,6 +280,28 @@ def run(date: str) -> dict:
                              held["reason"])
                 else:
                     r["pick_criteria"]["prop"] = prop
+                # SHADOW ONLY, NEVER BET: the same hitter's hits+runs+RBIs over
+                # 1.5. 1+ hit is a ~63% event priced near -200 (66.7% break-even)
+                # so the hold eats the edge; H+R+RBI 1.5 was +105 on 2026-10-03,
+                # a 48.8% break-even - the same read with 16 points less hold.
+                # Whether the read transfers is unknown and cannot be
+                # back-tested: those prices were never captured. So it is logged
+                # to its own book and left alone, like the watch tags.
+                # Plays only - it costs one extra API credit per game per day.
+                if _play(r) == "pick":
+                    try:
+                        hrr = prop_odds.hrr_line(date, prop["player"],
+                                                 gm.away.name, gm.home.name)
+                        if hrr.get("over") is not None:
+                            r["pick_criteria"]["shadow_hrr"] = {
+                                "player": prop["player"],
+                                "player_id": prop.get("player_id"),
+                                "market": "hits+runs+RBIs over 1.5",
+                                "over": hrr["over"], "under": hrr.get("under"),
+                                "bet": False}
+                    except Exception as exc:
+                        log.warning("hrr shadow line failed on %s: %s",
+                                    r.get("game_pk"), exc)
                 for b in scored:
                     b["fit"] = fits.get(b.get("player_id"), 0)
                 r["pick_criteria"]["hit_bats"] = scored[:3]
@@ -1759,6 +1781,10 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
+    sh = pc.get("shadow_hrr")
+    if sh and sh.get("over") is not None:
+        out.append(f"       ◻ tracking only, NOT a bet: {sh['player']} "
+                   f"H+R+RBI o1.5 {sh['over']:+d}")
     cond = _contact_conditions(g, winner or _bet_side(pc)[0])
     if cond:
         out.append(f"       {cond}")
@@ -2106,6 +2132,12 @@ def main() -> None:
     payload = run(args.date)
     write_outputs(payload, args.date)
     grade.update_ledger(args.date)  # record any games that just went final (idempotent)
+    # Shadow book, its OWN ledger, nothing bet. Fails soft: a shadow log must
+    # never be able to take the board down.
+    try:
+        hrr_shadow.settle([args.date])
+    except Exception as exc:
+        log.warning("hrr shadow settle failed (board unaffected): %s", exc)
     notify.send_telegram(telegram_text(payload))
     # A new pick gets a board post; a WITHDRAWN one used to get silence, which
     # is indistinguishable from "the board hasn't refreshed yet" - the common

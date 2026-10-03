@@ -1,0 +1,34 @@
+name: HRR shadow book
+
+# Grades and reports the hits+runs+RBIs over 1.5 shadow log. NOTHING IS BET.
+# Its own ledger, separate from the prop and moneyline records.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m src.hrr_shadow
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/hrr_shadow.md output/hrr_shadow_ledger.json
+          if ! git diff --staged --quiet; then
+            git commit -m "HRR shadow book ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi

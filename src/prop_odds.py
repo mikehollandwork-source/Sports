@@ -140,6 +140,72 @@ def hit_line(date: str, player: str, away_name: str, home_name: str) -> int | No
     return _as_row(cache[game_key].get(player.strip().lower())).get("over")
 
 
+HRR_MARKET = "batter_hits_runs_rbis"
+HRR_POINT = 1.5
+
+
+def _hrr_cache_path(date: str) -> Path:
+    return OUTPUT_DIR / f"prop_odds_hrr_{date}.json"
+
+
+def _fetch_hrr_lines(event_id: str) -> dict:
+    """{player lower: {"over": american, "under": american}} for the
+    hits+runs+RBIs OVER/UNDER 1.5 line, median across books."""
+    data = _get(f"/events/{event_id}/odds", regions="us", markets=HRR_MARKET,
+                oddsFormat="american")
+    sides: dict = {}
+    for bk in (data or {}).get("bookmakers", []) or []:
+        for mk in bk.get("markets", []) or []:
+            if mk.get("key") != HRR_MARKET:
+                continue
+            for o in mk.get("outcomes", []) or []:
+                side = str(o.get("name")).lower()
+                if side not in ("over", "under") or o.get("point") != HRR_POINT:
+                    continue
+                who = str(o.get("description") or "").strip().lower()
+                if who and isinstance(o.get("price"), (int, float)):
+                    sides.setdefault(who, {}).setdefault(side, []).append(
+                        int(o["price"]))
+    out: dict = {}
+    for who, bysides in sides.items():
+        row = {s: int(sorted(v)[len(v) // 2]) for s, v in bysides.items() if v}
+        if row.get("over") is not None:
+            out[who] = row
+    return out
+
+
+def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
+    """{"over", "under"} for a player's hits+runs+RBIs 1.5 line, or {}.
+
+    SEPARATE MARKET, SEPARATE CREDIT. The Odds API bills per market, so this is
+    one extra credit per game per day on top of batter_hits. It is therefore
+    called for PLAYS ONLY - roughly 2-3 a day, about 80 credits a month against
+    the ~150-240 free tier, where batter_hits already spends a similar amount.
+    Calling it for every board game would bust the tier.
+
+    Why this market: 1+ hit is a ~63% event priced near -200, where break-even is
+    66.7% and the hold eats any edge the hitter read could produce. H+R+RBI over
+    1.5 was quoted at +105 on 2026-10-03, a 48.8% break-even - the same read with
+    16 points less hold to overcome. Whether the read transfers is unknown, which
+    is exactly why this is logged and not bet.
+
+    Cached in its own day file so the batter_hits cache shape is untouched.
+    """
+    if not _key():
+        return {}
+    try:
+        cache = json.loads(_hrr_cache_path(date).read_text())
+    except (OSError, ValueError):
+        cache = {}
+    game_key = f"{away_name}@{home_name}"
+    if game_key not in cache:
+        eid = _event_id(date, away_name, home_name)
+        cache[game_key] = _fetch_hrr_lines(eid) if eid else {}
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        _hrr_cache_path(date).write_text(json.dumps(cache, indent=1))
+    return _as_row(cache[game_key].get(player.strip().lower()))
+
+
 def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
     """{"over": american, "under": american} for a player's 0.5 hits line.
 
