@@ -1,0 +1,42 @@
+name: Prop markets probe
+
+# Which batter prop markets the odds feed offers, and at what prices. ONE-OFF:
+# costs ~1 API credit per market against a ~150-240/month free tier.
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Board date (YYYY-MM-DD). Blank = today, US/Eastern."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+          PICKS_DATE: ${{ github.event.inputs.date }}
+        run: python -m src.prop_markets_probe
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/prop_markets.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Prop markets probe ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
