@@ -1,0 +1,604 @@
+# MLB situationCodes (602)
+
+- `1` — January
+- `10` — October
+- `10h1` — October - first half
+- `10h2` — October - second half
+- `11` — November
+- `11h1` — November - first half
+- `11h2` — November - second half
+- `12` — December
+- `12h1` — December - first half
+- `12h2` — December - second half
+- `1h1` — January - first half
+- `1h2` — January - second half
+- `1r` — One Run
+- `1rh1` — One Run - first half
+- `1rh2` — One Run - second half
+- `2` — February
+- `2h1` — February - first half
+- `2h2` — February - second half
+- `2s` — Two Strikes
+- `3` — March
+- `3h1` — March - first half
+- `3h2` — March - second half
+- `4` — April
+- `4h1` — April - first half
+- `4h2` — April - second half
+- `5` — May
+- `5h1` — May - first half
+- `5h2` — May - second half
+- `6` — June
+- `6h1` — June - first half
+- `6h2` — June - second half
+- `7` — July
+- `7h1` — July - first half
+- `7h2` — July - second half
+- `8` — August
+- `8h1` — August - first half
+- `8h2` — August - second half
+- `9` — September
+- `9h1` — September - first half
+- `9h2` — September - second half
+- `a` — Away Games
+- `ac` — Ahead in Count
+- `ac01` — Ahead in Count Zone 1
+- `ac02` — Ahead in Count Zone 2
+- `ac03` — Ahead in Count Zone 3
+- `ac04` — Ahead in Count Zone 4
+- `ac05` — Ahead in Count Zone 5
+- `ac06` — Ahead in Count Zone 6
+- `ac07` — Ahead in Count Zone 7
+- `ac08` — Ahead in Count Zone 8
+- `ac09` — Ahead in Count Zone 9
+- `ac11` — Ahead in Count Zone 11
+- `ac12` — Ahead in Count Zone 12
+- `ac13` — Ahead in Count Zone 13
+- `ac14` — Ahead in Count Zone 14
+- `ah1` — Away Games - first half
+- `ah2` — Away Games - second half
+- `b1` — Batting First
+- `b2` — Batting Second
+- `b3` — Batting Third
+- `b4` — Batting Fourth
+- `b5` — Batting Fifth
+- `b6` — Batting Sixth
+- `b7` — Batting Seventh
+- `b8` — Batting Eighth
+- `b9` — Batting Ninth
+- `bc` — Behind in Count
+- `bc01` — Behind in Count Zone 1
+- `bc02` — Behind in Count Zone 2
+- `bc03` — Behind in Count Zone 3
+- `bc04` — Behind in Count Zone 4
+- `bc05` — Behind in Count Zone 5
+- `bc06` — Behind in Count Zone 6
+- `bc07` — Behind in Count Zone 7
+- `bc08` — Behind in Count Zone 8
+- `bc09` — Behind in Count Zone 9
+- `bc11` — Behind in Count Zone 11
+- `bc12` — Behind in Count Zone 12
+- `bc13` — Behind in Count Zone 13
+- `bc14` — Behind in Count Zone 14
+- `c00` — 0-0 Count
+- `c01` — 0-1 Count
+- `c02` — 0-2 Count
+- `c10` — 1-0 Count
+- `c11` — 1-1 Count
+- `c12` — 1-2 Count
+- `c20` — 2-0 Count
+- `c21` — 2-1 Count
+- `c22` — 2-2 Count
+- `c30` — 3-0 Count
+- `c31` — 3-1 Count
+- `c32` — 3-2 Count
+- `d` — Day Games
+- `d1` — Yesterday
+- `d30` — Last 30 Days
+- `d7` — Last 7 Days
+- `dfr` — On Fridays
+- `dh1` — Day Games - first half
+- `dh2` — Day Games - second half
+- `dmo` — On Mondays
+- `dr1` — One Day of Rest
+- `dr2` — Two Days of Rest
+- `dr3` — Three Days of Rest
+- `dr4` — Four Days of Rest
+- `dr5` — Five Plus Days of Rest
+- `dsa` — On Saturdays
+- `dsu` — On Sundays
+- `dth` — On Thursdays
+- `dtu` — On Tuesdays
+- `dwe` — On Wednesdays
+- `e` — Empty (Not Leadoff)
+- `ec` — Even Count
+- `ec01` — Even Count Zone 1
+- `ec02` — Even Count Zone 2
+- `ec03` — Even Count Zone 3
+- `ec04` — Even Count Zone 4
+- `ec05` — Even Count Zone 5
+- `ec06` — Even Count Zone 6
+- `ec07` — Even Count Zone 7
+- `ec08` — Even Count Zone 8
+- `ec09` — Even Count Zone 9
+- `ec11` — Even Count Zone 11
+- `ec12` — Even Count Zone 12
+- `ec13` — Even Count Zone 13
+- `ec14` — Even Count Zone 14
+- `ex` — Extra Innnings
+- `exh1` — Extra Innnings - first half
+- `exh2` — Extra Innnings - second half
+- `fba` — First Batter (RP Only)
+- `fc` — Full Count
+- `fip` — First Inning Pitched
+- `fp` — First Pitch
+- `g` — On Grass
+- `gh1` — On Grass - first half
+- `gh2` — On Grass - second half
+- `h` — Home Games
+- `h0` — Season To Date
+- `h1` — First Half
+- `h2` — Second Half
+- `hh1` — Home Games - first half
+- `hh2` — Home Games - second half
+- `i01` — First Inning
+- `i02` — Second Inning
+- `i03` — Third Inning
+- `i04` — Fourth Inning
+- `i05` — Fifth Inning
+- `i06` — Sixth Inning
+- `i07` — Seventh Inning
+- `i08` — Eighth Inning
+- `i09` — Ninth Inning
+- `ig01` — Innings One to Six
+- `ig07` — Seventh or Later
+- `ig08` — Eighth or Later
+- `ig09` — Ninth or Later
+- `int` — Interleague
+- `ix` — Extra Innings
+- `l` — Batting Left
+- `l10` — Last 10
+- `l10h1` — Last 10 - first half
+- `l10h2` — Last 10 - first half
+- `lc` — Late / Close
+- `lo` — Leading Off Inning
+- `n` — Night Games
+- `nh1` — Night Games - first half
+- `nh2` — Night Games - second half
+- `o0` — No Outs
+- `o001` — No Outs Zone 1
+- `o002` — No Outs Zone 2
+- `o003` — No Outs Zone 3
+- `o004` — No Outs Zone 4
+- `o005` — No Outs Zone 5
+- `o006` — No Outs Zone 6
+- `o007` — No Outs Zone 7
+- `o008` — No Outs Zone 8
+- `o009` — No Outs Zone 9
+- `o011` — No Outs Zone 11
+- `o012` — No Outs Zone 12
+- `o013` — No Outs Zone 13
+- `o014` — No Outs Zone 14
+- `o1` — One Out
+- `o101` — One Out Zone 1
+- `o102` — One Out Zone 2
+- `o103` — One Out Zone 3
+- `o104` — One Out Zone 4
+- `o105` — One Out Zone 5
+- `o106` — One Out Zone 6
+- `o107` — One Out Zone 7
+- `o108` — One Out Zone 8
+- `o109` — One Out Zone 9
+- `o111` — One Out Zone 11
+- `o112` — One Out Zone 12
+- `o113` — One Out Zone 13
+- `o114` — One Out Zone 14
+- `o2` — Two Outs
+- `o201` — Two Outs Zone 1
+- `o202` — Two Outs Zone 2
+- `o203` — Two Outs Zone 3
+- `o204` — Two Outs Zone 4
+- `o205` — Two Outs Zone 5
+- `o206` — Two Outs Zone 6
+- `o207` — Two Outs Zone 7
+- `o208` — Two Outs Zone 8
+- `o209` — Two Outs Zone 9
+- `o211` — Two Outs Zone 11
+- `o212` — Two Outs Zone 12
+- `o213` — Two Outs Zone 13
+- `o214` — Two Outs Zone 14
+- `p1` — Pitcher
+- `p2` — Catcher
+- `p3` — First Base
+- `p4` — Second Base
+- `p5` — Third Base
+- `p6` — Shortstop
+- `p7` — Left Field
+- `p8` — Center Field
+- `p9` — Right Field
+- `pch` — Changeup
+- `pch01` — Changeup Zone 1
+- `pch02` — Changeup Zone 2
+- `pch03` — Changeup Zone 3
+- `pch04` — Changeup Zone 4
+- `pch05` — Changeup Zone 5
+- `pch06` — Changeup Zone 6
+- `pch07` — Changeup Zone 7
+- `pch08` — Changeup Zone 8
+- `pch09` — Changeup Zone 9
+- `pch11` — Changeup Zone 11
+- `pch12` — Changeup Zone 12
+- `pch13` — Changeup Zone 13
+- `pch14` — Changeup Zone 14
+- `pcu` — Curveball
+- `pcu01` — Curveball Zone 1
+- `pcu02` — Curveball Zone 2
+- `pcu03` — Curveball Zone 3
+- `pcu04` — Curveball Zone 4
+- `pcu05` — Curveball Zone 5
+- `pcu06` — Curveball Zone 6
+- `pcu07` — Curveball Zone 7
+- `pcu08` — Curveball Zone 8
+- `pcu09` — Curveball Zone 9
+- `pcu11` — Curveball Zone 11
+- `pcu12` — Curveball Zone 12
+- `pcu13` — Curveball Zone 13
+- `pcu14` — Curveball Zone 14
+- `pd` — Designated Hitter
+- `pep` — Eephus Pitch
+- `pep01` — Eephus Pitch Zone 1
+- `pep02` — Eephus Pitch Zone 2
+- `pep03` — Eephus Pitch Zone 3
+- `pep04` — Eephus Pitch Zone 4
+- `pep05` — Eephus Pitch Zone 5
+- `pep06` — Eephus Pitch Zone 6
+- `pep07` — Eephus Pitch Zone 7
+- `pep08` — Eephus Pitch Zone 8
+- `pep09` — Eephus Pitch Zone 9
+- `pep11` — Eephus Pitch Zone 11
+- `pep12` — Eephus Pitch Zone 12
+- `pep13` — Eephus Pitch Zone 13
+- `pep14` — Eephus Pitch Zone 14
+- `pfa` — Fastball
+- `pfa01` — Fastball Zone 1
+- `pfa02` — Fastball Zone 2
+- `pfa03` — Fastball Zone 3
+- `pfa04` — Fastball Zone 4
+- `pfa05` — Fastball Zone 5
+- `pfa06` — Fastball Zone 6
+- `pfa07` — Fastball Zone 7
+- `pfa08` — Fastball Zone 8
+- `pfa09` — Fastball Zone 9
+- `pfa11` — Fastball Zone 11
+- `pfa12` — Fastball Zone 12
+- `pfa13` — Fastball Zone 13
+- `pfa14` — Fastball Zone 14
+- `pfc` — Cutter
+- `pfc01` — Cutter Zone 1
+- `pfc02` — Cutter Zone 2
+- `pfc03` — Cutter Zone 3
+- `pfc04` — Cutter Zone 4
+- `pfc05` — Cutter Zone 5
+- `pfc06` — Cutter Zone 6
+- `pfc07` — Cutter Zone 7
+- `pfc08` — Cutter Zone 8
+- `pfc09` — Cutter Zone 9
+- `pfc11` — Cutter Zone 11
+- `pfc12` — Cutter Zone 12
+- `pfc13` — Cutter Zone 13
+- `pfc14` — Cutter Zone 14
+- `pff` — Four-seam FB
+- `pff01` — Four-seam Fastball Zone 1
+- `pff02` — Four-seam Fastball Zone 2
+- `pff03` — Four-seam Fastball Zone 3
+- `pff04` — Four-seam Fastball Zone 4
+- `pff05` — Four-seam Fastball Zone 5
+- `pff06` — Four-seam Fastball Zone 6
+- `pff07` — Four-seam Fastball Zone 7
+- `pff08` — Four-seam Fastball Zone 8
+- `pff09` — Four-seam Fastball Zone 9
+- `pff11` — Four-seam Fastball Zone 11
+- `pff12` — Four-seam Fastball Zone 12
+- `pff13` — Four-seam Fastball Zone 13
+- `pff14` — Four-seam Fastball Zone 14
+- `pfo` — Forkball
+- `pfo01` — Forkball Zone 1
+- `pfo02` — Forkball Zone 2
+- `pfo03` — Forkball Zone 3
+- `pfo04` — Forkball Zone 4
+- `pfo05` — Forkball Zone 5
+- `pfo06` — Forkball Zone 6
+- `pfo07` — Forkball Zone 7
+- `pfo08` — Forkball Zone 8
+- `pfo09` — Forkball Zone 9
+- `pfo11` — Forkball Zone 11
+- `pfo12` — Forkball Zone 12
+- `pfo13` — Forkball Zone 13
+- `pfo14` — Forkball Zone 14
+- `pfs` — Splitter
+- `pfs01` — Splitter Zone 1
+- `pfs02` — Splitter Zone 2
+- `pfs03` — Splitter Zone 3
+- `pfs04` — Splitter Zone 4
+- `pfs05` — Splitter Zone 5
+- `pfs06` — Splitter Zone 6
+- `pfs07` — Splitter Zone 7
+- `pfs08` — Splitter Zone 8
+- `pfs09` — Splitter Zone 9
+- `pfs11` — Splitter Zone 11
+- `pfs12` — Splitter Zone 12
+- `pfs13` — Splitter Zone 13
+- `pfs14` — Splitter Zone 14
+- `pft` — Two-seam FB
+- `pft01` — Two-seam FB Zone 1
+- `pft02` — Two-seam FB Zone 2
+- `pft03` — Two-seam FB Zone 3
+- `pft04` — Two-seam FB Zone 4
+- `pft05` — Two-seam FB Zone 5
+- `pft06` — Two-seam FB Zone 6
+- `pft07` — Two-seam FB Zone 7
+- `pft08` — Two-seam FB Zone 8
+- `pft09` — Two-seam FB Zone 9
+- `pft11` — Two-seam FB Zone 11
+- `pft12` — Two-seam FB Zone 12
+- `pft13` — Two-seam FB Zone 13
+- `pft14` — Two-seam FB Zone 14
+- `pgy` — Gyroball
+- `pgy01` — Gyroball Zone 1
+- `pgy02` — Gyroball Zone 2
+- `pgy03` — Gyroball Zone 3
+- `pgy04` — Gyroball Zone 4
+- `pgy05` — Gyroball Zone 5
+- `pgy06` — Gyroball Zone 6
+- `pgy07` — Gyroball Zone 7
+- `pgy08` — Gyroball Zone 8
+- `pgy09` — Gyroball Zone 9
+- `pgy11` — Gyroball Zone 11
+- `pgy12` — Gyroball Zone 12
+- `pgy13` — Gyroball Zone 13
+- `pgy14` — Gyroball Zone 14
+- `ph` — Pinch Hitter
+- `pi000` — First 75 Pitches
+- `pi001` — Pitches 1-15
+- `pi016` — Pitches 16-30
+- `pi031` — Pitches 31-45
+- `pi046` — Pitches 46-60
+- `pi061` — Pitches 61-75
+- `pi076` — Pitches 76-90
+- `pi091` — Pitches 91-105
+- `pi100` — First 100 Pitches
+- `pi101` — Pitches 101 and Later
+- `pi106` — Pitches 106-120
+- `pi121` — Pitches 121 or Later
+- `pi760` — Pitches 76 and Later
+- `pkc` — Knuckle Curve
+- `pkc01` — Knuckle Curve Zone 1
+- `pkc02` — Knuckle Curve Zone 2
+- `pkc03` — Knuckle Curve Zone 3
+- `pkc04` — Knuckle Curve Zone 4
+- `pkc05` — Knuckle Curve Zone 5
+- `pkc06` — Knuckle Curve Zone 6
+- `pkc07` — Knuckle Curve Zone 7
+- `pkc08` — Knuckle Curve Zone 8
+- `pkc09` — Knuckle Curve Zone 9
+- `pkc11` — Knuckle Curve Zone 11
+- `pkc12` — Knuckle Curve Zone 12
+- `pkc13` — Knuckle Curve Zone 13
+- `pkc14` — Knuckle Curve Zone 14
+- `pkn` — Knuckleball
+- `pkn01` — Knuckleball Zone 1
+- `pkn02` — Knuckleball Zone 2
+- `pkn03` — Knuckleball Zone 3
+- `pkn04` — Knuckleball Zone 4
+- `pkn05` — Knuckleball Zone 5
+- `pkn06` — Knuckleball Zone 6
+- `pkn07` — Knuckleball Zone 7
+- `pkn08` — Knuckleball Zone 8
+- `pkn09` — Knuckleball Zone 9
+- `pkn11` — Knuckleball Zone 11
+- `pkn12` — Knuckleball Zone 12
+- `pkn13` — Knuckleball Zone 13
+- `pkn14` — Knuckleball Zone 14
+- `po` — Outfield
+- `posas` — Post All-Star
+- `pr` — Pinch Runner
+- `preas` — Pre All-Star
+- `psc` — Screwball
+- `psc01` — Screwball Zone 1
+- `psc02` — Screwball Zone 2
+- `psc03` — Screwball Zone 3
+- `psc04` — Screwball Zone 4
+- `psc05` — Screwball Zone 5
+- `psc06` — Screwball Zone 6
+- `psc07` — Screwball Zone 7
+- `psc08` — Screwball Zone 8
+- `psc09` — Screwball Zone 9
+- `psc11` — Screwball Zone 11
+- `psc12` — Screwball Zone 12
+- `psc13` — Screwball Zone 13
+- `psc14` — Screwball Zone 14
+- `psi` — Sinker
+- `psi01` — Sinker Zone 1
+- `psi02` — Sinker Zone 2
+- `psi03` — Sinker Zone 3
+- `psi04` — Sinker Zone 4
+- `psi05` — Sinker Zone 5
+- `psi06` — Sinker Zone 6
+- `psi07` — Sinker Zone 7
+- `psi08` — Sinker Zone 8
+- `psi09` — Sinker Zone 9
+- `psi11` — Sinker Zone 11
+- `psi12` — Sinker Zone 12
+- `psi13` — Sinker Zone 13
+- `psi14` — Sinker Zone 14
+- `psl` — Slider
+- `psl01` — Slider Zone 1
+- `psl02` — Slider Zone 2
+- `psl03` — Slider Zone 3
+- `psl04` — Slider Zone 4
+- `psl05` — Slider Zone 5
+- `psl06` — Slider Zone 6
+- `psl07` — Slider Zone 7
+- `psl08` — Slider Zone 8
+- `psl09` — Slider Zone 9
+- `psl11` — Slider Zone 11
+- `psl12` — Slider Zone 12
+- `psl13` — Slider Zone 13
+- `psl14` — Slider Zone 14
+- `px` — Undefined (e.g. PH bats twice in an inning)
+- `r` — Batting Right
+- `r0` — Bases Empty
+- `r001` — Bases Empty Zone 1
+- `r002` — Bases Empty Zone 2
+- `r003` — Bases Empty Zone 3
+- `r004` — Bases Empty Zone 4
+- `r005` — Bases Empty Zone 5
+- `r006` — Bases Empty Zone 6
+- `r007` — Bases Empty Zone 7
+- `r008` — Bases Empty Zone 8
+- `r009` — Bases Empty Zone 9
+- `r011` — Bases Empty Zone 11
+- `r012` — Bases Empty Zone 12
+- `r013` — Bases Empty Zone 13
+- `r014` — Bases Empty Zone 14
+- `r1` — Runner at 1st
+- `r12` — Runners at 1st & 2nd
+- `r123` — Bases Loaded
+- `r13` — Runners at 1st & 3rd
+- `r2` — Runner at 2nd
+- `r23` — Runners at 2nd & 3rd
+- `r3` — Runner at 3rd
+- `r3l2` — 3rd, Less than 2 Outs
+- `rbl01` — Bases Loaded Zone 1
+- `rbl02` — Bases Loaded Zone 2
+- `rbl03` — Bases Loaded Zone 3
+- `rbl04` — Bases Loaded Zone 4
+- `rbl05` — Bases Loaded Zone 5
+- `rbl06` — Bases Loaded Zone 6
+- `rbl07` — Bases Loaded Zone 7
+- `rbl08` — Bases Loaded Zone 8
+- `rbl09` — Bases Loaded Zone 9
+- `rbl11` — Bases Loaded Zone 11
+- `rbl12` — Bases Loaded Zone 12
+- `rbl13` — Bases Loaded Zone 13
+- `rbl14` — Bases Loaded Zone 14
+- `risp` — Scoring Position
+- `risp2` — Scoring Position - 2 Outs
+- `ron` — Runners On
+- `ron01` — Runners On Zone 1
+- `ron02` — Runners On Zone 2
+- `ron03` — Runners On Zone 3
+- `ron04` — Runners On Zone 4
+- `ron05` — Runners On Zone 5
+- `ron06` — Runners On Zone 6
+- `ron07` — Runners On Zone 7
+- `ron08` — Runners On Zone 8
+- `ron09` — Runners On Zone 9
+- `ron11` — Runners On Zone 11
+- `ron12` — Runners On Zone 12
+- `ron13` — Runners On Zone 13
+- `ron14` — Runners On Zone 14
+- `ron2` — Runners On - 2 Outs
+- `rp` — Reliever
+- `rsp01` — Scoring Position Zone 1
+- `rsp02` — Scoring Position Zone 2
+- `rsp03` — Scoring Position Zone 3
+- `rsp04` — Scoring Position Zone 4
+- `rsp05` — Scoring Position Zone 5
+- `rsp06` — Scoring Position Zone 6
+- `rsp07` — Scoring Position Zone 7
+- `rsp08` — Scoring Position Zone 8
+- `rsp09` — Scoring Position Zone 9
+- `rsp11` — Scoring Position Zone 11
+- `rsp12` — Scoring Position Zone 12
+- `rsp13` — Scoring Position Zone 13
+- `rsp14` — Scoring Position Zone 14
+- `sah` — Team is ahead
+- `sbh` — Team is behind
+- `sp` — Starter
+- `sti` — Score is tied
+- `t` — On Turf
+- `tal` — In games following a loss
+- `talh1` — In games following a loss - first half
+- `talh2` — In games following a loss - second half
+- `tat` — In games following a tie
+- `tath1` — In games following a tie - first half
+- `tath2` — In games following a tie - second half
+- `taw` — In games following a win
+- `tawh1` — In games following a win - first half
+- `tawh2` — In games following a win - second half
+- `th1` — On Turf - first half
+- `th2` — On Turf - second half
+- `tls` — In games lost by team
+- `tlsh1` — In games lost by team - first half
+- `tlsh2` — In games lost by team - second half
+- `tti` — In tie games
+- `ttih1` — In tie games - first half
+- `ttih2` — In tie games - second half
+- `twn` — In games won by team
+- `twnh1` — In games won by team - first half
+- `twnh2` — In games won by team - second half
+- `uc` — Unknown or no Count
+- `val` — vs. AL
+- `vao` — vs. Fly Ball Pitcher
+- `vb` — vs. Batter
+- `vdv` — vs. Division
+- `vdvh1` — vs. Division - first half
+- `vdvh2` — vs. Division - second half
+- `ven` — By Venue
+- `vgo` — vs. Ground Ball Pitcher
+- `vl` — vs Left
+- `vl01` — vs Left Zone 1
+- `vl02` — vs Left Zone 2
+- `vl03` — vs Left Zone 3
+- `vl04` — vs Left Zone 4
+- `vl05` — vs Left Zone 5
+- `vl06` — vs Left Zone 6
+- `vl07` — vs Left Zone 7
+- `vl08` — vs Left Zone 8
+- `vl09` — vs Left Zone 9
+- `vl11` — vs Left Zone 11
+- `vl12` — vs Left Zone 12
+- `vl13` — vs Left Zone 13
+- `vl14` — vs Left Zone 14
+- `vlg` — vs. League
+- `vlgh1` — vs. League - first half
+- `vlgh2` — vs. League - second half
+- `vls` — vs Left Handed Starter
+- `vlsh1` — vs Left Handed Starter - first half
+- `vlsh2` — vs Left Handed Starter - first half
+- `vnl` — vs. NL
+- `vp` — vs. Pitcher
+- `vr` — vs Right
+- `vr01` — vs Right Zone 1
+- `vr02` — vs Right Zone 2
+- `vr03` — vs Right Zone 3
+- `vr04` — vs Right Zone 4
+- `vr05` — vs Right Zone 5
+- `vr06` — vs Right Zone 6
+- `vr07` — vs Right Zone 7
+- `vr08` — vs Right Zone 8
+- `vr09` — vs Right Zone 9
+- `vr11` — vs Right Zone 11
+- `vr12` — vs Right Zone 12
+- `vr13` — vs Right Zone 13
+- `vr14` — vs Right Zone 14
+- `vrs` — vs Right Handed Starter
+- `vrsh1` — vs Right Handed Starter - first half
+- `vrsh2` — vs Right Handed Starter - first half
+- `vt` — vs. Team
+- `vth1` — vs. Team - first half
+- `vth2` — vs. Team - second half
+- `zn01` — Pitches in Zone 1
+- `zn02` — Pitches in Zone 2
+- `zn03` — Pitches in Zone 3
+- `zn04` — Pitches in Zone 4
+- `zn05` — Pitches in Zone 5
+- `zn06` — Pitches in Zone 6
+- `zn07` — Pitches in Zone 7
+- `zn08` — Pitches in Zone 8
+- `zn09` — Pitches in Zone 9
+- `zn11` — Pitches in Zone 11
+- `zn12` — Pitches in Zone 12
+- `zn13` — Pitches in Zone 13
+- `zn14` — Pitches in Zone 14
