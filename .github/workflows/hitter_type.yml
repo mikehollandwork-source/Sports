@@ -1,0 +1,45 @@
+name: Hitter type
+
+# Contact / power / ground-ball / speed profile for one team's lineup, so a
+# night's conditions can be matched to a profile instead of a name. Read-only.
+on:
+  workflow_dispatch:
+    inputs:
+      team:
+        description: "Full team name, e.g. San Diego Padres"
+        required: true
+      date:
+        description: "Board date (YYYY-MM-DD). Blank = today, US/Eastern."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
+        env:
+          TYPE_TEAM: ${{ github.event.inputs.team }}
+          PICKS_DATE: ${{ github.event.inputs.date }}
+        run: python -m src.hitter_type
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/hitter_type.md
+          if ! git diff --staged --quiet; then
+            git commit -m "Hitter type ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
