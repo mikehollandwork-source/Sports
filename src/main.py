@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import good_dog, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import good_dog, hitter_type, line_money, manual_picks, covers, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -248,17 +248,26 @@ def run(date: str) -> dict:
                 opp_pitcher_id=opp_sp.player_id if opp_sp else None)
             if opp_sp:
                 r["pick_criteria"]["opp_starter"] = opp_sp.name
-            prop = ranked[0] if ranked else None
+            # the conditions term, per hitter, from his batted-ball profile
+            fits = _fits_for(r, ranked, team.team_id, date)
+            scored = sorted(ranked,
+                            key=lambda b: _prop_score(b, fits.get(b.get("player_id"), 0)),
+                            reverse=True)
+            prop = scored[0] if scored else None
             if prop:
                 line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
                 if line is not None:
                     prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
+                fit = fits.get(prop.get("player_id"), 0)
+                prop["fit"] = fit
+                prop["prop_score"] = round(_prop_score(prop, fit), 4)
+                # Stamped so the prop ledger stays separable: entries before this
+                # were chosen by hit-rate-in-wins, which is a different population.
+                prop["selector"] = PROP_SELECTOR
                 r["pick_criteria"]["prop"] = prop
-                # display order is form + shrunk BvP; `prop` above keeps the
-                # hit-in-wins ordering it has always had, so the prop ledger and
-                # grader are untouched by this
-                r["pick_criteria"]["hit_bats"] = sorted(
-                    ranked, key=_hit_score, reverse=True)[:3]
+                for b in scored:
+                    b["fit"] = fits.get(b.get("player_id"), 0)
+                r["pick_criteria"]["hit_bats"] = scored[:3]
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
@@ -1515,19 +1524,90 @@ LEAGUE_OPS = 0.710     # roughly league-average OPS; the point BvP shrinks towar
 BVP_PRIOR = 20         # PA of imaginary league-average history added to each line
 
 
-def _hit_score(b: dict) -> float:
-    """Form plus sample-shrunk BvP, both on an OPS-ish scale.
+# PROP SELECTION. The posted prop used to be ranked[0] - the top hit rate in the
+# team's season WINS. That is the wrong statistic for a prop bet, and measurably
+# so: the posted props have hit 62.7% (89-53) against a 66.7% break-even at their
+# median -200 price, for -8.63u. A rate computed INSIDE wins is conditioned on the
+# outcome, so it partly measures "the team wins when he hits" rather than "he
+# hits", and it is inflated for every regular.
+#
+# A prop asks P(he gets a hit tonight). The honest base for that is his ALL-GAMES
+# rate, then adjusted by what we know about tonight:
+#   all_rate  how often he actually gets a hit, unconditioned
+#   form      his last-5 rate against his OWN season rate
+#   bvp       shrunk by sample against the opposing starter
+#   fit       his batted-ball profile against tonight's air and starter
+#
+# Everything is kept on a hit-probability scale and ADDED UNWEIGHTED: with no
+# evidence that one of these predicts a hit better than another, a weighting would
+# be a free parameter tuned on nothing. (This replaces `_hit_score`, which ordered
+# the DISPLAY by form + BvP only; it had no other caller and is removed.)
+# The one scaling judgement is fit/100, which caps conditions at about +/-5
+# points of hit probability - stated as a judgement, not a fit.
+PROP_FIT_SCALE = 100.0
+PROP_SELECTOR = "all_rate+form+bvp+fit"   # stamped on each prop so the ledger stays separable
 
-    Form is percentage points over the hitter's OWN season rate, divided by 100
-    to sit alongside an OPS delta. The two are added unweighted: with no evidence
-    that either predicts a hit better than the other, inventing a weighting would
-    be a free parameter tuned on nothing.
+
+def _prop_score(b: dict, fit: int = 0) -> float:
+    """Estimated hit likelihood for tonight, on a probability-ish scale.
+
+    FORM IS SHRUNK, for the same reason BvP is. `form` is computed over
+    props.RECENT_GAMES games, so a +39% reading is five games of evidence, and
+    taking it at face value would say a hitter is 39 points more likely to get a
+    hit tonight than his own season rate. It gets the same sample-size treatment
+    BvP gets, with the prior set EQUAL TO the window - so at exactly the window
+    length form carries half its face value. The prior is the window rather than
+    a number picked to produce an answer.
     """
-    form = (b.get("form") or 0) / 100.0
+    base = (b.get("all_rate") or 0) / 100.0
+    n = props.RECENT_GAMES
+    form = ((b.get("form") or 0) / 100.0) * (n / (n + n))
     bvp = b.get("bvp") or {}
     pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
     edge = ((ops - LEAGUE_OPS) * (pa / (pa + BVP_PRIOR))) if pa > 0 else 0.0
-    return form + edge
+    return base + form + edge + (fit / PROP_FIT_SCALE)
+
+
+def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
+    """{player_id: fit score} from each hitter's batted-ball profile against
+    tonight's conditions. Fails soft to {} - a missing profile costs the
+    conditions term, and must never cost the board."""
+    out: dict = {}
+    cold_or_in = _conditions_against(game)
+    if not cold_or_in:
+        return out                       # nothing to adjust for
+    try:
+        season = int(date[:4])
+        for b in bats:
+            pid = b.get("player_id")
+            if not pid:
+                continue
+            st = hitter_type.season_line(pid, season)
+            if st:
+                out[pid] = hitter_type.fit(hitter_type.profile(st))[0]
+    except Exception as exc:
+        log.warning("conditions fit unavailable: %s", exc)
+        return {}
+    return out
+
+
+def _conditions_against(g: dict) -> bool:
+    """True when tonight actually suppresses batted balls - cold, wind blowing in,
+    or a high-strikeout starter. Without one of those the profile term would be
+    noise dressed as information, so it is simply not applied."""
+    w = g.get("weather") or {}
+    if isinstance(w.get("temp_f"), int) and w["temp_f"] <= TEMP_COLD:
+        return True
+    away, home = (g.get("matchup") or " @ ").split(" @ ")
+    wind = _wind_component(g, home)
+    if wind and wind[0] == "in":
+        return True
+    sa = g.get("statistical_advantage") or {}
+    for side in ("home", "away"):
+        k9 = (sa.get(side) or {}).get("starter_k9")
+        if isinstance(k9, (int, float)) and k9 >= K9_POWER:
+            return True
+    return False
 
 
 def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
