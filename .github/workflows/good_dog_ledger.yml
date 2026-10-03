@@ -1,0 +1,36 @@
+name: Good dog ledger
+
+# The good-dog tag as a plain ledger: every qualifying dog on every board, graded
+# at the board's own price, with the running balance and worst drawdown. No cuts
+# scanned - this answers "what would we actually have", not "is it noise".
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
+        run: python -m src.good_dog_ledger
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/good_dog_ledger.md output/team_splits_cache.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Good dog ledger ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              sleep 5
+            done
+          fi
