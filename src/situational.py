@@ -33,8 +33,16 @@ from .mlb_api import lineup, schedule_for
 log = logging.getLogger("situational")
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 
-# what we want, in priority order; matched against the live catalogue by code
-WANTED = ("risp", "men_on", "runners_on", "bases_loaded", "nobody_on", "empty")
+# MLB's real codes, read off /api/v1/situationCodes (602 of them). The guessable
+# names - men_on, runners_on, bases_loaded, nobody_on - are NOT codes; the first
+# run of this module requested them and the catalogue check reported every one as
+# missing, which is the whole reason it discovers rather than assumes.
+PRIMARY = "ron"        # "Runners On" - the question asked
+WANTED = ("ron",       # Runners On
+          "risp",      # Scoring Position
+          "risp2",     # Scoring Position - 2 Outs
+          "r123",      # Bases Loaded
+          "r0")        # Bases Empty - the baseline to read the others against
 
 
 def situation_codes() -> dict:
@@ -142,27 +150,32 @@ def build(team_name: str, date: str) -> str:
     for p in bats:
         sp = player_splits(p.player_id, season, use)
         overall = season_line(p.player_id, season)
-        risp = sp.get("risp") or {}
-        rows.append({"name": p.name, "overall": overall, "risp": risp,
+        prim = sp.get(PRIMARY) or {}
+        rows.append({"name": p.name, "overall": overall, "prim": prim,
                      "splits": sp,
-                     "lift": (_ops(risp) - _ops(overall))
-                             if _ops(risp) is not None and _ops(overall) is not None
+                     "lift": (_ops(prim) - _ops(overall))
+                             if _ops(prim) is not None and _ops(overall) is not None
                              else None})
-    ranked = sorted(rows, key=lambda r: -(_ops(r["risp"]) or -9))
+    ranked = sorted(rows, key=lambda r: -(_ops(r["prim"]) or -9))
 
-    md += ["## With runners in scoring position", "",
-           "| hitter | RISP | overall | RISP − overall |", "|---|---|---|---|"]
+    label = catalogue.get(PRIMARY, PRIMARY)
+    md += [f"## With {label.lower()} (`{PRIMARY}`)", "",
+           "_Ranked by OPS in that split. The `− overall` column is what the "
+           "split adds beyond the hitter's own season line; near zero means it "
+           "adds nothing._", "",
+           f"| hitter | {label} | overall (season) | − overall |",
+           "|---|---|---|---|"]
     for r in ranked:
         lift = f"**{r['lift']:+.3f}**" if r["lift"] is not None else "—"
-        md.append(f"| {r['name']} | {_line(r['risp'])} | {_line(r['overall'])} "
+        md.append(f"| {r['name']} | {_line(r['prim'])} | {_line(r['overall'])} "
                   f"| {lift} |")
     md.append("")
 
-    other = [c for c in use if c != "risp"]
+    other = [c for c in use if c != PRIMARY]
     if other:
         md += ["## The other situational splits", "",
                "| hitter | " + " | ".join(
-                   f"{c} ({catalogue.get(c, '')})".strip() for c in other) + " |",
+                   f"{catalogue.get(c) or c} (`{c}`)" for c in other) + " |",
                "|---|" + "---|" * len(other)]
         for r in sorted(rows, key=lambda x: x["name"]):
             md.append(f"| {r['name']} | "
