@@ -49,6 +49,23 @@ tilt = (share of HR on the family) − (share of PA-ending pitches on it). Needs
 | breaking | 174 | +0.140 | 0.060 |
 | offspeed | 174 | +0.221 ** | 0.003 |
 
+## How big is it, though?
+
+_A p-value says the signal exists. This says whether it is worth wiring, on the same scale as the factors already in the selector._
+
+slope +0.0087 per unit tilt (n=251) · hitter fastball tilt p10 -0.148 / p90 +0.218 · starter fastball share p10 41% / mean 56% / p90 72%
+
+| hitter | starter | multiplier on HR rate |
+|---|---|---|
+| p90 fastball tilt | p90 fastball share | ×1.0097 |
+| p90 fastball tilt | p10 fastball share | ×0.9906 |
+| p10 fastball tilt | p90 fastball share | ×0.9934 |
+| p10 fastball tilt | p10 fastball share | ×1.0064 |
+
+**Full achievable range ×0.991 to ×1.010** — a 1.9% spread, and only between the extremes of both distributions.
+
+For scale, the factors the selector already applies: form up to ×1.30, win probability ×1.27, wind ×1.24, park ×1.12, temperature ×1.08, opposing pitching ×1.05.
+
 ## How to read this
 
 - split-half r near zero means the season cannot agree with itself, so nothing carries forward by construction and the term must not be built
