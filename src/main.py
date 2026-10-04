@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for
-from . import batter_look, good_dog, hitter_type, hrr_shadow, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -305,6 +305,21 @@ def run(date: str) -> dict:
                 for b in scored:
                     b["fit"] = fits.get(b.get("player_id"), 0)
                 r["pick_criteria"]["hit_bats"] = scored[:3]
+                # HOME RUN PICK, from the board's own three bats.
+                #
+                # The constraint costs real probability and that is worth
+                # stating: on 2026-10-04 the best of the board's three was
+                # Merrill at 12.1%, against Tatis at 23.6% from the whole
+                # lineup - the three are chosen to GET A HIT, which favours
+                # contact and penalises the strikeout rate that comes with
+                # power. Picking from them was the instruction, so the cost is
+                # paid openly rather than worked around.
+                if _play(r) == "pick":
+                    try:
+                        _attach_hr_prop(r, scored[:3], gm, is_home, date)
+                    except Exception as exc:
+                        log.warning("hr prop failed on %s: %s",
+                                    r.get("game_pk"), exc)
         except Exception as exc:
             log.warning("prop failed for %s: %s", r.get("game_pk"), exc)
 
@@ -1640,6 +1655,46 @@ def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
     return out
 
 
+def _attach_hr_prop(r: dict, bats: list, gm, is_home: bool, date: str) -> None:
+    """Most likely home run among the board's own three bats, with its price.
+
+    Booked into its OWN book in the prop ledger (`home_runs`), not mixed into
+    `singles`. A 1+ hit single at -200 and a 1+ HR at +575 are different bets at
+    opposite ends of the price scale; pooling them makes one record that
+    describes neither. Separate books keep both readable while the home runs
+    still count inside the prop ledger.
+    """
+    ids = [b.get("player_id") for b in bats if b.get("player_id")]
+    if not ids:
+        return
+    opp_sp = (gm.away if is_home else gm.home).probable_pitcher
+    ranked = hr_pick.score_hitters(
+        ids, int(date[:4]), getattr(opp_sp, "player_id", None),
+        r.get("park_factor") or 1.0)
+    if not ranked:
+        return
+    top = ranked[0]
+    bat = {b.get("player_id"): b for b in bats}.get(top["player_id"]) or {}
+    name = bat.get("player")
+    if not name:
+        return
+    row = {"player": name, "player_id": top["player_id"],
+           "market": "1+ home run", "p_game": round(top["p_game"], 4),
+           "season": f"{top['hr']}/{top['pa']}",
+           "recent": f"{top['recent_hr']}/{top['recent_pa']}",
+           "iso": top["iso"], "pitcher_factor": top["pitcher_factor"],
+           "park": top["park"], "from_board_three": True}
+    try:
+        line = prop_odds.hr_line(date, name, gm.away.name, gm.home.name)
+        if line.get("over") is not None:
+            row["odds"] = line["over"]
+            if line.get("under") is not None:
+                row["under"] = line["under"]
+    except Exception as exc:
+        log.warning("hr line unavailable for %s: %s", name, exc)
+    r["pick_criteria"]["hr_prop"] = row
+
+
 def _break_even(odds: int) -> float:
     """The hit rate a 1+ hit bet needs at this price just to break even."""
     o = int(odds)
@@ -1781,6 +1836,13 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
+    hp = pc.get("hr_prop")
+    if hp:
+        price = (f" {hp['odds']:+d}" if isinstance(hp.get("odds"), int)
+                 else " (no line)")
+        out.append(f"       💥 HR PICK: {hp['player']} 1+ HR{price}"
+                   f"  ·  {hp['p_game']:.1%}  ·  {hp['season']} HR/PA"
+                   f" season, {hp['recent']} last 15")
     sh = pc.get("shadow_hrr")
     if sh and sh.get("over") is not None:
         out.append(f"       ◻ tracking only, NOT a bet: {sh['player']} "

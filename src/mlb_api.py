@@ -195,6 +195,32 @@ def player_hits(game_pk: int, player_id: int) -> int | None:
     return None
 
 
+def player_home_runs(game_pk: int, player_id: int) -> int | None:
+    """Home runs the player hit in a game, from the boxscore batting line. None
+    if unavailable (game not final / player absent / fetch fails).
+
+    Mirrors player_hits. A player who did not bat returns None, not 0, so a
+    scratch is never graded as a losing bet.
+    """
+    try:
+        with apitime.timed("mlb", f"box/{game_pk}"):
+            box = SESSION.get(
+                f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore",
+                timeout=TIMEOUT).json()
+        for side in ("home", "away"):
+            p = (box.get("teams", {}).get(side, {}).get("players") or {}).get(
+                f"ID{player_id}")
+            if p:
+                bat = (p.get("stats", {}).get("batting", {}) or {})
+                if int(bat.get("plateAppearances", 0) or 0) < 1:
+                    return None
+                return int(bat.get("homeRuns", 0) or 0)
+    except Exception as exc:
+        log.warning("player_home_runs fetch failed (%s/%s): %s",
+                    game_pk, player_id, exc)
+    return None
+
+
 def _team_from_raw(raw: dict) -> Team:
     t = raw["team"]
     pp = raw.get("probablePitcher")

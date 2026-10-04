@@ -86,6 +86,49 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), f"{hr9:.2f} HR/9 over {ip:.0f} IP"
 
 
+def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
+                  park: float) -> list[dict]:
+    """Rank a GIVEN set of hitters by P(1+ HR), same formula as `candidates`.
+
+    No MIN_PA / MIN_HR filter here, deliberately. That filter exists to stop a
+    bench bat with 3 homers in 40 PA topping a whole-lineup ranking. When the
+    CANDIDATE SET IS ALREADY FIXED - the three bats the board posts - filtering
+    would just return nothing and answer no question. The caller gets `pa` and
+    `hr` on every row so a thin sample is visible rather than hidden.
+    """
+    pf, pnote = _pitcher_factor(pitcher_id, season)
+    stats = mlb_api._season_hitting([p for p in player_ids if p], season)
+    out = []
+    for pid in player_ids:
+        st = stats.get(pid) or {}
+        try:
+            pa = int(st.get("plateAppearances", 0) or 0)
+            hr = int(st.get("homeRuns", 0) or 0)
+            ab = float(st.get("atBats", 0) or 0)
+            hits = float(st.get("hits", 0) or 0)
+            tb = float(st.get("totalBases", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if pa < 1:
+            continue
+        p_season = hr / pa
+        rhr, rpa = _recent_power(pid, season)
+        p_recent = (rhr / rpa) if rpa else p_season
+        w = rpa / (rpa + SHRINK)
+        p_blend = w * p_recent + (1 - w) * p_season
+        p_adj = _clamp(p_blend * pf * float(park), 0.0, 0.25)
+        out.append({
+            "player_id": pid, "pa": pa, "hr": hr,
+            "iso": round(((tb - hits) / ab) if ab else 0.0, 3),
+            "season_rate": p_season, "recent_hr": rhr, "recent_pa": rpa,
+            "blend": p_blend, "weight": round(w, 2),
+            "pitcher_factor": round(pf, 2), "pitcher_note": pnote,
+            "park": round(float(park), 3),
+            "p_game": 1 - (1 - p_adj) ** EXPECTED_PA})
+    out.sort(key=lambda r: -r["p_game"])
+    return out
+
+
 def candidates(date: str) -> list[dict]:
     try:
         day = json.loads((OUTPUT_DIR / f"picks_{date}.json").read_text())

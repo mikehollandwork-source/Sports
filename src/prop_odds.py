@@ -206,6 +206,56 @@ def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
     return _as_row(cache[game_key].get(player.strip().lower()))
 
 
+HR_MARKET = "batter_home_runs"
+HR_POINT = 0.5
+
+
+def _hr_cache_path(date: str) -> Path:
+    return OUTPUT_DIR / f"prop_odds_hr_{date}.json"
+
+
+def hr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
+    """{"over", "under"} for a player's 1+ HOME RUN line, or {}.
+
+    SEPARATE MARKET, SEPARATE CREDIT - see hrr_line. Plays only.
+    """
+    if not _key():
+        return {}
+    try:
+        cache = json.loads(_hr_cache_path(date).read_text())
+    except (OSError, ValueError):
+        cache = {}
+    game_key = f"{away_name}@{home_name}"
+    if game_key not in cache:
+        eid = _event_id(date, away_name, home_name)
+        rows: dict = {}
+        if eid:
+            data = _get(f"/events/{eid}/odds", regions="us", markets=HR_MARKET,
+                        oddsFormat="american")
+            sides: dict = {}
+            for bk in (data or {}).get("bookmakers", []) or []:
+                for mk in bk.get("markets", []) or []:
+                    if mk.get("key") != HR_MARKET:
+                        continue
+                    for o in mk.get("outcomes", []) or []:
+                        side = str(o.get("name")).lower()
+                        if side not in ("over", "under") \
+                                or o.get("point") != HR_POINT:
+                            continue
+                        who = str(o.get("description") or "").strip().lower()
+                        if who and isinstance(o.get("price"), (int, float)):
+                            sides.setdefault(who, {}).setdefault(
+                                side, []).append(int(o["price"]))
+            for who, bys in sides.items():
+                row = {sd: int(sorted(v)[len(v) // 2]) for sd, v in bys.items() if v}
+                if row.get("over") is not None:
+                    rows[who] = row
+        cache[game_key] = rows
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        _hr_cache_path(date).write_text(json.dumps(cache, indent=1))
+    return _as_row(cache[game_key].get(player.strip().lower()))
+
+
 def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
     """{"over": american, "under": american} for a player's 0.5 hits line.
 

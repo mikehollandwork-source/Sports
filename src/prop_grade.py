@@ -67,10 +67,12 @@ def load_ledger() -> dict:
         led = json.loads(LEDGER_PATH.read_text())
         led.setdefault("singles", _empty())
         led.setdefault("parlays", _empty())
+        led.setdefault("home_runs", _empty())
         return led
     except (OSError, ValueError):
         return {"stake": STAKE, "prop_price": PROP_PRICE,
-                "singles": _empty(), "parlays": _empty()}
+                "singles": _empty(), "parlays": _empty(),
+                "home_runs": _empty()}
 
 
 def _dec(american: int) -> float:
@@ -84,16 +86,42 @@ def parlay_odds(a: int, b: int) -> int:
     return round((dec - 1) * 100) if dec >= 2 else -round(100 / (dec - 1))
 
 
-def grade_date(date: str) -> tuple[list, list]:
-    """(single_entries, parlay_entries) for the date's props on FINAL games."""
+def grade_date(date: str) -> tuple[list, list, list]:
+    """(singles, parlays, home_runs) for the date's props on FINAL games.
+
+    HOME RUNS ARE THEIR OWN BOOK, not folded into singles. A 1+ hit at -200 and
+    a 1+ HR at +575 sit at opposite ends of the price scale and hit at ~63% and
+    ~15%; pooling them produces one record that describes neither. They still
+    count inside the prop ledger, which is what was asked - just readably.
+    """
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
         return [], []
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
-    singles, parlays = [], []
+    singles, parlays, homers = [], [], []
     for g in payload.get("games", []):
         pc = g.get("pick_criteria") or {}
+        # 1+ HR on the hitter the board posts. Same play-only rule as singles.
+        hp = pc.get("hr_prop")
+        res0 = results.get(g.get("game_pk"))
+        if (hp and hp.get("player_id") and pc.get("play") == "pick"
+                and res0 and res0.get("final")
+                and isinstance(hp.get("odds"), int)):
+            hrs = mlb_api.player_home_runs(g.get("game_pk"), hp["player_id"])
+            if hrs is not None:
+                won = hrs >= 1
+                price = int(hp["odds"])
+                homers.append({
+                    "key": f"{date}#{g['game_pk']}", "date": date,
+                    "matchup": g["matchup"],
+                    "bet": f"{hp['player']} 1+ HR",
+                    "result": "W" if won else "L",
+                    "score": (f"{res0['away']} {res0['away_score']} @ "
+                              f"{res0['home']} {res0['home_score']}"),
+                    "odds": price, "real_line": True, "hr": hrs,
+                    "profit": round(grade.american_profit(price) if won
+                                    else -STAKE, 2)})
         prop = pc.get("prop")
         adv = pc.get("advantage_team")
         pid = (prop or {}).get("player_id")
@@ -135,17 +163,20 @@ def grade_date(date: str) -> tuple[list, list]:
                 "result": "W" if won else "L", "score": score, "odds": po,
                 "real_line": "odds" in prop,
                 "profit": round(grade.american_profit(po) if won else -STAKE, 2)})
-    return singles, parlays
+    return singles, parlays, homers
 
 
 def update(date: str) -> dict:
     led = load_ledger()
-    s, p = grade_date(date)
+    s, p, hr = grade_date(date)
     ns = grade._add(led["singles"], s)
     npar = grade._add(led["parlays"], p)
-    if ns or npar:
-        log.info("props %s: +%d singles, +%d parlays (singles %+.2fu / parlays %+.2fu)",
-                 date, ns, npar, led["singles"]["bankroll"], led["parlays"]["bankroll"])
+    nhr = grade._add(led["home_runs"], hr)
+    if ns or npar or nhr:
+        log.info("props %s: +%d singles, +%d parlays, +%d home runs "
+                 "(singles %+.2fu / parlays %+.2fu / HR %+.2fu)",
+                 date, ns, npar, nhr, led["singles"]["bankroll"],
+                 led["parlays"]["bankroll"], led["home_runs"]["bankroll"])
     OUTPUT_DIR.mkdir(exist_ok=True)
     LEDGER_PATH.write_text(json.dumps(led, indent=2))
     return led
