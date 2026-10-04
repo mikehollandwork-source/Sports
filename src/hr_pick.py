@@ -140,6 +140,29 @@ WIN_HR_RATIO = 3.86 / 2.23
 _WL = 1.0 / (0.5 * WIN_HR_RATIO + 0.5)
 WIN_MULT, LOSE_MULT = WIN_HR_RATIO * _WL, _WL
 FORM_CLAMP = (0.80, 1.30)
+# TREND: is the bat RISING, not merely elevated? form_factor above compares a
+# 15-game lump against the hitter's season, which is a LEVEL - a hitter hot in
+# games 1-10 and cold in 11-15 scores the same as one cold then hot.
+# Measured in form_trend.py over 22,361 hitter-games from 419 hitters, with both
+# windows ending BEFORE the game predicted: a rising bat homers at 3.369% per PA
+# against 3.085% falling, pooled 3.200%, permutation p=0.0215 on the
+# pre-registered primary split. TREND_UP and TREND_DOWN are those two rates over
+# the pooled rate - derived from the measurement, not fitted.
+# The split is 5 games against the prior 10, not the "couple of games" asked for,
+# because three games is ~12 PA where one double swings a slash line hundreds of
+# points. A two-game slope would be noise.
+# NOTE a post-hoc subgroup, deliberately NOT built in: almost all of the effect
+# sits where the 15-game LEVEL is depressed (x1.147, p=0.0085) rather than
+# elevated (x1.039, p=0.476) - coming out of a slump rather than already hot.
+# That is a subgroup of an already-significant primary, so it is recorded for
+# forward confirmation instead of baked in. Do not re-fit these against the
+# record this is now accumulating.
+TREND_RECENT = 5
+TREND_EARLIER = 10
+TREND_MIN_BATTED = 8       # batted balls per window before a ratio is readable
+TREND_MIN_AB = 10
+TREND_UP = 1.05
+TREND_DOWN = 0.96
 
 # THE FLOOR, DERIVED NOT CHOSEN. A pitcher faces roughly 38 batters per 9
 # innings, so LEAGUE_HR9 implies a league-average HR rate per plate appearance,
@@ -223,10 +246,10 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), note
 
 
-def _recent_batted_ball(pid: int, season: int, n: int = FORM_GAMES) -> dict:
-    """Air/ground outs, ISO and sample over a hitter's last n games."""
+def _bb_sum(splits: list[dict]) -> dict:
+    """Air/ground outs, ISO and sample over a list of game-log splits."""
     air = ground = ab = hits = tb = pa = 0.0
-    for sp in mlb_api._full_gamelog(pid, "hitting", season)[-n:]:
+    for sp in splits:
         st = sp.get("stat", {}) or {}
         def g(k):
             try:
@@ -238,6 +261,50 @@ def _recent_batted_ball(pid: int, season: int, n: int = FORM_GAMES) -> dict:
         pa += g("plateAppearances")
     return {"air": air, "ground": ground, "ab": ab, "pa": pa, "hits": hits,
             "iso": ((tb - hits) / ab) if ab else None}
+
+
+def _recent_batted_ball(pid: int, season: int, n: int = FORM_GAMES) -> dict:
+    """Air/ground outs, ISO and sample over a hitter's last n games."""
+    return _bb_sum(mlb_api._full_gamelog(pid, "hitting", season)[-n:])
+
+
+def trend_factor(pid: int, season: int) -> tuple[float, str]:
+    """Is the bat rising? Last TREND_RECENT games against the TREND_EARLIER
+    before them, on air share and ISO - the same pair form_factor reads, and for
+    the same reason: home runs over 5 games are 0-2 events, while batted balls
+    are dozens.
+
+    Returns 1.0 and says why when either window is too thin, so a hitter early
+    in the season is left neutral rather than guessed at. The gamelog is cached
+    in-process, so this costs no extra request on top of form_factor's.
+    """
+    rows = mlb_api._full_gamelog(pid, "hitting", season)
+    a = rows[-TREND_RECENT:]
+    b = rows[-(TREND_RECENT + TREND_EARLIER):-TREND_RECENT]
+    if len(a) < TREND_RECENT or len(b) < TREND_EARLIER:
+        return 1.0, "too few games for a trend"
+    wa, wb = _bb_sum(a), _bb_sum(b)
+    ba, bb = wa["air"] + wa["ground"], wb["air"] + wb["ground"]
+    if min(ba, bb) < TREND_MIN_BATTED or min(wa["ab"], wb["ab"]) < TREND_MIN_AB:
+        return 1.0, "trend window too thin"
+    # An earlier window with ISO 0 - no extra-base hit in those 10 games - has
+    # no ratio to take, and form_trend.py excluded those rows when the effect
+    # was measured, so applying the factor to them would be using it outside the
+    # population it was estimated on. They are 3.7% of rows, and at ~41 home
+    # runs between them they cannot support a rule of their own, so they stay
+    # neutral. That does lose the sharpest slump-recovery cases; the alternative
+    # is inventing a rule, which is worse.
+    if not wb["air"] or wa["iso"] is None or wb["iso"] is None \
+            or wb["iso"] <= 0:
+        return 1.0, "trend baseline unreadable"
+    air_ratio = (wa["air"] / ba) / (wb["air"] / bb)
+    iso_ratio = wa["iso"] / wb["iso"]
+    ratio = (air_ratio * iso_ratio) ** 0.5
+    up = ratio > 1.0
+    f = TREND_UP if up else TREND_DOWN
+    return f, (f"{'rising' if up else 'falling'}: last {TREND_RECENT} vs prior "
+               f"{TREND_EARLIER} — air {wa['air']/ba:.0%} vs {wb['air']/bb:.0%}, "
+               f"ISO {wa['iso']:.3f} vs {wb['iso']:.3f} -> x{f:.2f}")
 
 
 def form_factor(recent: dict, season_st: dict) -> tuple[float, str]:
@@ -425,8 +492,9 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
         # window are dozens, so the form term is measured there instead.
         rb = _recent_batted_ball(pid, season)
         ff, fnote = form_factor(rb, st)
+        tf, tnote = trend_factor(pid, season)
         rhr, rpa = _recent_power(pid, season)      # reported, no longer weighted
-        p_blend = base * ff
+        p_blend = base * ff * tf
         pfac = pf if opp_factor is None else opp_factor
         p_adj = _clamp(p_blend * pfac * float(park) * float(wind) * float(temp)
                        * float(win), 0.0, 0.25)
@@ -435,6 +503,7 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
             "player_id": pid, "pa": pa, "hr": hr, "wind_factor": round(wind, 2),
             "temp_factor": round(temp, 2), "slot": (slots or {}).get(pid),
             "form_factor": round(ff, 2), "form_note": fnote,
+            "trend_factor": round(tf, 2), "trend_note": tnote,
             "win_factor": round(win, 2), "team": team,
             "expected_pa": exp_pa, "hand_rate": p_hand, "hand_pa": hand_pa,
             "iso": round(((tb - hits) / ab) if ab else 0.0, 3),

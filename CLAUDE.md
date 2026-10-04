@@ -170,6 +170,28 @@ unit-testable with mock `Game`/`Team` objects.
   cannot reorder candidates by construction — keep it there. `TILT_SLOPE` and
   `LEAGUE_FASTBALL_SHARE` are PRE-REGISTERED from the measurement and must not be
   re-fitted against the forward record the field is accumulating.
+- **The HR selector has BOTH a level and a trend term, and they are different
+  things.** `form_factor` compares a 15-game lump against the hitter's season —
+  a LEVEL, which cannot tell a bat hot in games 1-10 and cold in 11-15 from the
+  reverse. `trend_factor` adds direction: last 5 games against the prior 10, on
+  air share and ISO. Measured in `form_trend.py` over 22,361 hitter-games from
+  419 hitters, both windows ending BEFORE the game predicted — rising bats homer
+  at 3.369% per PA against 3.085% falling (pooled 3.200%), permutation p=0.0215
+  on the pre-registered primary split, permuted BY HITTER since a hitter's games
+  share his park and slot. `TREND_UP`/`TREND_DOWN` are those rates over the
+  pooled rate: derived, not fitted, and PRE-REGISTERED. The two terms are nearly
+  independent (r=+0.132), so multiplying both is not double-counting. **Known
+  gaps, both deliberate:** the split is 5-vs-10 rather than "the last couple
+  games" because 3 games is ~12 PA where one double swings a slash line hundreds
+  of points; and an earlier window with ISO 0 has no ratio, stays neutral, and so
+  the sharpest slump-recovery cases are missed (3.7% of rows, ~41 HR — too few to
+  support a rule). **Recorded for forward confirmation, NOT built in:** almost
+  all the effect sits where the 15-game level is depressed (×1.147, p=0.0085)
+  rather than elevated (×1.039, p=0.476) — coming out of a slump, not already
+  hot. That is a post-hoc subgroup of an already-significant primary, so it is
+  being watched rather than baked in. The air-rate trend alone is NULL (p=0.149);
+  ISO alone carries it (p=0.0060), so "rising without hits" is specifically the
+  half that does not work.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
