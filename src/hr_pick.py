@@ -117,6 +117,21 @@ FORM_MIN_AB = 15
 # are not getting hits, as long as the air and power are there" requires. With
 # only counting stats there is no exit-velocity substitute.
 FORM_MIN_HITS = 5
+
+# WIN PROBABILITY, which matters because home runs and winning are the same
+# event seen twice. Measured in hr_side_scan over 26,141 batter-games: hitters
+# whose team WON homered at 3.86% per PA against 2.23% for losers - a 1.73x
+# ratio, z = +14.7. A home run SCORES, so it is part of what makes the winner.
+#
+# A hitter's unconditional rate already blends his wins and losses at roughly
+# 50/50, so relative to it a winning side is x1.268 and a losing side x0.732.
+# Tonight's de-vigged win probability interpolates between them. This is what
+# lets BOTH lineups be compared on one footing: a big bat on the underdog is
+# discounted rather than excluded, by a factor derived from the measurement
+# rather than chosen.
+WIN_HR_RATIO = 3.86 / 2.23
+_WL = 1.0 / (0.5 * WIN_HR_RATIO + 0.5)
+WIN_MULT, LOSE_MULT = WIN_HR_RATIO * _WL, _WL
 FORM_CLAMP = (0.80, 1.30)
 
 # THE FLOOR, DERIVED NOT CHOSEN. A pitcher faces roughly 38 batters per 9
@@ -219,6 +234,14 @@ def temp_factor(temp_f, roof: str | None) -> tuple[float, str]:
     return f, f"{temp_f:.0f}F (x{f:.2f})"
 
 
+def win_factor(p_win: float | None) -> tuple[float, str]:
+    """Multiplier from tonight's win probability, from the measured 1.73x split."""
+    if not isinstance(p_win, (int, float)) or not 0.0 < p_win < 1.0:
+        return 1.0, "no win probability"
+    f = p_win * WIN_MULT + (1 - p_win) * LOSE_MULT
+    return f, f"p(win) {p_win:.0%} (x{f:.2f})"
+
+
 def slot_pa(slot: int | None) -> float:
     """Expected plate appearances for a batting-order slot."""
     return PA_BY_SLOT.get(slot or 0, EXPECTED_PA)
@@ -315,7 +338,8 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
                   min_pa: int = 0, min_hr: int = 0,
                   temp: float = 1.0, hand: str | None = None,
                   slots: dict | None = None,
-                  opp_factor: float | None = None) -> list[dict]:
+                  opp_factor: float | None = None,
+                  win: float = 1.0, team: str | None = None) -> list[dict]:
     """Rank a GIVEN set of hitters by P(1+ HR), same formula as `candidates`.
 
     `min_pa` / `min_hr` default to 0 - no filter - which is right when the
@@ -353,13 +377,14 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
         rhr, rpa = _recent_power(pid, season)      # reported, no longer weighted
         p_blend = base * ff
         pfac = pf if opp_factor is None else opp_factor
-        p_adj = _clamp(p_blend * pfac * float(park) * float(wind) * float(temp),
-                       0.0, 0.25)
+        p_adj = _clamp(p_blend * pfac * float(park) * float(wind) * float(temp)
+                       * float(win), 0.0, 0.25)
         exp_pa = slot_pa((slots or {}).get(pid))
         out.append({
             "player_id": pid, "pa": pa, "hr": hr, "wind_factor": round(wind, 2),
             "temp_factor": round(temp, 2), "slot": (slots or {}).get(pid),
             "form_factor": round(ff, 2), "form_note": fnote,
+            "win_factor": round(win, 2), "team": team,
             "expected_pa": exp_pa, "hand_rate": p_hand, "hand_pa": hand_pa,
             "iso": round(((tb - hits) / ab) if ab else 0.0, 3),
             "season_rate": base, "recent_hr": rhr, "recent_pa": rpa,

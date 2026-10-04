@@ -1659,117 +1659,141 @@ def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
     return out
 
 
+def _hr_side(r: dict, bat_team, opp_team, gm, is_home: bool, date: str,
+             shared: dict) -> list[dict]:
+    """Scored HR candidates for ONE lineup, against ITS OWN opposing pitching.
+
+    Each side faces a different starter and bullpen and has its own win
+    probability, so the two lineups cannot share those terms - only the park,
+    wind and temperature, which are the game's.
+    """
+    try:
+        hitters = mlb_lineup(gm.game_pk, bat_team.team_id, date, is_home)
+    except Exception as exc:
+        log.warning("hr lineup unavailable for %s: %s", bat_team.name, exc)
+        return []
+    names = {h.player_id: h.name for h in hitters if getattr(h, "player_id", None)}
+    if not names:
+        return []
+    season = int(date[:4])
+    opp_sp = opp_team.probable_pitcher
+    sa = (r.get("statistical_advantage") or {}).get(
+        "away" if is_home else "home") or {}
+    pen, pen_ip = hr_pick.pen_hr9(opp_team.team_id, date,
+                                  getattr(opp_sp, "player_id", None), season)
+    oppf, oppnote = hr_pick.opposing_hr9_factor(
+        getattr(opp_sp, "player_id", None), pen,
+        (float(sa["starter_ip_last5"]) / 5.0) if sa.get("starter_ip_last5")
+        else hr_pick.STARTER_IP_DEFAULT, season)
+    wmult, wnote = hr_pick.win_factor(shared["p_win"].get(bat_team.name))
+    slots = {h.player_id: i + 1 for i, h in enumerate(hitters)
+             if getattr(h, "player_id", None)}
+    rows = hr_pick.score_hitters(
+        list(names), season, getattr(opp_sp, "player_id", None),
+        shared["park"], wind=shared["wind"], min_pa=hr_pick.MIN_PA,
+        min_hr=hr_pick.MIN_HR, temp=shared["temp"],
+        hand=getattr(opp_sp, "hand", None), slots=slots, opp_factor=oppf,
+        win=wmult, team=bat_team.name)
+    for row in rows:
+        row["name"] = names.get(row["player_id"])
+        row["opposing"] = oppnote
+        row["bullpen_ip"] = round(pen_ip, 1)
+        row["win_note"] = wnote
+        row["opp_hand"] = getattr(opp_sp, "hand", None)
+    return rows
+
+
 def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
-    """Most likely home run on the picked team, with its price, or nothing.
+    """Most likely home run in the GAME - either lineup - or nothing.
 
-    FROM THE WHOLE LINEUP, not the three posted bats. Those three are chosen to
-    GET A HIT, which favours contact and penalises the strikeout rate that comes
-    with power - a structurally wrong pool for a home-run bet. Measured on
-    2026-10-04: best of the three was Merrill at 14.6% while the lineup held
-    Tatis at 23.6% and Sheets at 23.3%. Widening does not make the model's
-    estimate of any one hitter better; it makes the SELECTION better, which is
-    the thing that was broken.
-
-    Widening REQUIRES the sample filter back. Without MIN_PA / MIN_HR a bench bat
-    at 2 HR in 25 PA reads 38% and beats a 26-homer regular at 20% - noise
-    winning because its denominator is small.
+    BOTH TEAMS, not just the side the board backs, and not the three posted
+    bats. The three are chosen to GET A HIT, which favours contact and penalises
+    the strikeout rate that comes with power. Restricting to our own side then
+    throws away half the hitters in the game for no reason - the question is who
+    is likeliest to homer, not who is on our ticket.
+    
+    The two sides are made comparable by a WIN-PROBABILITY factor derived from
+    hr_side_scan: winners homer at 1.73x losers over 26,141 batter-games, so a
+    bat on the likely loser is discounted (x0.73 at the extreme) rather than
+    excluded. Park, wind and temperature are shared; the opposing starter,
+    bullpen and hand are per side.
 
     Booked into its own `home_runs` book in the prop ledger, never mixed into
-    `singles`: a 1+ hit at -200 and a 1+ HR at +390 are different bets.
+    `singles`.
     """
-    # ---- conditions first: these can refuse the whole thing ----------------
-    away, home = (r.get("matchup") or " @ ").split(" @ ")
-    wc = _wind_component(r, home)
+    away_name, home_name = (r.get("matchup") or " @ ").split(" @ ")
+    wc = _wind_component(r, home_name)
     cond = _contact_conditions(r, team.name)
-    against = cond.startswith("contact conditions: AGAINST THE BAT")
-    if (wc and wc[0] == "in") or against:
+    if (wc and wc[0] == "in") or cond.startswith("contact conditions: AGAINST THE BAT"):
         why = ("wind is blowing IN" if (wc and wc[0] == "in")
                else "conditions are against the bat")
         r["pick_criteria"]["hr_withheld"] = {
-            "reason": f"no HR pick — {why} ({cond.split(': ', 1)[-1]})",
-            "wind": f"{(r.get('weather') or {}).get('wind_mph')} mph "
-                    f"{wc[0] if wc else '—'}"}
+            "reason": f"no HR pick — {why} ({cond.split(': ', 1)[-1]})"}
         log.info("hr prop withheld on %s: %s", r.get("game_pk"), why)
         return
 
-    try:
-        hitters = mlb_lineup(gm.game_pk, team.team_id, date, is_home)
-    except Exception as exc:
-        log.warning("hr lineup unavailable: %s", exc)
-        return
-    names = {h.player_id: h.name for h in hitters if getattr(h, "player_id", None)}
-    if not names:
-        return
-    opp_team = gm.away if is_home else gm.home
-    opp_sp = opp_team.probable_pitcher
-    season = int(date[:4])
     w = r.get("weather") or {}
     wf, wnote = hr_pick.wind_factor(w.get("wind_mph"),
                                     wc[1] if wc else 0.0,
                                     wc[0] if wc else None)
     tf, tnote = hr_pick.temp_factor(w.get("temp_f"), w.get("roof"))
-    # HR-specific park factor. PARK_FACTORS is a RUN factor and says so in its
-    # own docstring; Fenway is 1.06 for runs and ~0.97 for home runs, Kauffman
-    # 1.03 and ~0.90. Using the run number for HR was wrong in a known way.
-    hrpark = hr_factor(gm.home.name)
-    # Starter AND bullpen: a 5.3-inning start leaves ~41% of plate appearances
-    # against relievers the model used to treat as the starter.
-    sa = (r.get("statistical_advantage") or {}).get("away" if is_home else "home") or {}
-    pen, pen_ip = hr_pick.pen_hr9(opp_team.team_id, date,
-                                  getattr(opp_sp, "player_id", None), season)
-    oppf, oppnote = hr_pick.opposing_hr9_factor(
-        getattr(opp_sp, "player_id", None), pen,
-        sa.get("starter_ip_last5") and float(sa["starter_ip_last5"]) / 5.0
-        or hr_pick.STARTER_IP_DEFAULT, season)
-    # batting-order slot -> expected plate appearances (the exponent)
-    slots = {h.player_id: i + 1 for i, h in enumerate(hitters)
-             if getattr(h, "player_id", None)}
-    ranked = hr_pick.score_hitters(
-        list(names), season, getattr(opp_sp, "player_id", None),
-        hrpark, wind=wf, min_pa=hr_pick.MIN_PA, min_hr=hr_pick.MIN_HR,
-        temp=tf, hand=getattr(opp_sp, "hand", None), slots=slots,
-        opp_factor=oppf)
+    pc = r.get("pick_criteria") or {}
+    # de-vigged win probability per team, from the board's own two prices
+    p_win: dict = {}
+    adv, a_ml = pc.get("advantage_team"), pc.get("advantage_moneyline")
+    o_ml = pc.get("opponent_moneyline")
+    if adv and isinstance(a_ml, int) and isinstance(o_ml, int):
+        ia, io = _implied(a_ml), _implied(o_ml)
+        tot = ia + io
+        if tot > 0:
+            opp = home_name if adv == away_name else away_name
+            p_win = {adv: ia / tot, opp: io / tot}
+    shared = {"park": hr_factor(gm.home.name), "wind": wf, "temp": tf,
+              "p_win": p_win}
 
-    # ---- no numbers indicating a home run -> post nothing ------------------
-    if not ranked:
+    cands = (_hr_side(r, gm.away, gm.home, gm, False, date, shared)
+             + _hr_side(r, gm.home, gm.away, gm, True, date, shared))
+    if not cands:
         r["pick_criteria"]["hr_withheld"] = {
-            "reason": f"no HR pick — nobody in the lineup has the season behind "
-                      f"it ({hr_pick.MIN_PA}+ PA and {hr_pick.MIN_HR}+ HR)",
-            "wind": wnote}
+            "reason": f"no HR pick — nobody in either lineup has the season "
+                      f"behind it ({hr_pick.MIN_PA}+ PA and "
+                      f"{hr_pick.MIN_HR}+ HR)", "wind": wnote}
         log.info("hr prop withheld on %s: no qualifying bat", r.get("game_pk"))
         return
-    top = ranked[0]
+    cands.sort(key=lambda c: -c["p_game"])
+    top = cands[0]
     if top["p_game"] < hr_pick.HR_FLOOR:
         r["pick_criteria"]["hr_withheld"] = {
-            "best": names.get(top["player_id"]),
+            "best": top.get("name"), "team": top.get("team"),
             "p_game": round(top["p_game"], 4),
             "floor": round(hr_pick.HR_FLOOR, 4),
             "season": f"{top['hr']}/{top['pa']}", "wind": wnote,
-            "reason": f"no HR pick — best in the lineup is "
+            "reason": f"no HR pick — best in the game is "
                       f"{top['p_game']:.1%}, under the "
                       f"{hr_pick.HR_FLOOR:.1%} a league-average hitter manages"}
         log.info("hr prop withheld on %s: under the floor", r.get("game_pk"))
         return
-
-    name = names.get(top["player_id"])
+    name = top.get("name")
     if not name:
         return
     row = {"player": name, "player_id": top["player_id"],
-           "market": "1+ home run", "p_game": round(top["p_game"], 4),
+           "team": top.get("team"), "market": "1+ home run",
+           "p_game": round(top["p_game"], 4),
            "season": f"{top['hr']}/{top['pa']}",
            "recent": f"{top['recent_hr']}/{top['recent_pa']}",
            "iso": top["iso"], "pitcher_factor": top["pitcher_factor"],
            "park": top["park"], "wind": wnote, "temp": tnote,
            "wind_factor": top.get("wind_factor"),
            "slot": top.get("slot"), "expected_pa": top.get("expected_pa"),
-           "form_factor": top.get("form_factor"),
-           "form": top.get("form_note"),
+           "form_factor": top.get("form_factor"), "form": top.get("form_note"),
+           "win_factor": top.get("win_factor"), "win": top.get("win_note"),
            "vs_hand": (None if top.get("hand_rate") is None else
                        f"{top['hand_rate']*top['hand_pa']:.0f}/{top['hand_pa']}"
-                       f" vs {getattr(opp_sp, 'hand', '?')}HP"),
-           "opposing": oppnote, "bullpen_ip": round(pen_ip, 1),
+                       f" vs {top.get('opp_hand') or '?'}HP"),
+           "opposing": top.get("opposing"), "bullpen_ip": top.get("bullpen_ip"),
            "floor": round(hr_pick.HR_FLOOR, 4),
-           "pool": "whole lineup", "considered": len(ranked)}
+           "pool": "both lineups", "considered": len(cands),
+           "our_side": top.get("team") == (pc.get("bet_team") or team.name)}
     try:
         line = prop_odds.hr_line(date, name, gm.away.name, gm.home.name)
         if line.get("over") is not None:
