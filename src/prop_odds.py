@@ -348,3 +348,38 @@ def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
         cache[game_key] = _fetch_game_lines(eid) if eid else {}
         _save_cache(date, cache)
     return _as_row(cache[game_key].get(player.strip().lower()))
+
+
+def credits_check() -> str:
+    """What the API says is left, via the FREE /events listing.
+
+    /events costs nothing - only /events/{id}/odds is billed - so this reports
+    the real remaining balance without spending a credit to find out.
+    """
+    if not _key():
+        return "no THE_ODDS_API_KEY in the environment"
+    _get("/events", dateFormat="iso")          # free; headers recorded
+    st = _state()
+    rem, used = st.get("remaining"), st.get("used")
+    if rem is None and used is None:
+        return "the API returned no credit headers"
+    total = (rem + used) if isinstance(rem, int) and isinstance(used, int) else None
+    bits = [f"remaining **{rem}**", f"used **{used}**"]
+    if total is not None:
+        bits.append(f"so the period allowance is **{total}**")
+    bits.append(f"reserve is {RESERVE}")
+    return " · ".join(bits)
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO,
+                        format="%(levelname)s %(name)s: %(message)s")
+    line = credits_check()
+    print(line)
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    (OUTPUT_DIR / "odds_credits.md").write_text(
+        f"# Odds API credits\n\n- {line}\n")
+
+
+if __name__ == "__main__":
+    main()
