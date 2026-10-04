@@ -1762,6 +1762,8 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "park": top["park"], "wind": wnote, "temp": tnote,
            "wind_factor": top.get("wind_factor"),
            "slot": top.get("slot"), "expected_pa": top.get("expected_pa"),
+           "form_factor": top.get("form_factor"),
+           "form": top.get("form_note"),
            "vs_hand": (None if top.get("hand_rate") is None else
                        f"{top['hand_rate']*top['hand_pa']:.0f}/{top['hand_pa']}"
                        f" vs {getattr(opp_sp, 'hand', '?')}HP"),
