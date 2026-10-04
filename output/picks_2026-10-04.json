@@ -1,6 +1,6 @@
 {
   "date": "2026-10-04",
-  "generated_at": "2026-10-04T05:02:50.092377+00:00",
+  "generated_at": "2026-10-04T05:37:00.214822+00:00",
   "games": [
     {
       "game_pk": 849825,
@@ -105,16 +105,22 @@
       "public_majority": {
         "team": "Milwaukee Brewers",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Sd",
+            "pcts": {
+              "Sd": 61.0,
+              "Mil": 39.0
+            }
+          },
           "forum": {
             "pick": "Milwaukee Brewers",
             "home": 17,
             "away": 15
           },
-          "agree": null,
+          "agree": false,
           "forum_lean": 0.062,
-          "consensus_lean": null,
-          "blended_lean": 0.182,
+          "consensus_lean": -0.22,
+          "blended_lean": 0.104,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -139,6 +145,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "away",
+            "agrees": false
+          },
+          {
             "name": "forum",
             "side": "home",
             "agrees": true
@@ -156,10 +167,10 @@
         ],
         "majority_side": "home",
         "agree": 3,
-        "dissent": 0,
+        "dissent": 1,
         "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 3 sources agree on the public side",
+        "verdict": "mostly agrees",
+        "note": "3/4 sources agree (covers differ)",
         "flags": [],
         "line": "with public",
         "money": "with public",
@@ -240,7 +251,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Milwaukee Brewers",
+          "consensus_pct": 39.0,
+          "moneyline": "-127"
+        },
+        "non_majority": {
+          "team": "San Diego Padres",
+          "consensus_pct": 61.0,
+          "moneyline": "+122"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 6,
@@ -389,7 +411,7 @@
       },
       "pick_criteria": {
         "status": "PICK",
-        "reason": "fade \u2014 Milwaukee Brewers -200 was withdrawn",
+        "reason": "fade \u2014 standing bet on San Diego Padres",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
         "public_trusted": true,
@@ -403,7 +425,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.182,
+            "blended_lean": 0.104,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -414,7 +436,7 @@
         },
         "consistency_hits": 4,
         "advantage_moneyline": -149,
-        "opponent_moneyline": 123,
+        "opponent_moneyline": 124,
         "line_check": {
           "open": -131,
           "current": -149,
@@ -438,10 +460,10 @@
         },
         "vegas": {
           "bet": "San Diego Padres",
-          "odds": 123,
+          "odds": 124,
           "basis": "money %",
           "hold_home": -1656510,
-          "hold_away": 2941400
+          "hold_away": 2923200
         },
         "play": "pick",
         "starred": [],
@@ -459,11 +481,11 @@
         },
         "line_vs_money": "with",
         "bet_team": "San Diego Padres",
-        "bet_moneyline": 123,
+        "bet_moneyline": 124,
         "good_dog": {
           "team": "San Diego Padres",
           "rate": 0.616,
-          "odds": 123
+          "odds": 124
         },
         "line_money": null,
         "source": "fade",
@@ -834,12 +856,12 @@
         "majority": {
           "team": "Los Angeles Dodgers",
           "consensus_pct": 60.0,
-          "moneyline": "-149"
+          "moneyline": "-163"
         },
         "non_majority": {
           "team": "Atlanta Braves",
           "consensus_pct": 40.0,
-          "moneyline": "+133"
+          "moneyline": "+127"
         }
       },
       "consistency": {
