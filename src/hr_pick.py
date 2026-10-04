@@ -56,6 +56,13 @@ MIN_PA = 250           # "superstar": a real season behind the rate
 MIN_HR = 10
 LEAGUE_HR9 = 1.15      # league-average HR allowed per 9 innings
 PITCHER_CLAMP = (0.70, 1.40)
+# A starter's recent HR-allowed, blended into his season rate.
+# RECENT_PRIOR_IP is deliberately large: HR/9 is one of the slowest-stabilising
+# pitching rates (it needs well over a hundred innings to carry its own weight),
+# so three starts - about sixteen innings - gets 16/(16+60) = 21% and the season
+# keeps the rest. Reasoned from how noisy the rate is, not fitted to anything.
+RECENT_STARTS = 3
+RECENT_PRIOR_IP = 60.0
 
 # WIND, which this model used to ignore entirely while using the park factor.
 # Outward wind is a real home-run factor and leaving it out made every number
@@ -158,6 +165,38 @@ def _recent_power(pid: int, season: int, n: int = RECENT_GAMES) -> tuple[int, in
     return hr, pa
 
 
+def recent_starter_hr(pid: int, season: int,
+                      n: int = RECENT_STARTS) -> tuple[float, float]:
+    """(HR allowed, IP) over the starter's last n STARTS.
+
+    Starts only, so a spot relief outing does not count as one of them; falls
+    back to his last n appearances when the feed omits gamesStarted. Returns
+    (0, 0) on any failure, which the caller reads as "no recent window".
+    """
+    try:
+        rows = mlb_api._full_gamelog(pid, "pitching", season)
+    except Exception as exc:
+        log.warning("recent starts unavailable for %s: %s", pid, exc)
+        return 0.0, 0.0
+
+    def started(sp):
+        try:
+            return float((sp.get("stat") or {}).get("gamesStarted", 0) or 0) >= 1
+        except (TypeError, ValueError):
+            return False
+
+    starts = [sp for sp in rows if started(sp)] or rows
+    hr = ip = 0.0
+    for sp in starts[-n:]:
+        st = sp.get("stat") or {}
+        try:
+            hr += float(st.get("homeRuns", 0) or 0)
+        except (TypeError, ValueError):
+            pass
+        ip += mlb_api._ip_to_float(st.get("inningsPitched"))
+    return hr, ip
+
+
 def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     if not pid:
         return 1.0, "no probable starter — league average assumed"
@@ -169,7 +208,19 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     if ip < 20:
         return 1.0, f"only {ip:.0f} IP — league average assumed"
     hr9 = (line["hr"] * 9.0) / ip
-    return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), f"{hr9:.2f} HR/9 over {ip:.0f} IP"
+    note = f"{hr9:.2f} HR/9 over {ip:.0f} IP"
+
+    # Is he home-run prone RIGHT NOW? Minority weight by construction - see
+    # RECENT_PRIOR_IP - so a three-start blip tilts the estimate without
+    # replacing a season of evidence.
+    r_hr, r_ip = recent_starter_hr(pid, season)
+    if r_ip >= 3.0:
+        r_hr9 = (r_hr * 9.0) / r_ip
+        w = r_ip / (r_ip + RECENT_PRIOR_IP)
+        hr9 = hr9 * (1 - w) + r_hr9 * w
+        note = (f"{note}, {r_hr9:.2f} over last {RECENT_STARTS} starts "
+                f"({r_hr:.0f} HR / {r_ip:.1f} IP, x{w:.0%}) -> {hr9:.2f} HR/9")
+    return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), note
 
 
 def _recent_batted_ball(pid: int, season: int, n: int = FORM_GAMES) -> dict:
