@@ -1793,6 +1793,12 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "opposing": top.get("opposing"), "bullpen_ip": top.get("bullpen_ip"),
            "floor": round(hr_pick.HR_FLOOR, 4),
            "pool": "both lineups", "considered": len(cands),
+           # The runner-up's probability, logged so the question "would a new
+           # factor have changed the pick?" is answerable from the record rather
+           # than argued. Reporting only - it selects nothing.
+           "runner_up": (None if len(cands) < 2 else cands[1].get("name")),
+           "runner_up_p": (None if len(cands) < 2
+                           else round(cands[1]["p_game"], 4)),
            "our_side": top.get("team") == (pc.get("bet_team") or team.name)}
     try:
         line = prop_odds.hr_line(date, name, gm.away.name, gm.home.name)

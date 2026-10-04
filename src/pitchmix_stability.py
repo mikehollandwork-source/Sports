@@ -72,6 +72,7 @@ SEASON = 2026
 PRIOR = 2025
 MIN_PA = 150        # PA-ending pitches needed in a season for a usable tilt
 MIN_HR = 5          # homers needed, or the HR shares are one or two events
+LEAGUE_HR_PA = 0.0303   # league HR per PA, the same figure hr_pick.HR_FLOOR uses
 FAMILIES = ("fastball", "breaking", "offspeed")
 PERMUTATIONS = 2000
 SEED = 20261004
@@ -305,6 +306,104 @@ def _quartiles(ids: list[int], group: str, cache: dict) -> list[str]:
     return out + [""]
 
 
+def _slope(ids: list[int], cache: dict, family: str) -> tuple[float, float, int]:
+    """(slope, observed-tilt SD, n) for half-A tilt -> half-B rate-minus-overall.
+
+    Regressing the OBSERVED tilt straight onto the later outcome is the point:
+    it already absorbs the predictor's own noise, so the slope needs no further
+    shrinkage. Shrinking it again by the reliability would double-count the
+    noise and understate the effect about fivefold.
+    """
+    xs, ys = [], []
+    for pid in ids:
+        t = _tallies(pid, "hitting", SEASON, cache)
+        if not t:
+            continue
+        h = t.get("_halves") or {}
+        a, b = h.get("A"), h.get("B")
+        if not a or not b:
+            continue
+        ahr = sum(a[f][0] for f in FAMILIES); apa = sum(a[f][1] for f in FAMILIES)
+        bhr = sum(b[f][0] for f in FAMILIES); bpa = sum(b[f][1] for f in FAMILIES)
+        if min(apa, bpa) < MIN_PA / 2 or min(ahr, bhr) < MIN_HR / 2:
+            continue
+        if b[family][1] < 20:
+            continue
+        xs.append(a[family][0] / ahr - a[family][1] / apa)
+        ys.append(b[family][0] / b[family][1] - bhr / bpa)
+    r = _pearson(xs, ys)
+    if r is None or len(xs) < 10:
+        return 0.0, 0.0, len(xs)
+    sx = _stdev(xs)
+    sy = _stdev(ys)
+    return (r * sy / sx if sx else 0.0), sx, len(xs)
+
+
+def _stdev(v: list[float]) -> float:
+    n = len(v)
+    if n < 2:
+        return 0.0
+    m = sum(v) / n
+    return math.sqrt(sum((x - m) ** 2 for x in v) / (n - 1))
+
+
+def _pct(sorted_v: list[float], p: float) -> float:
+    return sorted_v[int(p * (len(sorted_v) - 1))] if sorted_v else 0.0
+
+
+def effect_size(hitters: list[int], pitchers: list[int],
+                cache: dict) -> list[str]:
+    """How big is the matchup term at its most extreme, in the units the
+    selector already uses?
+
+    A p-value says the signal exists; this says whether it is worth wiring. The
+    selector multiplies a per-PA home-run rate by form, wind, park, temperature
+    and win probability, so a new factor has to be read on that same scale.
+
+    A starter's fastball share shifts the fraction of a hitter's plate
+    appearances that come on fastballs by (w - mean w). On those his rate differs
+    from his overall by (slope x tilt). So the shift in his expected rate is
+    (w - mean w) x slope x tilt, and the multiplier is 1 + that / league rate.
+    """
+    slope, _, n = _slope(hitters, cache, "fastball")
+    tilts = sorted(
+        t for t in (tilt(_tallies(p, "hitting", SEASON, cache) or {}, "fastball")
+                    for p in hitters) if t is not None)
+    shares = []
+    for pid in pitchers:
+        t = _tallies(pid, "pitching", SEASON, cache)
+        if not t:
+            continue
+        pa = sum(t[f][1] for f in FAMILIES)
+        if pa >= MIN_PA:
+            shares.append(t["fastball"][1] / pa)
+    shares.sort()
+    if not tilts or not shares or not slope:
+        return ["_Not enough data to size the effect._", ""]
+    wbar = sum(shares) / len(shares)
+    out = [f"slope {slope:+.4f} per unit tilt (n={n}) · hitter fastball tilt "
+           f"p10 {_pct(tilts, .10):+.3f} / p90 {_pct(tilts, .90):+.3f} · "
+           f"starter fastball share p10 {_pct(shares, .10):.0%} / "
+           f"mean {wbar:.0%} / p90 {_pct(shares, .90):.0%}", "",
+           "| hitter | starter | multiplier on HR rate |", "|---|---|---|"]
+    mults = []
+    for hl, tl in (("p90 fastball tilt", _pct(tilts, .90)),
+                   ("p10 fastball tilt", _pct(tilts, .10))):
+        for wl, w in (("p90 fastball share", _pct(shares, .90)),
+                      ("p10 fastball share", _pct(shares, .10))):
+            mult = 1 + ((w - wbar) * slope * tl) / LEAGUE_HR_PA
+            mults.append(mult)
+            out.append(f"| {hl} | {wl} | ×{mult:.4f} |")
+    out += ["",
+            f"**Full achievable range ×{min(mults):.3f} to ×{max(mults):.3f}** "
+            f"— a {max(mults)/min(mults)-1:.1%} spread, and only between the "
+            f"extremes of both distributions.", "",
+            "For scale, the factors the selector already applies: form up to "
+            "×1.30, win probability ×1.27, wind ×1.24, park ×1.12, temperature "
+            "×1.08, opposing pitching ×1.05.", ""]
+    return out
+
+
 def build() -> str:
     cache = _load_cache()
     hitters, pitchers = _roster_ids()
@@ -332,6 +431,12 @@ def build() -> str:
                      f"Split-half within {SEASON} (alternating games)")
     md += _corr_rows(pitchers, "pitching", cache, _pairs,
                      f"{PRIOR} vs {SEASON}")
+
+    md += ["## How big is it, though?", "",
+           "_A p-value says the signal exists. This says whether it is worth "
+           "wiring, on the same scale as the factors already in the selector._",
+           ""]
+    md += effect_size(hitters, pitchers, cache)
 
     md += ["## How to read this", "",
            "- split-half r near zero means the season cannot agree with "
