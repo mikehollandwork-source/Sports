@@ -7,6 +7,7 @@ on:
       pitcher: {description: "Pitcher MLB id", required: false}
       bname: {description: "Batter name (label)", required: false}
       pname: {description: "Pitcher name (label)", required: false}
+      date: {description: "Date to resolve a starter from, if no pitcher id", required: false}
 permissions:
   contents: write
 jobs:
@@ -24,6 +25,7 @@ jobs:
           PROBE_PITCHER: ${{ github.event.inputs.pitcher }}
           PROBE_BNAME: ${{ github.event.inputs.bname }}
           PROBE_PNAME: ${{ github.event.inputs.pname }}
+          PICKS_DATE: ${{ github.event.inputs.date }}
         run: python -m src.pitchtype_probe
       - name: Commit
         run: |

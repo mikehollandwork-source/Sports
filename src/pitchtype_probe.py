@@ -89,6 +89,20 @@ def _table(rows: dict, group: str) -> list[str]:
     return md
 
 
+def resolve_starter(date: str) -> tuple[int, str]:
+    """(id, name) of a probable starter on this date, so the probe needs no
+    hand-copied player id."""
+    try:
+        for g in mlb_api.schedule_for(date):
+            for t in (g.home, g.away):
+                pp = getattr(t, "probable_pitcher", None)
+                if pp and getattr(pp, "player_id", None):
+                    return pp.player_id, pp.name
+    except Exception as exc:
+        log.warning("could not resolve a starter for %s: %s", date, exc)
+    return 0, "no starter found"
+
+
 def build(batter: int, pitcher: int, season: int,
           bname: str, pname: str) -> str:
     md = [f"# Pitch-type split probe — {season}", "",
@@ -127,8 +141,16 @@ def main() -> None:
                     default=int(os.environ.get("PROBE_SEASON") or 2026))
     ap.add_argument("--bname", default=os.environ.get("PROBE_BNAME") or "batter")
     ap.add_argument("--pname", default=os.environ.get("PROBE_PNAME") or "pitcher")
+    ap.add_argument("--date", default=os.environ.get("PICKS_DATE"))
     a = ap.parse_args()
-    md = build(a.batter, a.pitcher, a.season, a.bname, a.pname)
+    pitcher, pname = a.pitcher, a.pname
+    if not pitcher:
+        date = a.date
+        if not date:
+            from .main import today_eastern
+            date = today_eastern()
+        pitcher, pname = resolve_starter(date)
+    md = build(a.batter, pitcher, a.season, a.bname, pname)
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "pitchtype_probe.md").write_text(md)
     print(md)
