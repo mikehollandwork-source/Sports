@@ -161,30 +161,80 @@ def shape(player_id: int, group: str, season: int) -> list[str]:
         out.append("```")
         out.append(json.dumps(_prune(splits[0]), indent=1)[:2600])
         out.append("```")
-    # Does a HOME RUN record carry the pitch type?
-    hrs = []
+    # Does a HOME RUN record carry the pitch type? Records nest under
+    # stat.play, so read that level - reading sp["play"] finds nothing.
+    out += _hr_tally(splits, group)
+    # Is a PRIOR season available? Per-type samples are thin in one year, so
+    # this decides whether two seasons can be pooled.
+    try:
+        prev = mlb_api._get(f"people/{player_id}/stats", stats="playLog",
+                            group=group, season=season - 1)
+        ps = [sp for b in (prev.get("stats") or [])
+              for sp in (b.get("splits") or [])]
+        out.append(f"**{season - 1} playLog: {len(ps)} record(s)**")
+        if ps:
+            out += ["  " + ln for ln in _hr_tally(ps, group)]
+    except Exception as exc:
+        out.append(f"- prior season request failed: {exc}")
+    return out
+
+
+FAMILY = {
+    "FF": "fastball", "SI": "fastball", "FC": "fastball", "FT": "fastball",
+    "FA": "fastball",
+    "SL": "breaking", "CU": "breaking", "KC": "breaking", "ST": "breaking",
+    "SV": "breaking", "CS": "breaking", "SC": "breaking",
+    "CH": "offspeed", "FS": "offspeed", "FO": "offspeed", "EP": "offspeed",
+    "KN": "offspeed",
+}
+
+
+def _hr_tally(splits: list[dict], group: str) -> list[str]:
+    """HR and PA by pitch family, and by family x pitcher hand.
+
+    Families rather than raw types because a 17-homer hitter spread over twelve
+    types has one or two per type, which cannot carry weight. Three families
+    give five or six each - thin, but a number rather than noise.
+    """
+    pa: dict[str, int] = {}
+    hr: dict[str, int] = {}
+    pa_h: dict[tuple, int] = {}
+    hr_h: dict[tuple, int] = {}
+    raw_hr: dict[str, int] = {}
     for sp in splits:
-        play = sp.get("play") or {}
+        play = ((sp.get("stat") or {}).get("play") or {})
         det = play.get("details") or {}
-        ev = (det.get("event") or det.get("description") or "")
-        if "home run" in ev.lower() or det.get("eventType") == "home_run":
-            hrs.append(sp)
-    out.append(f"**home-run records found: {len(hrs)}**")
-    if hrs:
-        play = hrs[0].get("play") or {}
-        det = play.get("details") or {}
-        ptype = (det.get("type") or {})
-        out.append(f"  - first HR: event={det.get('event')!r} "
-                   f"pitch={ptype.get('description') or ptype.get('code')!r} "
-                   f"speed={(play.get('pitchData') or {}).get('startSpeed')!r}")
-        tally: dict[str, int] = {}
-        for h in hrs:
-            d = ((h.get("play") or {}).get("details") or {})
-            t = (d.get("type") or {}).get("description") or "?"
-            tally[t] = tally.get(t, 0) + 1
-        out.append("  - HR by pitch type: "
-                   + ", ".join(f"{k} {v}" for k, v in
-                               sorted(tally.items(), key=lambda kv: -kv[1])))
+        if not det.get("isPlateAppearance"):
+            continue
+        code = (det.get("type") or {}).get("code") or "?"
+        fam = FAMILY.get(code, "other")
+        hand = (det.get("pitchHand") or {}).get("code") or "?"
+        is_hr = det.get("eventType") == "home_run"
+        pa[fam] = pa.get(fam, 0) + 1
+        pa_h[(fam, hand)] = pa_h.get((fam, hand), 0) + 1
+        if is_hr:
+            hr[fam] = hr.get(fam, 0) + 1
+            hr_h[(fam, hand)] = hr_h.get((fam, hand), 0) + 1
+            desc = (det.get("type") or {}).get("description") or code
+            raw_hr[desc] = raw_hr.get(desc, 0) + 1
+    total_hr = sum(hr.values())
+    total_pa = sum(pa.values())
+    out = [f"**{total_hr} HR over {total_pa} PA-ending pitches** ({group})"]
+    if not total_pa:
+        return out
+    for fam in ("fastball", "breaking", "offspeed", "other"):
+        if fam not in pa:
+            continue
+        h, n = hr.get(fam, 0), pa[fam]
+        out.append(f"  - {fam}: {h} HR / {n} PA = {h/n:.3%}")
+        for hand in ("R", "L"):
+            nh = pa_h.get((fam, hand), 0)
+            if nh:
+                hh = hr_h.get((fam, hand), 0)
+                out.append(f"      vs {hand}HP: {hh} HR / {nh} PA = {hh/nh:.3%}")
+    if raw_hr:
+        out.append("  - raw types: " + ", ".join(
+            f"{k} {v}" for k, v in sorted(raw_hr.items(), key=lambda kv: -kv[1])))
     return out
 
 
