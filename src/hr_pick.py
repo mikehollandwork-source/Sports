@@ -87,6 +87,38 @@ PA_BY_SLOT = {1: 4.65, 2: 4.55, 3: 4.45, 4: 4.35, 5: 4.20,
 STARTER_IP_DEFAULT = 5.3
 PEN_ARMS_SAMPLED = 6
 
+# RECENT FORM, MEASURED THE RIGHT WAY FOR A HOME RUN.
+#
+# The old recent term was HR per PA over the last 15 games. That is close to
+# unusable: 15 games is ~60 PA and contains maybe 0-3 home runs, so the rate is
+# nearly all noise - and it carried 51% of the weight. Merrill had 1 HR in 63 PA
+# and the term dragged him from 17.0% to 14.6% on two events.
+#
+# What actually precedes a home run is ELEVATING WITH AUTHORITY, and both parts
+# of that have dozens of events in the same window:
+#     air share   airOuts / (airOuts + groundOuts) - is he putting it in the air
+#     ISO         (TB - H) / AB                    - is there power behind it
+#
+# Each is compared with the hitter's OWN season figure, so the term reads "more
+# or less than usual for him" rather than "good or bad in the abstract", and the
+# two ratios are combined as a GEOMETRIC MEAN - equal weight, which is the
+# no-information choice, and no free parameter to tune.
+#
+# Crucially this does NOT penalise a lack of recent HITS. A hitter 0-for-12 with
+# eight fly-outs reads ABOVE 1.0, which is the intended behaviour: the balls are
+# going where home runs go.
+FORM_GAMES = 15
+FORM_MIN_BATTED = 10       # batted balls needed before the term is readable
+FORM_MIN_AB = 15
+# ISO over a window with almost no hits is 0 BY DEFINITION, which is "no
+# information", not "no power" - a hitter 0-for-12 cannot show extra-base power
+# because he has no hits to be extra-base. Below this many hits the ISO ratio is
+# dropped and the air share carries the term alone, which is what "even if they
+# are not getting hits, as long as the air and power are there" requires. With
+# only counting stats there is no exit-velocity substitute.
+FORM_MIN_HITS = 5
+FORM_CLAMP = (0.80, 1.30)
+
 # THE FLOOR, DERIVED NOT CHOSEN. A pitcher faces roughly 38 batters per 9
 # innings, so LEAGUE_HR9 implies a league-average HR rate per plate appearance,
 # and that gives the chance an AVERAGE hitter homers in a game. A bat that cannot
@@ -123,6 +155,60 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
         return 1.0, f"only {ip:.0f} IP — league average assumed"
     hr9 = (line["hr"] * 9.0) / ip
     return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), f"{hr9:.2f} HR/9 over {ip:.0f} IP"
+
+
+def _recent_batted_ball(pid: int, season: int, n: int = FORM_GAMES) -> dict:
+    """Air/ground outs, ISO and sample over a hitter's last n games."""
+    air = ground = ab = hits = tb = pa = 0.0
+    for sp in mlb_api._full_gamelog(pid, "hitting", season)[-n:]:
+        st = sp.get("stat", {}) or {}
+        def g(k):
+            try:
+                return float(st.get(k, 0) or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        air += g("airOuts"); ground += g("groundOuts")
+        ab += g("atBats"); hits += g("hits"); tb += g("totalBases")
+        pa += g("plateAppearances")
+    return {"air": air, "ground": ground, "ab": ab, "pa": pa, "hits": hits,
+            "iso": ((tb - hits) / ab) if ab else None}
+
+
+def form_factor(recent: dict, season_st: dict) -> tuple[float, str]:
+    """Multiplier from recent batted-ball form against the hitter's own season.
+
+    Returns 1.0 and says so when the window is too thin or the feed does not
+    carry air/ground outs - degrading rather than guessing.
+    """
+    def sf(k):
+        try:
+            return float(season_st.get(k, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    s_air, s_ground = sf("airOuts"), sf("groundOuts")
+    s_ab, s_hits, s_tb = sf("atBats"), sf("hits"), sf("totalBases")
+    batted = recent["air"] + recent["ground"]
+    if batted < FORM_MIN_BATTED or recent["ab"] < FORM_MIN_AB:
+        return 1.0, "recent window too thin"
+    if (s_air + s_ground) <= 0 or s_ab <= 0:
+        return 1.0, "no season batted-ball baseline"
+    r_air = recent["air"] / batted
+    b_air = s_air / (s_air + s_ground)
+    s_iso = (s_tb - s_hits) / s_ab
+    r_iso = recent["iso"]
+    if not b_air or r_iso is None or s_iso <= 0:
+        return 1.0, "baseline unreadable"
+    air_ratio = _clamp(r_air / b_air, 0.6, 1.6)
+    if recent.get("hits", 0) < FORM_MIN_HITS:
+        # too few hits for ISO to mean anything - judge the air alone
+        f = _clamp(air_ratio, *FORM_CLAMP)
+        return f, (f"air {r_air:.0%} vs {b_air:.0%} own; only "
+                   f"{int(recent.get('hits', 0))} hits so ISO ignored -> "
+                   f"x{f:.2f}")
+    iso_ratio = _clamp(r_iso / s_iso, 0.5, 2.0)
+    f = _clamp((air_ratio * iso_ratio) ** 0.5, *FORM_CLAMP)
+    return f, (f"air {r_air:.0%} vs {b_air:.0%} own, ISO {r_iso:.3f} vs "
+               f"{s_iso:.3f} -> x{f:.2f}")
 
 
 def temp_factor(temp_f, roof: str | None) -> tuple[float, str]:
@@ -258,11 +344,14 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
         # overall rate otherwise. It is NOT blended with the overall rate: that
         # would be mixing a matchup rate with a rate that already contains it.
         p_hand, hand_pa = platoon_hr_rate(pid, season, hand)
-        p_season = p_hand if p_hand is not None else hr / pa
-        rhr, rpa = _recent_power(pid, season)
-        p_recent = (rhr / rpa) if rpa else p_season
-        w = rpa / (rpa + SHRINK)
-        p_blend = w * p_recent + (1 - w) * p_season
+        base = p_hand if p_hand is not None else hr / pa
+        # Recent form is a MULTIPLIER on a real rate, not a rate of its own. HR
+        # per PA over 15 games is 0-3 events; air share and ISO over the same
+        # window are dozens, so the form term is measured there instead.
+        rb = _recent_batted_ball(pid, season)
+        ff, fnote = form_factor(rb, st)
+        rhr, rpa = _recent_power(pid, season)      # reported, no longer weighted
+        p_blend = base * ff
         pfac = pf if opp_factor is None else opp_factor
         p_adj = _clamp(p_blend * pfac * float(park) * float(wind) * float(temp),
                        0.0, 0.25)
@@ -270,10 +359,11 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
         out.append({
             "player_id": pid, "pa": pa, "hr": hr, "wind_factor": round(wind, 2),
             "temp_factor": round(temp, 2), "slot": (slots or {}).get(pid),
+            "form_factor": round(ff, 2), "form_note": fnote,
             "expected_pa": exp_pa, "hand_rate": p_hand, "hand_pa": hand_pa,
             "iso": round(((tb - hits) / ab) if ab else 0.0, 3),
-            "season_rate": p_season, "recent_hr": rhr, "recent_pa": rpa,
-            "blend": p_blend, "weight": round(w, 2),
+            "season_rate": base, "recent_hr": rhr, "recent_pa": rpa,
+            "blend": p_blend,
             "pitcher_factor": round(pfac, 2), "pitcher_note": pnote,
             "park": round(float(park), 3),
             "p_game": 1 - (1 - p_adj) ** exp_pa})
