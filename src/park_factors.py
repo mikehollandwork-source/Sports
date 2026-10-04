@@ -94,3 +94,57 @@ PARK_BEARING: dict[str, float] = {
 def bearing_for(team_name: str) -> float | None:
     """Home-to-centre bearing for a park, or None when unknown (no wind read)."""
     return PARK_BEARING.get(team_name)
+
+
+# ---------------------------------------------------------------------------
+# HOME-RUN park factors, which are NOT the run factors above.
+#
+# The table above is a RUN factor and its docstring says so. Using it for home
+# runs is wrong in a specific, known way: Fenway inflates RUNS through doubles
+# off the wall while being modest for HR, and Kauffman's size suppresses HR while
+# its gaps keep runs up. Coors inflates both, but less for HR than for runs.
+#
+# These are approximate, well-known public estimates - the same standing and the
+# same caveat as PARK_FACTORS, and meant to be tuned. What matters is the
+# DIVERGENCE from the run factor, which is where using one number for both was
+# costing accuracy. Keyed by the MLB API's full team name.
+HR_FACTORS: dict[str, float] = {
+    "Cincinnati Reds": 1.18,
+    "Colorado Rockies": 1.12,
+    "New York Yankees": 1.12,
+    "Philadelphia Phillies": 1.08,
+    "Baltimore Orioles": 1.05,
+    "Chicago White Sox": 1.05,
+    "Milwaukee Brewers": 1.05,
+    "Texas Rangers": 1.05,
+    "Toronto Blue Jays": 1.05,
+    "Los Angeles Dodgers": 1.05,
+    "Arizona Diamondbacks": 1.03,
+    "Atlanta Braves": 1.02,
+    "Houston Astros": 1.02,
+    "Los Angeles Angels": 1.02,
+    "Washington Nationals": 1.02,
+    "Chicago Cubs": 1.00,
+    "Minnesota Twins": 1.00,
+    "Boston Red Sox": 0.97,
+    "Cleveland Guardians": 0.97,
+    "St. Louis Cardinals": 0.95,
+    "New York Mets": 0.95,
+    "Tampa Bay Rays": 0.95,
+    "San Diego Padres": 0.92,
+    "Detroit Tigers": 0.92,
+    "Pittsburgh Pirates": 0.92,
+    "Kansas City Royals": 0.90,
+    "Miami Marlins": 0.90,
+    "Seattle Mariners": 0.90,
+    "Athletics": 0.90,
+    "Oakland Athletics": 0.90,
+    "San Francisco Giants": 0.88,
+}
+
+
+def hr_factor(team_name: str | None) -> float:
+    """HR park factor for the home team's park; 1.0 when unknown."""
+    if not team_name:
+        return 1.0
+    return HR_FACTORS.get(team_name, 1.0)

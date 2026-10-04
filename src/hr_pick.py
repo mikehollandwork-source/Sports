@@ -42,7 +42,7 @@ import sys
 import zoneinfo
 from pathlib import Path
 
-from . import mlb_api
+from . import batter_look, mlb_api
 
 log = logging.getLogger("hr_pick")
 
@@ -64,6 +64,28 @@ PITCHER_CLAMP = (0.70, 1.40)
 # fitted to anything in this repo, same standing as PITCHER_CLAMP.
 WIND_HR_PER_MPH = 0.02
 WIND_CLAMP = (0.80, 1.30)
+
+# TEMPERATURE. Warm air is less dense and the ball carries further. ~0.3% per
+# degree from a 70F reference, tightly clamped - deliberately smaller than the
+# wind term because the effect is smaller and the evidence thinner. Conventional,
+# not fitted to anything here.
+TEMP_REF = 70.0
+TEMP_HR_PER_F = 0.003
+TEMP_CLAMP = (0.92, 1.08)
+
+# EXPECTED PLATE APPEARANCES BY BATTING ORDER. EXPECTED_PA was flat at 4.2 for
+# everyone, which is the exponent in the whole calculation - worth ~3 points of
+# HR probability between a leadoff bat and a ninth-place one. These sum to
+# PA_PER_9 (38.0), so the slot split is consistent with the league constant the
+# floor is derived from rather than being a second set of numbers.
+PA_BY_SLOT = {1: 4.65, 2: 4.55, 3: 4.45, 4: 4.35, 5: 4.20,
+              6: 4.10, 7: 4.00, 8: 3.90, 9: 3.80}
+
+# BULLPEN. The model applied the STARTER's HR/9 to every plate appearance, but a
+# 5-inning start leaves ~44% of them against relievers. The opposing pitching is
+# now a blend weighted by the starter's own expected innings.
+STARTER_IP_DEFAULT = 5.3
+PEN_ARMS_SAMPLED = 6
 
 # THE FLOOR, DERIVED NOT CHOSEN. A pitcher faces roughly 38 batters per 9
 # innings, so LEAGUE_HR9 implies a league-average HR rate per plate appearance,
@@ -103,6 +125,90 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), f"{hr9:.2f} HR/9 over {ip:.0f} IP"
 
 
+def temp_factor(temp_f, roof: str | None) -> tuple[float, str]:
+    """Multiplier from air temperature. A closed roof neutralises it."""
+    if (roof or "") == "closed" or not isinstance(temp_f, (int, float)):
+        return 1.0, "no readable temperature"
+    f = _clamp(1.0 + TEMP_HR_PER_F * (float(temp_f) - TEMP_REF), *TEMP_CLAMP)
+    return f, f"{temp_f:.0f}F (x{f:.2f})"
+
+
+def slot_pa(slot: int | None) -> float:
+    """Expected plate appearances for a batting-order slot."""
+    return PA_BY_SLOT.get(slot or 0, EXPECTED_PA)
+
+
+def pen_hr9(team_id: int | None, date: str, starter_id: int | None,
+            season: int) -> tuple[float | None, float]:
+    """(bullpen HR/9, innings behind it) for a team's active relievers.
+
+    Aggregated over the first PEN_ARMS_SAMPLED arms, which keeps the fetch
+    bounded. None when there is not enough to read.
+    """
+    if not team_id:
+        return None, 0.0
+    try:
+        ids = mlb_api.reliever_ids(team_id, date, starter_id)[:PEN_ARMS_SAMPLED]
+    except Exception as exc:
+        log.warning("reliever list failed for %s: %s", team_id, exc)
+        return None, 0.0
+    hr = ip = 0.0
+    for pid in ids:
+        try:
+            line = mlb_api.pitcher_season_line(pid, season)
+        except Exception:
+            continue
+        ip += float(line.get("ip") or 0.0)
+        hr += float(line.get("hr") or 0.0)
+    if ip < 20:
+        return None, ip
+    return (hr * 9.0) / ip, ip
+
+
+def opposing_hr9_factor(starter_id: int | None, pen: float | None,
+                        starter_ip: float, season: int) -> tuple[float, str]:
+    """Starter and bullpen HR/9 blended by the starter's expected share of the
+    game, then expressed relative to league and clamped.
+
+    The starter used to get 100% of the weight. On a 5.3-inning start he gets
+    59% and the bullpen 41%, which is what the hitter actually faces.
+    """
+    sf, snote = _pitcher_factor(starter_id, season)
+    if pen is None:
+        return sf, snote + "; bullpen unavailable, starter only"
+    share = _clamp((starter_ip or STARTER_IP_DEFAULT) / 9.0, 0.3, 0.85)
+    pen_f = _clamp(pen / LEAGUE_HR9, *PITCHER_CLAMP)
+    blend = _clamp(share * sf + (1 - share) * pen_f, *PITCHER_CLAMP)
+    return blend, (f"{snote} x{share:.0%} + bullpen {pen:.2f} HR/9 "
+                   f"x{1-share:.0%} -> x{blend:.2f}")
+
+
+def platoon_hr_rate(pid: int, season: int, hand: str | None) -> tuple[float | None, int]:
+    """(HR per PA against this hand, PA) or (None, 0).
+
+    A hitter's home-run rate is strongly handedness-dependent, and the vs-hand
+    split is a several-hundred-PA sample - far better than the overall rate for a
+    specific matchup. Returns None when the split does not carry home runs, so
+    the caller falls back rather than guessing.
+    """
+    if hand not in ("L", "R"):
+        return None, 0
+    try:
+        hands = batter_look.player_vs_hand(pid, season)
+    except Exception as exc:
+        log.warning("vs-hand HR split failed for %s: %s", pid, exc)
+        return None, 0
+    st = hands.get(hand) or {}
+    try:
+        pa = int(st.get("plateAppearances"))
+        hr = int(st.get("homeRuns"))
+    except (TypeError, ValueError):
+        return None, 0
+    if pa < 1:
+        return None, 0
+    return hr / pa, pa
+
+
 def wind_factor(mph, strength, direction: str | None) -> tuple[float, str]:
     """Multiplier on a hitter's HR rate from the wind, and a note.
 
@@ -120,7 +226,10 @@ def wind_factor(mph, strength, direction: str | None) -> tuple[float, str]:
 
 def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
                   park: float, wind: float = 1.0,
-                  min_pa: int = 0, min_hr: int = 0) -> list[dict]:
+                  min_pa: int = 0, min_hr: int = 0,
+                  temp: float = 1.0, hand: str | None = None,
+                  slots: dict | None = None,
+                  opp_factor: float | None = None) -> list[dict]:
     """Rank a GIVEN set of hitters by P(1+ HR), same formula as `candidates`.
 
     `min_pa` / `min_hr` default to 0 - no filter - which is right when the
@@ -144,20 +253,30 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
             continue
         if pa < 1 or pa < min_pa or hr < min_hr:
             continue
-        p_season = hr / pa
+        # The BASE rate is the vs-hand rate when the split carries home runs -
+        # a several-hundred-PA sample specific to tonight's starter - and the
+        # overall rate otherwise. It is NOT blended with the overall rate: that
+        # would be mixing a matchup rate with a rate that already contains it.
+        p_hand, hand_pa = platoon_hr_rate(pid, season, hand)
+        p_season = p_hand if p_hand is not None else hr / pa
         rhr, rpa = _recent_power(pid, season)
         p_recent = (rhr / rpa) if rpa else p_season
         w = rpa / (rpa + SHRINK)
         p_blend = w * p_recent + (1 - w) * p_season
-        p_adj = _clamp(p_blend * pf * float(park) * float(wind), 0.0, 0.25)
+        pfac = pf if opp_factor is None else opp_factor
+        p_adj = _clamp(p_blend * pfac * float(park) * float(wind) * float(temp),
+                       0.0, 0.25)
+        exp_pa = slot_pa((slots or {}).get(pid))
         out.append({
             "player_id": pid, "pa": pa, "hr": hr, "wind_factor": round(wind, 2),
+            "temp_factor": round(temp, 2), "slot": (slots or {}).get(pid),
+            "expected_pa": exp_pa, "hand_rate": p_hand, "hand_pa": hand_pa,
             "iso": round(((tb - hits) / ab) if ab else 0.0, 3),
             "season_rate": p_season, "recent_hr": rhr, "recent_pa": rpa,
             "blend": p_blend, "weight": round(w, 2),
-            "pitcher_factor": round(pf, 2), "pitcher_note": pnote,
+            "pitcher_factor": round(pfac, 2), "pitcher_note": pnote,
             "park": round(float(park), 3),
-            "p_game": 1 - (1 - p_adj) ** EXPECTED_PA})
+            "p_game": 1 - (1 - p_adj) ** exp_pa})
     out.sort(key=lambda r: -r["p_game"])
     return out
 

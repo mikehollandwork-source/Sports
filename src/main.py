@@ -22,7 +22,7 @@ import zoneinfo
 from pathlib import Path
 
 from . import consensus as consensus_rule
-from .park_factors import bearing_for
+from .park_factors import bearing_for, hr_factor
 from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
@@ -1700,14 +1700,35 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
     names = {h.player_id: h.name for h in hitters if getattr(h, "player_id", None)}
     if not names:
         return
-    opp_sp = (gm.away if is_home else gm.home).probable_pitcher
-    wf, wnote = hr_pick.wind_factor(
-        (r.get("weather") or {}).get("wind_mph"),
-        wc[1] if wc else 0.0, wc[0] if wc else None)
+    opp_team = gm.away if is_home else gm.home
+    opp_sp = opp_team.probable_pitcher
+    season = int(date[:4])
+    w = r.get("weather") or {}
+    wf, wnote = hr_pick.wind_factor(w.get("wind_mph"),
+                                    wc[1] if wc else 0.0,
+                                    wc[0] if wc else None)
+    tf, tnote = hr_pick.temp_factor(w.get("temp_f"), w.get("roof"))
+    # HR-specific park factor. PARK_FACTORS is a RUN factor and says so in its
+    # own docstring; Fenway is 1.06 for runs and ~0.97 for home runs, Kauffman
+    # 1.03 and ~0.90. Using the run number for HR was wrong in a known way.
+    hrpark = hr_factor(gm.home.name)
+    # Starter AND bullpen: a 5.3-inning start leaves ~41% of plate appearances
+    # against relievers the model used to treat as the starter.
+    sa = (r.get("statistical_advantage") or {}).get("away" if is_home else "home") or {}
+    pen, pen_ip = hr_pick.pen_hr9(opp_team.team_id, date,
+                                  getattr(opp_sp, "player_id", None), season)
+    oppf, oppnote = hr_pick.opposing_hr9_factor(
+        getattr(opp_sp, "player_id", None), pen,
+        sa.get("starter_ip_last5") and float(sa["starter_ip_last5"]) / 5.0
+        or hr_pick.STARTER_IP_DEFAULT, season)
+    # batting-order slot -> expected plate appearances (the exponent)
+    slots = {h.player_id: i + 1 for i, h in enumerate(hitters)
+             if getattr(h, "player_id", None)}
     ranked = hr_pick.score_hitters(
-        list(names), int(date[:4]), getattr(opp_sp, "player_id", None),
-        r.get("park_factor") or 1.0, wind=wf,
-        min_pa=hr_pick.MIN_PA, min_hr=hr_pick.MIN_HR)
+        list(names), season, getattr(opp_sp, "player_id", None),
+        hrpark, wind=wf, min_pa=hr_pick.MIN_PA, min_hr=hr_pick.MIN_HR,
+        temp=tf, hand=getattr(opp_sp, "hand", None), slots=slots,
+        opp_factor=oppf)
 
     # ---- no numbers indicating a home run -> post nothing ------------------
     if not ranked:
@@ -1738,8 +1759,13 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "season": f"{top['hr']}/{top['pa']}",
            "recent": f"{top['recent_hr']}/{top['recent_pa']}",
            "iso": top["iso"], "pitcher_factor": top["pitcher_factor"],
-           "park": top["park"], "wind": wnote,
+           "park": top["park"], "wind": wnote, "temp": tnote,
            "wind_factor": top.get("wind_factor"),
+           "slot": top.get("slot"), "expected_pa": top.get("expected_pa"),
+           "vs_hand": (None if top.get("hand_rate") is None else
+                       f"{top['hand_rate']*top['hand_pa']:.0f}/{top['hand_pa']}"
+                       f" vs {getattr(opp_sp, 'hand', '?')}HP"),
+           "opposing": oppnote, "bullpen_ip": round(pen_ip, 1),
            "floor": round(hr_pick.HR_FLOOR, 4),
            "pool": "whole lineup", "considered": len(ranked)}
     try:
