@@ -22,6 +22,7 @@ Writes output/pitchtype_probe.md.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from pathlib import Path
@@ -120,6 +121,82 @@ def alt_endpoints(player_id: int, group: str, season: int) -> list[str]:
     return out
 
 
+def shape(player_id: int, group: str, season: int) -> list[str]:
+    """Dump the structure of a playLog/pitchArsenal record.
+
+    pitchArsenal gives the MIX (type, usage%) but no outcomes; pitchLog/playLog
+    give per-pitch records whose `play` may carry both the pitch type and the
+    result. If it does, HR-by-pitch-type is computable for hitter AND pitcher
+    from real pitch-level data - which is what the idea actually needs.
+    """
+    out = []
+    try:
+        ars = mlb_api._get(f"people/{player_id}/stats", stats="pitchArsenal",
+                           group=group, season=season)
+    except Exception as exc:
+        out.append(f"- arsenal request failed: {exc}")
+        ars = {}
+    rows = []
+    for b in ars.get("stats") or []:
+        for sp in b.get("splits") or []:
+            st = sp.get("stat") or {}
+            t = st.get("type") or {}
+            rows.append((st.get("percentage"), t.get("description") or t.get("code"),
+                         st.get("count"), st.get("averageSpeed")))
+    rows.sort(key=lambda r: -(r[0] or 0))
+    out.append(f"**arsenal ({group})** — {len(rows)} type(s)")
+    for pct, desc, cnt, spd in rows:
+        out.append(f"  - {desc}: {pct}  (n={cnt}, {spd} mph)")
+
+    try:
+        pl = mlb_api._get(f"people/{player_id}/stats", stats="playLog",
+                          group=group, season=season)
+    except Exception as exc:
+        out.append(f"- playLog request failed: {exc}")
+        return out
+    splits = [sp for b in (pl.get("stats") or []) for sp in (b.get("splits") or [])]
+    out.append(f"**playLog ({group})** — {len(splits)} record(s)")
+    if splits:
+        out.append("one record, keys only:")
+        out.append("```")
+        out.append(json.dumps(_prune(splits[0]), indent=1)[:2600])
+        out.append("```")
+    # Does a HOME RUN record carry the pitch type?
+    hrs = []
+    for sp in splits:
+        play = sp.get("play") or {}
+        det = play.get("details") or {}
+        ev = (det.get("event") or det.get("description") or "")
+        if "home run" in ev.lower() or det.get("eventType") == "home_run":
+            hrs.append(sp)
+    out.append(f"**home-run records found: {len(hrs)}**")
+    if hrs:
+        play = hrs[0].get("play") or {}
+        det = play.get("details") or {}
+        ptype = (det.get("type") or {})
+        out.append(f"  - first HR: event={det.get('event')!r} "
+                   f"pitch={ptype.get('description') or ptype.get('code')!r} "
+                   f"speed={(play.get('pitchData') or {}).get('startSpeed')!r}")
+        tally: dict[str, int] = {}
+        for h in hrs:
+            d = ((h.get("play") or {}).get("details") or {})
+            t = (d.get("type") or {}).get("description") or "?"
+            tally[t] = tally.get(t, 0) + 1
+        out.append("  - HR by pitch type: "
+                   + ", ".join(f"{k} {v}" for k, v in
+                               sorted(tally.items(), key=lambda kv: -kv[1])))
+    return out
+
+
+def _prune(obj, depth: int = 0):
+    """Structure, not volume: keep keys and scalar samples, trim long lists."""
+    if isinstance(obj, dict):
+        return {k: _prune(v, depth + 1) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_prune(v, depth + 1) for v in obj[:2]]
+    return obj
+
+
 def resolve_starter(date: str) -> tuple[int, str]:
     """(id, name) of a probable starter on this date, so the probe needs no
     hand-copied player id."""
@@ -157,6 +234,13 @@ def build(batter: int, pitcher: int, season: int,
         md += alt_endpoints(batter, "hitting", season)
     if pitcher:
         md += alt_endpoints(pitcher, "pitching", season)
+    md += ["", "## Pitch-level records", "",
+           "_The real test: does a per-pitch record carry the pitch type AND "
+           "the outcome? If yes, HR-by-pitch-type is computable directly._", ""]
+    if batter:
+        md += [f"### {bname} (hitting)", ""] + shape(batter, "hitting", season)
+    if pitcher:
+        md += ["", f"### {pname} (pitching)", ""] + shape(pitcher, "pitching", season)
     md += ["", "## What to conclude", "",
            "- both tables populated with PA and HR -> the matchup term is "
            "buildable, with heavy shrinkage for the per-type sample",
