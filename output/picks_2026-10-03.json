@@ -1,6 +1,6 @@
 {
   "date": "2026-10-03",
-  "generated_at": "2026-10-03T23:03:30.566620+00:00",
+  "generated_at": "2026-10-04T00:03:35.382601+00:00",
   "games": [
     {
       "game_pk": 849829,
@@ -1889,19 +1889,19 @@
           "consensus": {
             "pick": "Mil",
             "pcts": {
-              "Sd": 39.0,
-              "Mil": 61.0
+              "Sd": 38.0,
+              "Mil": 62.0
             }
           },
           "forum": {
-            "pick": "San Diego Padres",
-            "home": 11,
+            "pick": "Milwaukee Brewers",
+            "home": 16,
             "away": 13
           },
-          "agree": false,
-          "forum_lean": -0.083,
-          "consensus_lean": 0.22,
-          "blended_lean": 0.16,
+          "agree": true,
+          "forum_lean": 0.103,
+          "consensus_lean": 0.24,
+          "blended_lean": 0.241,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1932,8 +1932,8 @@
           },
           {
             "name": "forum",
-            "side": "away",
-            "agrees": false
+            "side": "home",
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
@@ -1947,11 +1947,11 @@
           }
         ],
         "majority_side": "home",
-        "agree": 3,
-        "dissent": 1,
+        "agree": 4,
+        "dissent": 0,
         "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/4 sources agree (forum differ)",
+        "verdict": "corroborated",
+        "note": "all 4 sources agree on the public side",
         "flags": [],
         "line": "flat",
         "money": "with public",
@@ -2035,13 +2035,13 @@
       "betting_lines": {
         "majority": {
           "team": "Milwaukee Brewers",
-          "consensus_pct": 61.0,
+          "consensus_pct": 62.0,
           "moneyline": "-250"
         },
         "non_majority": {
           "team": "San Diego Padres",
-          "consensus_pct": 39.0,
-          "moneyline": "+165"
+          "consensus_pct": 38.0,
+          "moneyline": "+163"
         }
       },
       "consistency": {
@@ -2191,8 +2191,8 @@
         }
       },
       "pick_criteria": {
-        "status": "pick",
-        "reason": "handle+tickets agree, line moved against us",
+        "status": "PICK",
+        "reason": "fade \u2014 Milwaukee Brewers -209 was withdrawn",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
         "public_trusted": true,
@@ -2206,7 +2206,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.16,
+            "blended_lean": 0.241,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -2216,18 +2216,18 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": -209,
-        "opponent_moneyline": 171,
+        "advantage_moneyline": -218,
+        "opponent_moneyline": 178,
         "line_check": {
           "open": -227,
-          "current": -209,
-          "implied_shift": -0.018,
+          "current": -218,
+          "implied_shift": -0.009,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-227\u2192-209, -1.8%)",
+          "reason": "line moved away from the pick (-227\u2192-218, -0.9%)",
           "morning": -198,
           "early_shift": -0.03,
-          "late_shift": 0.012,
-          "timing": null,
+          "late_shift": 0.021,
+          "timing": "late",
           "pinny_morning": -187
         },
         "form_edge": false,
@@ -2245,156 +2245,146 @@
         },
         "vegas": {
           "bet": "San Diego Padres",
-          "odds": 171,
+          "odds": 178,
           "basis": "money %",
-          "hold_home": -658469,
-          "hold_away": 2067800
+          "hold_home": -556147,
+          "hold_away": 1940400
         },
         "play": "pick",
         "starred": [],
-        "win_prob": 68,
-        "win_driver": "consensus",
+        "win_prob": 76,
+        "win_driver": "bvp + consistency + favorite",
         "pm_quote": {
           "pm_pct": 64,
           "pm_american": -178,
-          "edge_pts": 3.6,
+          "edge_pts": 4.6,
           "vs_book": "better"
         },
         "projected": {
           "win_prob": 57.6,
           "fair_american": -136
         },
-        "line_vs_money": "against",
-        "bet_team": "Milwaukee Brewers",
-        "bet_moneyline": -209,
-        "consensus": {
-          "drift": -0.015,
-          "imbalance": 0.0,
-          "line": "against"
-        },
+        "line_vs_money": "flat",
+        "bet_team": "San Diego Padres",
+        "bet_moneyline": 178,
         "good_dog": {
           "team": "San Diego Padres",
           "rate": 0.624,
-          "odds": 171
+          "odds": 178
         },
-        "line_money": {
-          "team": "Milwaukee Brewers",
-          "odds": -209,
-          "move": 0.018,
-          "strong": false,
-          "line_team": "San Diego Padres"
-        },
-        "opp_starter": "Robbie Ray",
+        "line_money": null,
+        "source": "fade",
+        "opp_starter": "Jacob Misiorowski",
         "prop": {
-          "player": "Jackson Chourio",
-          "player_id": 694192,
-          "hit_rate": 76,
-          "all_rate": 74,
-          "gap": 2,
-          "form": 26,
-          "super_hot": true,
+          "player": "Fernando Tatis Jr.",
+          "player_id": 665487,
+          "hit_rate": 73,
+          "all_rate": 71,
+          "gap": 3,
+          "form": -11,
+          "super_hot": false,
           "bvp": {
-            "pa": 5,
-            "ops": 0.4
+            "pa": 3,
+            "ops": 1.334
           },
-          "wins_played": 83,
-          "games_played": 127,
+          "wins_played": 90,
+          "games_played": 161,
           "avg_pa": 4.6,
           "platoon": {
-            "hand": "L",
-            "avg": 0.333,
-            "pa": 171,
-            "delta": 0.041,
-            "shrunk": 0.015
+            "hand": "R",
+            "avg": 0.283,
+            "pa": 543,
+            "delta": -0.006,
+            "shrunk": -0.0038
           },
-          "odds": -228,
-          "fit": 0,
-          "prop_score": 0.823,
+          "odds": -195,
+          "fit": 2,
+          "prop_score": 0.7526,
           "selector": "all_rate+form+bvp+fit+platoon"
         },
         "shadow_hrr": {
-          "player": "Jackson Chourio",
-          "player_id": 694192,
+          "player": "Fernando Tatis Jr.",
+          "player_id": 665487,
           "market": "hits+runs+RBIs over 1.5",
-          "over": -130,
-          "under": -102,
+          "over": 112,
+          "under": -140,
           "bet": false
         },
         "hit_bats": [
           {
-            "player": "Jackson Chourio",
-            "player_id": 694192,
-            "hit_rate": 76,
-            "all_rate": 74,
-            "gap": 2,
-            "form": 26,
-            "super_hot": true,
+            "player": "Fernando Tatis Jr.",
+            "player_id": 665487,
+            "hit_rate": 73,
+            "all_rate": 71,
+            "gap": 3,
+            "form": -11,
+            "super_hot": false,
             "bvp": {
-              "pa": 5,
-              "ops": 0.4
+              "pa": 3,
+              "ops": 1.334
             },
-            "wins_played": 83,
-            "games_played": 127,
+            "wins_played": 90,
+            "games_played": 161,
             "avg_pa": 4.6,
             "platoon": {
-              "hand": "L",
-              "avg": 0.333,
-              "pa": 171,
-              "delta": 0.041,
-              "shrunk": 0.015
+              "hand": "R",
+              "avg": 0.283,
+              "pa": 543,
+              "delta": -0.006,
+              "shrunk": -0.0038
             },
-            "odds": -228,
-            "fit": 0,
-            "prop_score": 0.823,
+            "odds": -195,
+            "fit": 2,
+            "prop_score": 0.7526,
             "selector": "all_rate+form+bvp+fit+platoon"
           },
           {
-            "player": "Brice Turang",
-            "player_id": 668930,
-            "hit_rate": 72,
-            "all_rate": 67,
-            "gap": 5,
-            "form": 33,
+            "player": "Dustin Harris",
+            "player_id": 687957,
+            "hit_rate": 74,
+            "all_rate": 62,
+            "gap": 11,
+            "form": 18,
             "super_hot": true,
             "bvp": {
-              "pa": 7,
-              "ops": 0.286
+              "pa": 0,
+              "ops": 0.0
             },
-            "wins_played": 96,
-            "games_played": 150,
-            "avg_pa": 4.6,
+            "wins_played": 19,
+            "games_played": 45,
+            "avg_pa": 4.3,
             "platoon": {
-              "hand": "L",
-              "avg": 0.216,
-              "pa": 202,
-              "delta": -0.053,
-              "shrunk": -0.0212
+              "hand": "R",
+              "avg": 0.302,
+              "pa": 129,
+              "delta": 0.01,
+              "shrunk": 0.003
             },
-            "fit": 2
+            "fit": 3
           },
           {
-            "player": "William Contreras",
-            "player_id": 661388,
-            "hit_rate": 76,
-            "all_rate": 65,
-            "gap": 11,
-            "form": 15,
+            "player": "Ty France",
+            "player_id": 664034,
+            "hit_rate": 71,
+            "all_rate": 62,
+            "gap": 9,
+            "form": 18,
             "super_hot": true,
             "bvp": {
-              "pa": 10,
-              "ops": 0.667
+              "pa": 2,
+              "ops": 1.0
             },
-            "wins_played": 97,
-            "games_played": 147,
-            "avg_pa": 4.6,
+            "wins_played": 72,
+            "games_played": 130,
+            "avg_pa": 4.1,
             "platoon": {
-              "hand": "L",
-              "avg": 0.272,
-              "pa": 183,
-              "delta": 0.001,
-              "shrunk": 0.0005
+              "hand": "R",
+              "avg": 0.298,
+              "pa": 362,
+              "delta": 0.003,
+              "shrunk": 0.0015
             },
-            "fit": 0
+            "fit": -3
           }
         ]
       },
@@ -2433,7 +2423,7 @@
     }
   ],
   "picks": [
-    "Milwaukee Brewers"
+    "San Diego Padres"
   ],
   "coin_flips": [],
   "leans": []
