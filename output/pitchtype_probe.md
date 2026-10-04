@@ -133,7 +133,31 @@ one record, keys only:
  }
 }
 ```
-**home-run records found: 0**
+**17 HR over 419 PA-ending pitches** (hitting)
+  - fastball: 12 HR / 223 PA = 5.381%
+      vs RHP: 12 HR / 182 PA = 6.593%
+      vs LHP: 0 HR / 41 PA = 0.000%
+  - breaking: 3 HR / 104 PA = 2.885%
+      vs RHP: 3 HR / 79 PA = 3.797%
+      vs LHP: 0 HR / 25 PA = 0.000%
+  - offspeed: 2 HR / 92 PA = 2.174%
+      vs RHP: 2 HR / 87 PA = 2.299%
+      vs LHP: 0 HR / 5 PA = 0.000%
+  - raw types: Four-seam FB 8, Cutter 3, Changeup 2, Sinker 1, Slider 1, Knuckle Curve 1, Sweeper 1
+**2025 playLog: 546 record(s)**
+  **19 HR over 545 PA-ending pitches** (hitting)
+    - fastball: 7 HR / 277 PA = 2.527%
+        vs RHP: 6 HR / 195 PA = 3.077%
+        vs LHP: 1 HR / 82 PA = 1.220%
+    - breaking: 8 HR / 182 PA = 4.396%
+        vs RHP: 7 HR / 114 PA = 6.140%
+        vs LHP: 1 HR / 68 PA = 1.471%
+    - offspeed: 4 HR / 85 PA = 4.706%
+        vs RHP: 4 HR / 82 PA = 4.878%
+        vs LHP: 0 HR / 3 PA = 0.000%
+    - other: 0 HR / 1 PA = 0.000%
+        vs RHP: 0 HR / 1 PA = 0.000%
+    - raw types: Four-seam FB 6, Changeup 3, Sweeper 3, Slider 2, Curveball 2, Sinker 1, Splitter 1, Knuckle Curve 1
 
 ### Logan Henderson (pitching)
 
@@ -231,7 +255,23 @@ one record, keys only:
  }
 }
 ```
-**home-run records found: 0**
+**14 HR over 370 PA-ending pitches** (pitching)
+  - fastball: 7 HR / 226 PA = 3.097%
+      vs RHP: 7 HR / 226 PA = 3.097%
+  - breaking: 1 HR / 15 PA = 6.667%
+      vs RHP: 1 HR / 15 PA = 6.667%
+  - offspeed: 6 HR / 129 PA = 4.651%
+      vs RHP: 6 HR / 129 PA = 4.651%
+  - raw types: Changeup 6, Four-seam FB 5, Cutter 2, Sweeper 1
+**2025 playLog: 99 record(s)**
+  **3 HR over 99 PA-ending pitches** (pitching)
+    - fastball: 3 HR / 60 PA = 5.000%
+        vs RHP: 3 HR / 60 PA = 5.000%
+    - breaking: 0 HR / 4 PA = 0.000%
+        vs RHP: 0 HR / 4 PA = 0.000%
+    - offspeed: 0 HR / 35 PA = 0.000%
+        vs RHP: 0 HR / 35 PA = 0.000%
+    - raw types: Four-seam FB 3
 
 ## What to conclude
 
