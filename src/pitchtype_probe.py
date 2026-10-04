@@ -89,6 +89,37 @@ def _table(rows: dict, group: str) -> list[str]:
     return md
 
 
+def alt_endpoints(player_id: int, group: str, season: int) -> list[str]:
+    """Try the OTHER places MLB might serve pitch-mix data.
+
+    statSplits with the pitch-type sitCodes came back empty for both groups,
+    while vr/vl on the SAME endpoint works (the platoon term uses it) - so
+    statSplits is fine and the pitch-type codes are simply not populated. These
+    are the documented alternatives, checked before the idea is abandoned.
+    """
+    out = []
+    for stats in ("pitchArsenal", "pitchLog", "playLog", "hotColdZones",
+                  "sabermetrics"):
+        try:
+            data = mlb_api._get(f"people/{player_id}/stats", stats=stats,
+                                group=group, season=season)
+        except Exception as exc:
+            out.append(f"- `{stats}` ({group}): request failed — {exc}")
+            continue
+        blocks = data.get("stats") or []
+        if not blocks:
+            out.append(f"- `{stats}` ({group}): **empty**")
+            continue
+        n = sum(len(b.get("splits") or []) for b in blocks)
+        keys = set()
+        for b in blocks:
+            for sp in (b.get("splits") or [])[:3]:
+                keys |= set((sp.get("stat") or {}).keys())
+        out.append(f"- `{stats}` ({group}): **{n} split(s)**, fields: "
+                   + (", ".join(sorted(keys)[:14]) or "none"))
+    return out
+
+
 def resolve_starter(date: str) -> tuple[int, str]:
     """(id, name) of a probable starter on this date, so the probe needs no
     hand-copied player id."""
@@ -119,7 +150,14 @@ def build(batter: int, pitcher: int, season: int,
                    "splits for this group, so this half of the idea is dead.", ""]
             continue
         md += _table(rows, group)
-    md += ["## What to conclude", "",
+    md += ["## Alternative endpoints", "",
+           "_statSplits serves vr/vl fine, so it is the pitch-type CODES that "
+           "are unpopulated. These are the documented alternatives._", ""]
+    if batter:
+        md += alt_endpoints(batter, "hitting", season)
+    if pitcher:
+        md += alt_endpoints(pitcher, "pitching", season)
+    md += ["", "## What to conclude", "",
            "- both tables populated with PA and HR -> the matchup term is "
            "buildable, with heavy shrinkage for the per-type sample",
            "- a pitcher's PA per type doubles as his USAGE mix, which is the "
