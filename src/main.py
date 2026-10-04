@@ -29,7 +29,8 @@ from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
                        find_slate_line, line_confirms,
                        projected_from_margin)
-from .mlb_api import (enrich_with_stats, hp_umpire, results_for, schedule_for,
+from .mlb_api import (enrich_with_stats, hp_umpire, lineup as mlb_lineup,
+                      results_for, schedule_for,
                       team_home_away_split)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -315,18 +316,11 @@ def run(date: str) -> dict:
                 for b in scored:
                     b["fit"] = fits.get(b.get("player_id"), 0)
                 r["pick_criteria"]["hit_bats"] = scored[:3]
-                # HOME RUN PICK, from the board's own three bats.
-                #
-                # The constraint costs real probability and that is worth
-                # stating: on 2026-10-04 the best of the board's three was
-                # Merrill at 12.1%, against Tatis at 23.6% from the whole
-                # lineup - the three are chosen to GET A HIT, which favours
-                # contact and penalises the strikeout rate that comes with
-                # power. Picking from them was the instruction, so the cost is
-                # paid openly rather than worked around.
+                # HOME RUN PICK, from the WHOLE lineup - see _attach_hr_prop
+                # for why the three posted bats are the wrong pool for it.
                 if _play(r) == "pick" and upcoming:
                     try:
-                        _attach_hr_prop(r, scored[:3], gm, is_home, date)
+                        _attach_hr_prop(r, team, gm, is_home, date)
                     except Exception as exc:
                         log.warning("hr prop failed on %s: %s",
                                     r.get("game_pk"), exc)
@@ -1665,65 +1659,78 @@ def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
     return out
 
 
-def _attach_hr_prop(r: dict, bats: list, gm, is_home: bool, date: str) -> None:
-    """Most likely home run among the board's own three bats, with its price.
+def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
+    """Most likely home run on the picked team, with its price, or nothing.
 
-    Booked into its OWN book in the prop ledger (`home_runs`), not mixed into
-    `singles`. A 1+ hit single at -200 and a 1+ HR at +575 are different bets at
-    opposite ends of the price scale; pooling them makes one record that
-    describes neither. Separate books keep both readable while the home runs
-    still count inside the prop ledger.
+    FROM THE WHOLE LINEUP, not the three posted bats. Those three are chosen to
+    GET A HIT, which favours contact and penalises the strikeout rate that comes
+    with power - a structurally wrong pool for a home-run bet. Measured on
+    2026-10-04: best of the three was Merrill at 14.6% while the lineup held
+    Tatis at 23.6% and Sheets at 23.3%. Widening does not make the model's
+    estimate of any one hitter better; it makes the SELECTION better, which is
+    the thing that was broken.
+
+    Widening REQUIRES the sample filter back. Without MIN_PA / MIN_HR a bench bat
+    at 2 HR in 25 PA reads 38% and beats a 26-homer regular at 20% - noise
+    winning because its denominator is small.
+
+    Booked into its own `home_runs` book in the prop ledger, never mixed into
+    `singles`: a 1+ hit at -200 and a 1+ HR at +390 are different bets.
     """
-    ids = [b.get("player_id") for b in bats if b.get("player_id")]
-    if not ids:
-        return
-    opp_sp = (gm.away if is_home else gm.home).probable_pitcher
-    # Wind is now IN the model rather than a second floor beside it. An outward
-    # wind lifts every bat's rate, so on a blowing-out night a marginal hitter
-    # clears the same bar instead of needing a special exemption - which is what
-    # "if it's blowing out, still choose it" actually means once the conditions
-    # are priced rather than bolted on.
+    # ---- conditions first: these can refuse the whole thing ----------------
     away, home = (r.get("matchup") or " @ ").split(" @ ")
     wc = _wind_component(r, home)
+    cond = _contact_conditions(r, team.name)
+    against = cond.startswith("contact conditions: AGAINST THE BAT")
+    if (wc and wc[0] == "in") or against:
+        why = ("wind is blowing IN" if (wc and wc[0] == "in")
+               else "conditions are against the bat")
+        r["pick_criteria"]["hr_withheld"] = {
+            "reason": f"no HR pick — {why} ({cond.split(': ', 1)[-1]})",
+            "wind": f"{(r.get('weather') or {}).get('wind_mph')} mph "
+                    f"{wc[0] if wc else '—'}"}
+        log.info("hr prop withheld on %s: %s", r.get("game_pk"), why)
+        return
+
+    try:
+        hitters = mlb_lineup(gm.game_pk, team.team_id, date, is_home)
+    except Exception as exc:
+        log.warning("hr lineup unavailable: %s", exc)
+        return
+    names = {h.player_id: h.name for h in hitters if getattr(h, "player_id", None)}
+    if not names:
+        return
+    opp_sp = (gm.away if is_home else gm.home).probable_pitcher
     wf, wnote = hr_pick.wind_factor(
         (r.get("weather") or {}).get("wind_mph"),
         wc[1] if wc else 0.0, wc[0] if wc else None)
     ranked = hr_pick.score_hitters(
-        ids, int(date[:4]), getattr(opp_sp, "player_id", None),
-        r.get("park_factor") or 1.0, wind=wf)
+        list(names), int(date[:4]), getattr(opp_sp, "player_id", None),
+        r.get("park_factor") or 1.0, wind=wf,
+        min_pa=hr_pick.MIN_PA, min_hr=hr_pick.MIN_HR)
+
+    # ---- no numbers indicating a home run -> post nothing ------------------
     if not ranked:
+        r["pick_criteria"]["hr_withheld"] = {
+            "reason": f"no HR pick — nobody in the lineup has the season behind "
+                      f"it ({hr_pick.MIN_PA}+ PA and {hr_pick.MIN_HR}+ HR)",
+            "wind": wnote}
+        log.info("hr prop withheld on %s: no qualifying bat", r.get("game_pk"))
         return
     top = ranked[0]
-    # THE GATE. Two reasons to post nothing, and they are different in kind.
-    #
-    # 1) No power at all. A hitter with ZERO season home runs has no rate to
-    #    multiply, and no wind, park or pitcher factor can lift zero. Harris was
-    #    0-for-152 on 2026-10-04; promoting him on a windy day would be the model
-    #    pretending a multiplier can create an ability.
-    # 2) Below the league-average hitter. hr_pick.HR_FLOOR is derived from
-    #    LEAGUE_HR9, not chosen - a bat that cannot clear the AVERAGE hitter's
-    #    chance is not a home-run prop, and the board should say so rather than
-    #    post the least-bad of three contact hitters.
-    #
-    # The wind exemption lives in the multiplier, so a LOW-power bat can clear
-    # the floor when it is blowing out. A NO-power bat still cannot, correctly.
-    if top["hr"] < 1 or top["p_game"] < hr_pick.HR_FLOOR:
+    if top["p_game"] < hr_pick.HR_FLOOR:
         r["pick_criteria"]["hr_withheld"] = {
-            "best": {b.get("player_id"): b.get("player")
-                     for b in bats}.get(top["player_id"]),
+            "best": names.get(top["player_id"]),
             "p_game": round(top["p_game"], 4),
             "floor": round(hr_pick.HR_FLOOR, 4),
             "season": f"{top['hr']}/{top['pa']}", "wind": wnote,
-            "reason": ("no season home runs — nothing for the wind or park to "
-                       "multiply" if top["hr"] < 1 else
-                       f"best of the three is {top['p_game']:.1%}, under the "
-                       f"{hr_pick.HR_FLOOR:.1%} a league-average hitter manages"
-                       f" ({wnote})")}
-        log.info("hr prop withheld on %s: %s", r.get("game_pk"),
-                 r["pick_criteria"]["hr_withheld"]["reason"])
+            "reason": f"no HR pick — best in the lineup is "
+                      f"{top['p_game']:.1%}, under the "
+                      f"{hr_pick.HR_FLOOR:.1%} a league-average hitter manages"}
+        log.info("hr prop withheld on %s: under the floor", r.get("game_pk"))
         return
-    bat = {b.get("player_id"): b for b in bats}.get(top["player_id"]) or {}
-    name = bat.get("player")
+
+    name = names.get(top["player_id"])
     if not name:
         return
     row = {"player": name, "player_id": top["player_id"],
@@ -1733,7 +1740,8 @@ def _attach_hr_prop(r: dict, bats: list, gm, is_home: bool, date: str) -> None:
            "iso": top["iso"], "pitcher_factor": top["pitcher_factor"],
            "park": top["park"], "wind": wnote,
            "wind_factor": top.get("wind_factor"),
-           "floor": round(hr_pick.HR_FLOOR, 4), "from_board_three": True}
+           "floor": round(hr_pick.HR_FLOOR, 4),
+           "pool": "whole lineup", "considered": len(ranked)}
     try:
         line = prop_odds.hr_line(date, name, gm.away.name, gm.home.name)
         if line.get("over") is not None:
@@ -1888,7 +1896,7 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         out.append("       • " + "  ·  ".join(x for x in bits if x))
     hw = pc.get("hr_withheld")
     if hw:
-        out.append(f"       no HR pick — {hw['reason']}")
+        out.append(f"       {hw['reason']}")
     hp = pc.get("hr_prop")
     if hp:
         price = (f" {hp['odds']:+d}" if isinstance(hp.get("odds"), int)

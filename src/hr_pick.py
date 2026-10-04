@@ -119,14 +119,15 @@ def wind_factor(mph, strength, direction: str | None) -> tuple[float, str]:
 
 
 def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
-                  park: float, wind: float = 1.0) -> list[dict]:
+                  park: float, wind: float = 1.0,
+                  min_pa: int = 0, min_hr: int = 0) -> list[dict]:
     """Rank a GIVEN set of hitters by P(1+ HR), same formula as `candidates`.
 
-    No MIN_PA / MIN_HR filter here, deliberately. That filter exists to stop a
-    bench bat with 3 homers in 40 PA topping a whole-lineup ranking. When the
-    CANDIDATE SET IS ALREADY FIXED - the three bats the board posts - filtering
-    would just return nothing and answer no question. The caller gets `pa` and
-    `hr` on every row so a thin sample is visible rather than hidden.
+    `min_pa` / `min_hr` default to 0 - no filter - which is right when the
+    candidate set is already fixed and small. Pass MIN_PA / MIN_HR whenever the
+    pool is a WHOLE LINEUP: without them a bench bat at 2 HR in 25 PA reads 38%
+    and tops a 26-homer regular at 20%, which is noise winning on sample size.
+    The caller always gets `pa` and `hr` so a thin sample stays visible.
     """
     pf, pnote = _pitcher_factor(pitcher_id, season)
     stats = mlb_api._season_hitting([p for p in player_ids if p], season)
@@ -141,7 +142,7 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
             tb = float(st.get("totalBases", 0) or 0)
         except (TypeError, ValueError):
             continue
-        if pa < 1:
+        if pa < 1 or pa < min_pa or hr < min_hr:
             continue
         p_season = hr / pa
         rhr, rpa = _recent_power(pid, season)
