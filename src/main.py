@@ -1787,6 +1787,8 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "wind_factor": top.get("wind_factor"),
            "slot": top.get("slot"), "expected_pa": top.get("expected_pa"),
            "form_factor": top.get("form_factor"), "form": top.get("form_note"),
+           "trend_factor": top.get("trend_factor"),
+           "trend": top.get("trend_note"),
            "win_factor": top.get("win_factor"), "win": top.get("win_note"),
            "vs_hand": (None if top.get("hand_rate") is None else
                        f"{top['hand_rate']*top['hand_pa']:.0f}/{top['hand_pa']}"
@@ -1974,6 +1976,8 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         out.append(f"       💥 HR PICK: {hp['player']} 1+ HR{price}"
                    f"  ·  {hp['p_game']:.1%}  ·  {hp['season']} HR/PA"
                    f" season, {hp['recent']} last 15")
+        if hp.get("trend"):
+            out.append(f"          form trend: {hp['trend']}")
         mix = hp.get("pitch_mix")
         if mix:
             out.append(f"          ◻ pitch mix (context, not in the number): "
