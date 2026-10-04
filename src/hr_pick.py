@@ -57,6 +57,23 @@ MIN_HR = 10
 LEAGUE_HR9 = 1.15      # league-average HR allowed per 9 innings
 PITCHER_CLAMP = (0.70, 1.40)
 
+# WIND, which this model used to ignore entirely while using the park factor.
+# Outward wind is a real home-run factor and leaving it out made every number
+# wrong in absolute terms on a windy day. ~2% per mph of the OUTWARD component is
+# a conventional figure, deliberately conservative, and clamped - it is not
+# fitted to anything in this repo, same standing as PITCHER_CLAMP.
+WIND_HR_PER_MPH = 0.02
+WIND_CLAMP = (0.80, 1.30)
+
+# THE FLOOR, DERIVED NOT CHOSEN. A pitcher faces roughly 38 batters per 9
+# innings, so LEAGUE_HR9 implies a league-average HR rate per plate appearance,
+# and that gives the chance an AVERAGE hitter homers in a game. A bat that cannot
+# clear the average hitter is not a home-run prop, and the board should post
+# nothing rather than post the least-bad of three contact hitters.
+PA_PER_9 = 38.0
+LEAGUE_HR_PA = LEAGUE_HR9 / PA_PER_9
+HR_FLOOR = 1 - (1 - LEAGUE_HR_PA) ** EXPECTED_PA
+
 
 def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
@@ -86,8 +103,23 @@ def _pitcher_factor(pid: int | None, season: int) -> tuple[float, str]:
     return _clamp(hr9 / LEAGUE_HR9, *PITCHER_CLAMP), f"{hr9:.2f} HR/9 over {ip:.0f} IP"
 
 
+def wind_factor(mph, strength, direction: str | None) -> tuple[float, str]:
+    """Multiplier on a hitter's HR rate from the wind, and a note.
+
+    Only an OUTWARD wind lifts it; an inward wind suppresses it. `strength` is
+    how squarely the wind runs the park's axis, so an angled wind counts less.
+    Returns 1.0 and says so when there is nothing readable.
+    """
+    if direction not in ("out", "in") or not isinstance(mph, (int, float)):
+        return 1.0, "no readable wind"
+    comp = float(mph) * float(strength or 0.0)
+    f = 1.0 + WIND_HR_PER_MPH * comp * (1 if direction == "out" else -1)
+    f = _clamp(f, *WIND_CLAMP)
+    return f, f"{mph:.0f} mph {direction} (x{f:.2f})"
+
+
 def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
-                  park: float) -> list[dict]:
+                  park: float, wind: float = 1.0) -> list[dict]:
     """Rank a GIVEN set of hitters by P(1+ HR), same formula as `candidates`.
 
     No MIN_PA / MIN_HR filter here, deliberately. That filter exists to stop a
@@ -116,9 +148,9 @@ def score_hitters(player_ids: list[int], season: int, pitcher_id: int | None,
         p_recent = (rhr / rpa) if rpa else p_season
         w = rpa / (rpa + SHRINK)
         p_blend = w * p_recent + (1 - w) * p_season
-        p_adj = _clamp(p_blend * pf * float(park), 0.0, 0.25)
+        p_adj = _clamp(p_blend * pf * float(park) * float(wind), 0.0, 0.25)
         out.append({
-            "player_id": pid, "pa": pa, "hr": hr,
+            "player_id": pid, "pa": pa, "hr": hr, "wind_factor": round(wind, 2),
             "iso": round(((tb - hits) / ab) if ab else 0.0, 3),
             "season_rate": p_season, "recent_hr": rhr, "recent_pa": rpa,
             "blend": p_blend, "weight": round(w, 2),
