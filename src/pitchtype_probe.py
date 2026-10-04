@@ -83,9 +83,9 @@ def _table(rows: dict, group: str) -> list[str]:
             tot_hr += hr
         md.append(f"| {LABEL[c]} (`{c}`) | {pa} | {hr} | {rate} | {has} |")
     md += ["", f"- totals across types: **{tot_pa} PA, {tot_hr} HR**",
-           f"- _if the totals look like a full season the types partition it; "
-           f"if they far exceed it, the codes overlap (e.g. `pfa` containing "
-           f"`pff`+`pft`) and only ONE family may be summed_", ""]
+           "- _if the totals look like a full season the types partition it; "
+           "if they far exceed it, the codes overlap (e.g. `pfa` containing "
+           "`pff`+`pft`) and only ONE family may be summed_", ""]
     return md
 
 
