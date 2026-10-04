@@ -159,10 +159,17 @@ unit-testable with mock `Game`/`Team` objects.
   out-of-sample twice (2025→2026 r=+0.145 p=0.038; half-A→half-B r=+0.141
   p=0.026, Fisher p=0.0078 against a six-test Bonferroni bar of 0.0083). But its
   full achievable effect is **×0.991 to ×1.010**, where form reaches ×1.30 and
-  wind ×1.24, so it cannot change a selection. Don't rebuild it without a reason
-  the 1.9% spread has grown. A pitcher's HR-by-family is stable (fastball
-  r=+0.248) yet unusable alone: his own mix times his own by-family rates is just
-  his overall rate, so it only enters through the weak hitter side.
+  wind ×1.24, so it cannot change a selection. A pitcher's HR-by-family is stable
+  (fastball r=+0.248) yet unusable alone: his own mix times his own by-family
+  rates is just his overall rate, so it only enters through the weak hitter side.
+  **It ships as CONTEXT instead** (`pitch_mix.py`): the board prints the starter's
+  fastball share, the hitter's fastball tilt and the multiplier that is *not*
+  applied, and `record_audit.pitch_mix_guard` bounds-checks that it never would
+  have changed a pick (leader gets his own multiplier, runner-up gets the ceiling
+  `MAX_MULT`). `main._attach_hr_prop` calls it AFTER the hitter is chosen, so it
+  cannot reorder candidates by construction — keep it there. `TILT_SLOPE` and
+  `LEAGUE_FASTBALL_SHARE` are PRE-REGISTERED from the measurement and must not be
+  re-fitted against the forward record the field is accumulating.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`

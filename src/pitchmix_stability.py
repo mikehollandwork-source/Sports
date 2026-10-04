@@ -61,6 +61,7 @@ import random
 from pathlib import Path
 
 from . import mlb_api
+from .pitch_mix import FAMILIES, FAMILY   # one copy of the table, there
 
 log = logging.getLogger("pitchmix_stability")
 
@@ -73,18 +74,8 @@ PRIOR = 2025
 MIN_PA = 150        # PA-ending pitches needed in a season for a usable tilt
 MIN_HR = 5          # homers needed, or the HR shares are one or two events
 LEAGUE_HR_PA = 0.0303   # league HR per PA, the same figure hr_pick.HR_FLOOR uses
-FAMILIES = ("fastball", "breaking", "offspeed")
 PERMUTATIONS = 2000
 SEED = 20261004
-
-FAMILY = {
-    "FF": "fastball", "SI": "fastball", "FC": "fastball", "FT": "fastball",
-    "FA": "fastball",
-    "SL": "breaking", "CU": "breaking", "KC": "breaking", "ST": "breaking",
-    "SV": "breaking", "CS": "breaking", "SC": "breaking",
-    "CH": "offspeed", "FS": "offspeed", "FO": "offspeed", "EP": "offspeed",
-    "KN": "offspeed",
-}
 
 
 # --- fetching -----------------------------------------------------------------

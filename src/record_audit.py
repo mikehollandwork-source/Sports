@@ -48,7 +48,7 @@ import statistics as st
 import subprocess
 from pathlib import Path
 
-from . import good_dog, grade, line_money, mlb_api
+from . import good_dog, grade, line_money, mlb_api, pitch_mix
 
 log = logging.getLogger("record_audit")
 
@@ -292,6 +292,58 @@ def line_money_guard() -> list[str]:
     return out + [""]
 
 
+def pitch_mix_guard() -> list[str]:
+    """Assert the pitch-type context never would have changed a home-run pick.
+
+    `pitch_mix` is computed after the hitter is chosen, so it cannot influence
+    the choice by construction. This checks the separate claim that motivated
+    leaving it out of the formula: that applying it would not have picked anyone
+    different.
+
+    Bounded properly rather than conveniently. The leader takes his OWN measured
+    multiplier, while the runner-up is credited with `pitch_mix.MAX_MULT` - the
+    most the matchup could do for anybody - even though his real figure is
+    unknown and almost always smaller. So a PASS here means no pick could have
+    flipped, not merely that none did.
+    """
+    checked = flips = 0
+    worst = None
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        try:
+            day = json.loads(Path(f).read_text())
+        except (OSError, ValueError):
+            continue
+        for g in day.get("games", []):
+            hp = (g.get("pick_criteria") or {}).get("hr_prop") or {}
+            mix = hp.get("pitch_mix") or {}
+            mult, p, rp = (mix.get("multiplier_not_applied"),
+                           hp.get("p_game"), hp.get("runner_up_p"))
+            if not mult or not p or not rp:
+                continue
+            checked += 1
+            margin = p * mult - rp * pitch_mix.MAX_MULT
+            if worst is None or margin < worst:
+                worst = margin
+            if margin < 0:
+                flips += 1
+    out = ["## Guard: the pitch-type context never would have changed a HR pick",
+           "",
+           "_Leader takes his own multiplier; runner-up is credited with the "
+           f"measured ceiling ×{pitch_mix.MAX_MULT:.3f}, so this is a bound, "
+           "not an observation._", "",
+           f"- HR picks carrying the context and a runner-up: **{checked}**"]
+    if not checked:
+        return out + ["- _none yet; the context ships with tonight's board._", ""]
+    out += [f"- narrowest margin over the runner-up: "
+            f"**{worst:+.2%}** of HR probability",
+            f"- picks it could have flipped: **{flips}**"]
+    out.append("- " + ("**PASS** — no pick could have changed" if flips == 0
+                       else f"**{flips} pick(s) could have flipped.** The "
+                            "1.9% spread may have grown; re-measure before "
+                            "trusting the 'context only' reading."))
+    return out + [""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Record audit — what was posted vs what got graded", "",
@@ -504,6 +556,7 @@ def build() -> str:
              and r["final_odds"] != r["first_odds"]]
     md += good_dog_guard()
     md += line_money_guard()
+    md += pitch_mix_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "

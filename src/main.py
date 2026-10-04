@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for, hr_factor
-from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pitch_mix, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -1697,6 +1697,7 @@ def _hr_side(r: dict, bat_team, opp_team, gm, is_home: bool, date: str,
     for row in rows:
         row["name"] = names.get(row["player_id"])
         row["opposing"] = oppnote
+        row["opp_starter_id"] = getattr(opp_sp, "player_id", None)
         row["bullpen_ip"] = round(pen_ip, 1)
         row["win_note"] = wnote
         row["opp_hand"] = getattr(opp_sp, "hand", None)
@@ -1800,6 +1801,17 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "runner_up_p": (None if len(cands) < 2
                            else round(cands[1]["p_game"], 4)),
            "our_side": top.get("team") == (pc.get("bet_team") or team.name)}
+    # Pitch-type matchup, reported and applied to nothing. Called here, with the
+    # winner already decided, so no code path exists by which it could reorder
+    # the candidates - see pitch_mix's docstring.
+    try:
+        mix = pitch_mix.context(top["player_id"], top.get("opp_starter_id"),
+                                int(date[:4]))
+        if mix:
+            row["pitch_mix"] = mix
+    except Exception as exc:
+        log.warning("pitch-mix context unavailable for %s: %s", name, exc)
+
     try:
         line = prop_odds.hr_line(date, name, gm.away.name, gm.home.name)
         if line.get("over") is not None:
@@ -1962,6 +1974,10 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         out.append(f"       💥 HR PICK: {hp['player']} 1+ HR{price}"
                    f"  ·  {hp['p_game']:.1%}  ·  {hp['season']} HR/PA"
                    f" season, {hp['recent']} last 15")
+        mix = hp.get("pitch_mix")
+        if mix:
+            out.append(f"          ◻ pitch mix (context, not in the number): "
+                       f"{mix['note']}")
     sh = pc.get("shadow_hrr")
     if sh and sh.get("over") is not None:
         out.append(f"       ◻ tracking only, NOT a bet: {sh['player']} "
