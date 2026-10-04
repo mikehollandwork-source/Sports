@@ -150,6 +150,19 @@ unit-testable with mock `Game`/`Team` objects.
   `k_readings` must be skipped — the readings are another game's and cannot be
   repaired.** Affects `venue_signal`, `venue_cross`, `venue_swap`, `best_execution`,
   `signal_sweep2`, `triple_check`; none of them filters on the flag yet.
+- **Pitch-type matchups were measured and REJECTED on size, not on principle**
+  (`pitchmix_stability.py`, `output/pitchmix_stability.md`). The data does exist:
+  `statSplits` serves none of the pitch-type sitCodes, but `playLog` carries pitch
+  type, outcome, `pitchHand` and `batSide` on every plate appearance, and
+  `pitchArsenal` gives a pitcher's usage mix. Only the FASTBALL family carries
+  signal — breaking p=0.22, offspeed p=0.72 — and the fastball tilt replicates
+  out-of-sample twice (2025→2026 r=+0.145 p=0.038; half-A→half-B r=+0.141
+  p=0.026, Fisher p=0.0078 against a six-test Bonferroni bar of 0.0083). But its
+  full achievable effect is **×0.991 to ×1.010**, where form reaches ×1.30 and
+  wind ×1.24, so it cannot change a selection. Don't rebuild it without a reason
+  the 1.9% spread has grown. A pitcher's HR-by-family is stable (fastball
+  r=+0.248) yet unusable alone: his own mix times his own by-family rates is just
+  his overall rate, so it only enters through the weak hitter side.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
