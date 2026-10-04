@@ -15,6 +15,7 @@ that once per play-game per day.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import logging
 import os
@@ -35,10 +36,86 @@ def _key() -> str | None:
     return os.environ.get("THE_ODDS_API_KEY") or None
 
 
+# CREDIT BUDGET.
+#
+# The Odds API bills one credit per MARKET per REGION on /events/{id}/odds, and
+# reports the truth in response headers - x-requests-remaining and
+# x-requests-used. Those are recorded rather than estimated, because an estimate
+# of spend is exactly the thing that silently drifts until lines stop arriving
+# and the ledger quietly falls back to its assumed -200.
+#
+# Measured on 104 days of boards: ~2.3 plays a day, so batter_hits ~72 a month,
+# the H+R+RBI shadow ~70 and home runs ~70 = ~213 against a ~150-240 tier.
+#
+# So fetches are PRIORITISED. When remaining credits fall under RESERVE, only
+# what is actually being BET still spends: the posted 1+ hit line and the home-run
+# line, both of which are graded into the prop ledger. The H+R+RBI shadow - an
+# experiment with nothing staked - is dropped first and automatically. That is
+# how the same RESULTS survive a smaller budget: the experiment yields, the bets
+# do not.
+STATE = OUTPUT_DIR / "odds_credits.json"
+RESERVE = int(os.environ.get("ODDS_RESERVE", "40"))
+PRIORITY = {"bet": 0, "shadow": 1}      # lower spends first
+
+
+def _state() -> dict:
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _note_headers(r) -> None:
+    """Record what the API itself says is left. Never estimated."""
+    rem = r.headers.get("x-requests-remaining")
+    used = r.headers.get("x-requests-used")
+    if rem is None and used is None:
+        return
+    st = _state()
+    try:
+        if rem is not None:
+            st["remaining"] = int(float(rem))
+        if used is not None:
+            st["used"] = int(float(used))
+    except (TypeError, ValueError):
+        return
+    st["last_seen"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    try:
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        STATE.write_text(json.dumps(st, indent=1))
+    except OSError:
+        pass
+
+
+def remaining() -> int | None:
+    """Credits the API last said were left, or None if never seen."""
+    v = _state().get("remaining")
+    return int(v) if isinstance(v, (int, float)) else None
+
+
+def may_spend(tier: str = "bet") -> bool:
+    """Whether a fetch of this tier should go ahead.
+
+    Unknown remaining -> allow: refusing on no information would silently stop
+    the board getting prices it has always had.
+    """
+    if PRIORITY.get(tier, 0) == 0:
+        return True                     # a bet's price always spends
+    rem = remaining()
+    if rem is None:
+        return True
+    if rem <= RESERVE:
+        log.warning("odds credits: %d left (reserve %d) - skipping %s fetch",
+                    rem, RESERVE, tier)
+        return False
+    return True
+
+
 def _get(path: str, **params):
     try:
         with apitime.timed("oddsapi", path):
             r = requests.get(f"{BASE}{path}", params={"apiKey": _key(), **params}, timeout=TIMEOUT)
+            _note_headers(r)
             r.raise_for_status()
             return r.json()
     except Exception as exc:
@@ -191,7 +268,7 @@ def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
 
     Cached in its own day file so the batter_hits cache shape is untouched.
     """
-    if not _key():
+    if not _key() or not may_spend("shadow"):
         return {}
     try:
         cache = json.loads(_hrr_cache_path(date).read_text())

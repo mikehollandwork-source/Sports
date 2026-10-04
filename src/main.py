@@ -261,7 +261,17 @@ def run(date: str) -> dict:
                             reverse=True)
             prop = scored[0] if scored else None
             if prop:
-                line = prop_odds.hit_line(date, prop["player"], gm.away.name, gm.home.name)
+                # Only buy a price for a game that has NOT started. An in-game
+                # price answers a different question - the market probe proved
+                # it, returning Over 0.5 hits at +208 on a game two hours old
+                # when that market prices near -200 pre-game - and the per-day
+                # cache would then freeze that wrong price for the rest of the
+                # day. Skipping it also stops spending credits on games that can
+                # no longer be bet.
+                upcoming = r.get("state") == "upcoming"
+                line = (prop_odds.hit_line(date, prop["player"], gm.away.name,
+                                           gm.home.name)
+                        if upcoming else None)
                 if line is not None:
                     prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
                 fit = fits.get(prop.get("player_id"), 0)
@@ -288,7 +298,7 @@ def run(date: str) -> dict:
                 # back-tested: those prices were never captured. So it is logged
                 # to its own book and left alone, like the watch tags.
                 # Plays only - it costs one extra API credit per game per day.
-                if _play(r) == "pick":
+                if _play(r) == "pick" and upcoming:
                     try:
                         hrr = prop_odds.hrr_line(date, prop["player"],
                                                  gm.away.name, gm.home.name)
@@ -314,7 +324,7 @@ def run(date: str) -> dict:
                 # contact and penalises the strikeout rate that comes with
                 # power. Picking from them was the instruction, so the cost is
                 # paid openly rather than worked around.
-                if _play(r) == "pick":
+                if _play(r) == "pick" and upcoming:
                     try:
                         _attach_hr_prop(r, scored[:3], gm, is_home, date)
                     except Exception as exc:
