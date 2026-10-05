@@ -1,34 +1,44 @@
 """
-Does this hitter get pulled before he finishes a game?
+How often is this hitter pulled out of a game he started?
 
 THE HARM
-A hits prop needs plate appearances. A hitter lifted for a pinch hitter in the
-sixth got two, and the prop was dead before first pitch. On 2026-10-04 the
-Braves did it twice in one game - Murphy out for Tellez after 1 AB, Thomas out
-for Yastrzemski after 2.
+A hits prop needs plate appearances. A hitter lifted in the sixth got two, and
+the prop was dead before first pitch. On 2026-10-04 the Braves did it twice in
+one game: Murphy out after 2 PA, Thomas out after 2.
 
-WHY THE EXISTING GATE DOES NOT CATCH IT
-`props.MIN_AVG_PA` is a MEAN (3.2 PA across the team wins he played in). A mean
-cannot express "ever pinch-hit for": a hitter who goes the distance in 85% of
-his starts and is lifted in the other 15% averages about 4.0 and sails through,
-while being exactly the risk worth avoiding. The quantity that matters is the
-SHARE of starts that end early, not the average length of one.
+WHY THE EXISTING GATE MISSES IT
+`props.MIN_AVG_PA` is a MEAN - 3.2 PA across the team wins he played in. A mean
+cannot express "ever pinch-hit for": a hitter who finishes 85% of his starts and
+is lifted in the other 15% averages about 4.0 and sails through, while being
+exactly the risk worth avoiding. What matters is the SHARE of starts that end
+early, not the average length of one.
 
-THE MEASURE
-short-start rate = starts ending in SHORT_PA or fewer plate appearances, over
-starts. Starts only, when the feed carries gamesStarted - a hitter who entered
-as a substitute is not a hitter who was pulled, and counting bench appearances
-would condemn every part-timer for the wrong reason. Where gamesStarted is
-missing the fallback is games with at least MIN_START_PA plate appearances,
-which is a weaker proxy and is reported as such.
+HOW IT IS DETECTED
+From the boxscore, not inferred from plate appearances. Every batter carries a
+`battingOrder`: a starter's ends in "00" (100, 200 ... 900) and anyone who
+replaces him in that slot gets the next number up with `isSubstitute` true. So
+slot 7 reading 700 / 701 / 702 means the starter was replaced, and no guessing
+from a short line is needed. A first attempt tried to infer it from PA and
+returned 0.0% for all 414 hitters - including Murphy, who had been pulled the
+day before - because it skipped games under 3 PA and then looked for games of 2
+PA or fewer among what was left.
 
-This module is READ-ONLY on its own; `props` imports `risk()` for the gate.
-`python -m src.pinch_risk` writes output/pinch_risk.md, the distribution the
-threshold was set from.
+This counts ANY replacement in the slot, not only a pinch hitter: a pinch
+runner or a defensive sub ends the starter's night just as finally, and kills a
+hits prop just as completely.
+
+COST
+One request per game, so the tally is cached by gamePk and refreshed
+incrementally - a full season once, then roughly fifteen boxscores a day. The
+board calls `refresh()` before building props.
+
+`risk()` returns None under MIN_STARTS, and the gate LETS THOSE THROUGH:
+unknown is not risky, and a feed outage must not silently empty the board.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -37,130 +47,172 @@ from . import mlb_api
 log = logging.getLogger("pinch_risk")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
+CACHE = OUTPUT_DIR / "pinch_risk_cache.json"
 REPORT = OUTPUT_DIR / "pinch_risk.md"
 
-SHORT_PA = 2            # a start ending here or below is a pull, not a game
-MIN_START_PA = 3        # fallback "he probably started" bar, when no gamesStarted
-MIN_STARTS = 20         # starts needed before a rate is worth acting on
+MIN_STARTS = 20        # starts before a rate is worth acting on
+SEASON_START = "03/01"
 
 
-def _starts(pid: int, season: int) -> tuple[list[float], bool]:
-    """(PA in each start, whether gamesStarted was available).
+def _load() -> dict:
+    try:
+        d = json.loads(CACHE.read_text())
+        d.setdefault("games", [])
+        d.setdefault("tally", {})
+        return d
+    except (OSError, ValueError):
+        return {"games": [], "tally": {}}
 
-    Returns ([], False) on any failure, which `risk` reads as "unknown" and the
-    gate treats as safe - a feed outage must not silently drop every prop.
+
+def _save(cache: dict) -> None:
+    try:
+        CACHE.write_text(json.dumps(cache))
+    except OSError as exc:
+        log.warning("pinch-risk cache not written (%s)", exc)
+
+
+def _scan(game_pk: int, tally: dict) -> bool:
+    """Add one final game's starters to the tally. False if it could not be read.
+
+    A starter is battingOrder ending "00" with isSubstitute false; he was pulled
+    if any other entry shares his slot (the same leading digit).
     """
     try:
-        rows = mlb_api._full_gamelog(pid, "hitting", season)
+        bs = mlb_api._get(f"game/{game_pk}/boxscore")
     except Exception as exc:
-        log.warning("gamelog unavailable for %s (%s)", pid, exc)
-        return [], False
-    pas, exact = [], False
-    for sp in rows:
-        st = sp.get("stat") or {}
-        try:
-            pa = float(st.get("plateAppearances", 0) or 0)
-        except (TypeError, ValueError):
-            continue
-        gs = st.get("gamesStarted")
-        if gs is not None:
-            exact = True
+        log.warning("boxscore %s unavailable (%s)", game_pk, exc)
+        return False
+    for side in ("away", "home"):
+        players = ((bs.get("teams") or {}).get(side) or {}).get("players") or {}
+        slots: dict[str, list[tuple[int, int, bool]]] = {}
+        for p in players.values():
+            bo = p.get("battingOrder")
+            pid = (p.get("person") or {}).get("id")
+            if not bo or not pid:
+                continue
             try:
-                if float(gs or 0) < 1:
-                    continue
+                n = int(bo)
             except (TypeError, ValueError):
                 continue
-        elif pa < MIN_START_PA:
-            continue
-        if pa >= 1:
-            pas.append(pa)
-    return pas, exact
+            sub = bool((p.get("gameStatus") or {}).get("isSubstitute"))
+            slots.setdefault(str(n // 100), []).append((n, pid, sub))
+        for entries in slots.values():
+            entries.sort()
+            n, pid, sub = entries[0]
+            if n % 100 != 0 or sub:
+                continue                    # not a starter; skip the slot
+            cell = tally.setdefault(str(pid), [0, 0])
+            cell[1] += 1                                   # a start
+            if len(entries) > 1:
+                cell[0] += 1                               # and he was replaced
+    return True
 
 
-def risk(pid: int, season: int) -> dict | None:
-    """{"rate", "short", "starts", "exact"} or None when the sample is too thin.
+def refresh(through: str, limit: int | None = None) -> dict:
+    """Bring the cache up to the day before `through` (YYYY-MM-DD).
 
-    None means "not enough to judge", never "fine" - the caller decides what to
-    do with an unknown, and `props` lets it through rather than dropping a
-    hitter for having a short season.
+    Only FINAL games are scanned, and each gamePk is scanned once, so calling
+    this on every board build costs one request per newly finished game.
     """
-    pas, exact = _starts(pid, season)
-    if len(pas) < MIN_STARTS:
-        return None
-    short = sum(1 for pa in pas if pa <= SHORT_PA)
-    return {"rate": short / len(pas), "short": short, "starts": len(pas),
-            "exact": exact}
-
-
-# --- the report the threshold was set from ------------------------------------
-def build() -> str:
+    cache = _load()
+    done = set(cache["games"])
+    season = through[:4]
     try:
-        teams = mlb_api._get("teams", sportId=1, season=2026).get("teams", [])
+        sched = mlb_api._get("schedule", sportId=1, gameType="R,P",
+                             startDate=f"{SEASON_START}/{season}",
+                             endDate=f"{through[5:7]}/{through[8:10]}/{season}")
     except Exception as exc:
-        log.warning("team list failed (%s)", exc)
-        teams = []
-    rows = []
-    for t in teams:
+        log.warning("schedule for pinch risk unavailable (%s)", exc)
+        return cache
+    pks = []
+    for d in sched.get("dates", []):
+        if (d.get("date") or "") >= through:
+            continue                      # never let today inform today
+        for g in d.get("games", []):
+            state = ((g.get("status") or {}).get("abstractGameState") or "")
+            if state == "Final" and g.get("gamePk") not in done:
+                pks.append(g["gamePk"])
+    if limit:
+        pks = pks[:limit]
+    added = 0
+    for pk in pks:
+        if _scan(pk, cache["tally"]):
+            cache["games"].append(pk)
+            added += 1
+    if added:
+        log.info("pinch risk: scanned %d new boxscore(s)", added)
+        _save(cache)
+    return cache
+
+
+def risk(pid: int, cache: dict | None = None) -> dict | None:
+    """{"rate", "pulled", "starts"} or None when the sample is too thin."""
+    cache = _load() if cache is None else cache
+    cell = (cache.get("tally") or {}).get(str(pid))
+    if not cell or cell[1] < MIN_STARTS:
+        return None
+    pulled, starts = cell
+    return {"rate": pulled / starts, "pulled": pulled, "starts": starts}
+
+
+# --- the report the threshold is set from -------------------------------------
+def build(through: str) -> str:
+    cache = refresh(through)
+    names = {}
+    tally = cache.get("tally") or {}
+    ids = [int(p) for p, c in tally.items() if c[1] >= MIN_STARTS]
+    for i in range(0, len(ids), 100):
         try:
-            r = mlb_api._get(f"teams/{t['id']}/roster", rosterType="active")
+            for pe in mlb_api._get("people", personIds=",".join(
+                    str(x) for x in ids[i:i + 100])).get("people", []):
+                names[pe["id"]] = pe.get("fullName")
         except Exception as exc:
-            log.warning("roster failed for %s (%s)", t.get("name"), exc)
-            continue
-        for e in r.get("roster", []):
-            if (e.get("position") or {}).get("type") == "Pitcher":
-                continue
-            person = e.get("person") or {}
-            pid, name = person.get("id"), person.get("fullName")
-            if not pid:
-                continue
-            rk = risk(pid, 2026)
-            if rk:
-                rows.append((name, t.get("abbreviation") or "", rk))
-    md = ["# How often does a hitter get pulled before he finishes? — 2026", "",
-          "_A hits prop needs plate appearances. `props.MIN_AVG_PA` is a MEAN "
-          "and cannot express \"ever pinch-hit for\"; this is the share of "
-          "STARTS ending in "
-          f"{SHORT_PA} PA or fewer._", "",
-          f"Hitters with {MIN_STARTS}+ starts: **{len(rows)}**", ""]
+            log.warning("name lookup failed (%s)", exc)
+    rows = [(names.get(i, str(i)), risk(i, cache)) for i in ids]
+    rows = [(n, r) for n, r in rows if r]
+    md = [f"# How often is a hitter pulled from a game he started? — {through[:4]}",
+          "",
+          "_From the boxscore: a starter's `battingOrder` ends in 00, and "
+          "anyone replacing him in that slot gets the next number up. Counts "
+          "any replacement - pinch hitter, pinch runner or defensive sub - "
+          "since each ends his night and kills a hits prop equally._", "",
+          f"Games scanned: **{len(cache.get('games') or [])}** · "
+          f"hitters with {MIN_STARTS}+ starts: **{len(rows)}**", ""]
     if not rows:
-        return "\n".join(md + ["_No usable rows._"])
-    exact = sum(1 for _, _, r in rows if r["exact"])
-    md += [f"gamesStarted available for {exact} of {len(rows)} "
-           f"({'exact starts' if exact == len(rows) else 'rest use the PA fallback'})",
-           ""]
-    rates = sorted(r["rate"] for _, _, r in rows)
+        return "\n".join(md + ["_No usable rows yet._"])
+    rates = sorted(r["rate"] for _, r in rows)
     def q(p):
         return rates[int(p * (len(rates) - 1))]
-    md += ["| percentile | short-start rate |", "|---|---|"]
+    md += ["| percentile | pulled-from-start rate |", "|---|---|"]
     for p in (0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99):
         md.append(f"| p{int(p*100)} | {q(p):.1%} |")
-    md += ["", "## Worst 25 — these are what the gate must catch", "",
-           "| hitter | team | short starts | starts | rate |", "|---|---|---|---|---|"]
-    for name, abbr, r in sorted(rows, key=lambda x: -x[2]["rate"])[:25]:
-        md.append(f"| {name} | {abbr} | {r['short']} | {r['starts']} "
-                  f"| **{r['rate']:.1%}** |")
+    md += ["", "## Worst 25 — what the gate has to catch", "",
+           "| hitter | pulled | starts | rate |", "|---|---|---|---|"]
+    for n, r in sorted(rows, key=lambda x: -x[1]["rate"])[:25]:
+        md.append(f"| {n} | {r['pulled']} | {r['starts']} | **{r['rate']:.1%}** |")
     md += ["", "## The two from 2026-10-04", ""]
-    for want in ("Murphy", "Thomas", "Tellez", "Yastrzemski"):
-        for name, abbr, r in rows:
-            if want in (name or ""):
-                md.append(f"- {name} ({abbr}): {r['short']}/{r['starts']} "
+    for want in ("Sean Murphy", "Lane Thomas", "Ozzie Albies",
+                 "Matt Olson", "Ronald Acu"):
+        for n, r in rows:
+            if want in (n or ""):
+                md.append(f"- {n}: {r['pulled']}/{r['starts']} "
                           f"= **{r['rate']:.1%}**")
     md += ["", "## Reading it", "",
-           "- the gate should sit where it catches the pulled bats without "
-           "condemning ordinary hitters, so compare the worst list against the "
-           "median rather than picking a round number",
-           "- a hitter under MIN_STARTS returns None and is LET THROUGH: "
-           "unknown is not the same as risky, and a feed outage must not "
-           "silently drop every prop on the board",
+           "- set the gate against the median, not a round number: it has to "
+           "catch the pulled bats without condemning ordinary hitters",
+           "- Albies, Olson and Acuña are printed as controls — they are the "
+           "everyday bats the gate must NOT touch",
+           "- a hitter under MIN_STARTS returns None and is let through",
            ""]
     return "\n".join(md)
 
 
 def main() -> None:
+    import datetime as dt
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
     OUTPUT_DIR.mkdir(exist_ok=True)
-    text = build()
+    text = build(dt.date.today().isoformat())
     REPORT.write_text(text)
     print(text)
 
