@@ -127,6 +127,50 @@ def main() -> None:
     except Exception as exc:
         out.append(f"gamelog failed: {exc}")
 
+    # --- 4. Statcast, the only place distance and spray live
+    out += ["", "## 4. Is Statcast (baseballsavant) reachable, and useful?", "",
+            "_MLB's own feed carries no hitData, so spray and distance can only "
+            "come from here. Checked for reachability AND for the fields that "
+            "matter, since a 200 that returns a login page is still a dead "
+            "end._", ""]
+    import csv as _csv
+    import io as _io
+    targets = [
+        ("batted-ball leaderboard",
+         "https://baseballsavant.mlb.com/leaderboard/statcast"
+         f"?type=batter&year={season}&position=&team=&min=q&csv=true"),
+        ("expected stats leaderboard",
+         "https://baseballsavant.mlb.com/leaderboard/expected_statistics"
+         f"?type=batter&year={season}&position=&team=&min=q&csv=true"),
+        ("per-batted-ball search",
+         "https://baseballsavant.mlb.com/statcast_search/csv?all=true"
+         f"&player_type=batter&batters_lookup%5B%5D={pid}"
+         f"&hfSea={season}%7C&type=details"),
+    ]
+    for label, url in targets:
+        try:
+            resp = mlb_api.SESSION.get(url, timeout=60)
+            ct = resp.headers.get("content-type", "")
+            body = resp.text
+            out.append(f"**{label}** — HTTP {resp.status_code}, "
+                       f"{len(body)} bytes, content-type `{ct}`")
+            if resp.status_code != 200 or "html" in ct.lower():
+                out.append("  - not CSV; treat as unavailable")
+                continue
+            rows = list(_csv.reader(_io.StringIO(body)))
+            if not rows:
+                out.append("  - empty")
+                continue
+            hdr = rows[0]
+            out.append(f"  - {len(rows)-1} data rows, {len(hdr)} columns")
+            want = [c for c in hdr if any(k in c.lower() for k in (
+                "distance", "angle", "launch", "pull", "oppo", "cent",
+                "barrel", "hc_x", "hc_y", "spray"))]
+            out += ["  - relevant columns: "
+                    + (", ".join(f"`{c}`" for c in want[:18]) or "**none**")]
+        except Exception as exc:
+            out.append(f"**{label}** — request failed: {exc}")
+
     text = "\n".join(out)
     OUTPUT_DIR.mkdir(exist_ok=True)
     (OUTPUT_DIR / "spray_probe.md").write_text(text)
