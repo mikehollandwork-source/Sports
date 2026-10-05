@@ -47,7 +47,7 @@ from . import mlb_api
 log = logging.getLogger("pinch_risk")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
-CACHE = OUTPUT_DIR / "pinch_risk_cache.json"
+CACHE = OUTPUT_DIR / "pinch_risk_cache_v2.json"   # v2 stores per-start rows
 REPORT = OUTPUT_DIR / "pinch_risk.md"
 
 MIN_STARTS = 20        # starts before a rate is worth acting on
@@ -58,10 +58,10 @@ def _load() -> dict:
     try:
         d = json.loads(CACHE.read_text())
         d.setdefault("games", [])
-        d.setdefault("tally", {})
+        d.setdefault("starts", {})
         return d
     except (OSError, ValueError):
-        return {"games": [], "tally": {}}
+        return {"games": [], "starts": {}}
 
 
 def _save(cache: dict) -> None:
@@ -71,20 +71,32 @@ def _save(cache: dict) -> None:
         log.warning("pinch-risk cache not written (%s)", exc)
 
 
-def _scan(game_pk: int, tally: dict) -> bool:
-    """Add one final game's starters to the tally. False if it could not be read.
+def _scan(game_pk: int, starts: dict, date: str = "") -> bool:
+    """Record one final game's starters. False if it could not be read.
 
     A starter is battingOrder ending "00" with isSubstitute false; he was pulled
     if any other entry shares his slot (the same leading digit).
+
+    Stores PER START - [date, PA, pulled, opposing starter hand] - rather than a
+    running count, because a count cannot tell a costly pull from a harmless
+    one. A defensive sub in the ninth, after the starter has had four plate
+    appearances, scores the same as a pinch hitter in the fifth, and only the
+    second one costs the prop anything.
     """
     try:
         bs = mlb_api._get(f"game/{game_pk}/boxscore")
     except Exception as exc:
         log.warning("boxscore %s unavailable (%s)", game_pk, exc)
         return False
+    opp_sp = {}
+    for side in ("away", "home"):
+        team = ((bs.get("teams") or {}).get(side) or {})
+        pitchers = team.get("pitchers") or []
+        opp_sp["home" if side == "away" else "away"] = (
+            pitchers[0] if pitchers else None)
     for side in ("away", "home"):
         players = ((bs.get("teams") or {}).get(side) or {}).get("players") or {}
-        slots: dict[str, list[tuple[int, int, bool]]] = {}
+        slots: dict[str, list[tuple[int, int, bool, float]]] = {}
         for p in players.values():
             bo = p.get("battingOrder")
             pid = (p.get("person") or {}).get("id")
@@ -95,16 +107,19 @@ def _scan(game_pk: int, tally: dict) -> bool:
             except (TypeError, ValueError):
                 continue
             sub = bool((p.get("gameStatus") or {}).get("isSubstitute"))
-            slots.setdefault(str(n // 100), []).append((n, pid, sub))
+            try:
+                pa = float(((p.get("stats") or {}).get("batting")
+                            or {}).get("plateAppearances", 0) or 0)
+            except (TypeError, ValueError):
+                pa = 0.0
+            slots.setdefault(str(n // 100), []).append((n, pid, sub, pa))
         for entries in slots.values():
             entries.sort()
-            n, pid, sub = entries[0]
+            n, pid, sub, pa = entries[0]
             if n % 100 != 0 or sub:
                 continue                    # not a starter; skip the slot
-            cell = tally.setdefault(str(pid), [0, 0])
-            cell[1] += 1                                   # a start
-            if len(entries) > 1:
-                cell[0] += 1                               # and he was replaced
+            starts.setdefault(str(pid), []).append(
+                [date, pa, 1 if len(entries) > 1 else 0, opp_sp.get(side)])
     return True
 
 
@@ -126,17 +141,18 @@ def refresh(through: str, limit: int | None = None) -> dict:
         return cache
     pks = []
     for d in sched.get("dates", []):
-        if (d.get("date") or "") >= through:
+        day = d.get("date") or ""
+        if day >= through:
             continue                      # never let today inform today
         for g in d.get("games", []):
             state = ((g.get("status") or {}).get("abstractGameState") or "")
             if state == "Final" and g.get("gamePk") not in done:
-                pks.append(g["gamePk"])
+                pks.append((g["gamePk"], day))
     if limit:
         pks = pks[:limit]
     added = 0
-    for pk in pks:
-        if _scan(pk, cache["tally"]):
+    for pk, day in pks:
+        if _scan(pk, cache["starts"], day):
             cache["games"].append(pk)
             added += 1
     if added:
@@ -146,13 +162,113 @@ def refresh(through: str, limit: int | None = None) -> dict:
 
 
 def risk(pid: int, cache: dict | None = None) -> dict | None:
-    """{"rate", "pulled", "starts"} or None when the sample is too thin."""
+    """Short-night risk for one hitter, or None when the sample is too thin.
+
+    `rate` is the measure the gate reads. Which measure that should BE was
+    settled by `compare()` below rather than assumed - see MEASURE.
+    """
     cache = _load() if cache is None else cache
-    cell = (cache.get("tally") or {}).get(str(pid))
-    if not cell or cell[1] < MIN_STARTS:
+    rows = (cache.get("starts") or {}).get(str(pid)) or []
+    if len(rows) < MIN_STARTS:
         return None
-    pulled, starts = cell
-    return {"rate": pulled / starts, "pulled": pulled, "starts": starts}
+    return summarise(rows)
+
+
+SHORT_PA = 3          # a start this short cannot carry a hits prop
+
+
+def summarise(rows: list) -> dict:
+    """Every candidate measure over one hitter's starts, so they can be
+    compared on the same rows instead of argued about."""
+    n = len(rows)
+    pulled = sum(1 for r in rows if r[2])
+    short = sum(1 for r in rows if r[1] <= SHORT_PA)
+    costly = sum(1 for r in rows if r[2] and r[1] <= SHORT_PA)
+    recent = rows[-30:]
+    rshort = sum(1 for r in recent if r[1] <= SHORT_PA)
+    return {
+        "starts": n,
+        "pulled": pulled,
+        "rate": short / n,                 # MEASURE: the one the gate reads
+        "pull_rate": pulled / n,
+        "short_rate": short / n,
+        "costly_rate": costly / n,
+        "mean_pa": sum(r[1] for r in rows) / n,
+        "recent_short_rate": (rshort / len(recent)) if recent else None,
+    }
+
+
+# --- which measure is actually best? ------------------------------------------
+MEASURES = {
+    "short_rate (PA<=3)": lambda m: m["short_rate"],
+    "pull_rate (any replacement)": lambda m: m["pull_rate"],
+    "costly_rate (pulled AND short)": lambda m: m["costly_rate"],
+    "mean PA per start (negated)": lambda m: -m["mean_pa"],
+    "recent 30 short_rate": lambda m: (m["recent_short_rate"]
+                                       if m["recent_short_rate"] is not None
+                                       else m["short_rate"]),
+}
+
+
+def _auc(pairs: list[tuple[float, int]]) -> float | None:
+    """P(a short night scores higher than a full one), ties counted half.
+
+    Rank-based, so it is the Mann-Whitney statistic and needs no binning or
+    threshold - which is the point, since the threshold is what comes after.
+    """
+    pos = [s for s, y in pairs if y]
+    neg = [s for s, y in pairs if not y]
+    if not pos or not neg:
+        return None
+    ordered = sorted(pairs, key=lambda t: t[0])
+    ranks, i = {}, 0
+    while i < len(ordered):
+        j = i
+        while j + 1 < len(ordered) and ordered[j + 1][0] == ordered[i][0]:
+            j += 1
+        r = (i + j) / 2 + 1
+        for k in range(i, j + 1):
+            ranks[k] = r
+        i = j + 1
+    rank_pos = sum(r for k, r in ranks.items() if ordered[k][1])
+    n1, n2 = len(pos), len(neg)
+    return (rank_pos - n1 * (n1 + 1) / 2) / (n1 * n2)
+
+
+def compare(cache: dict) -> list[str]:
+    """Forward test: which measure best predicts a SHORT NIGHT tonight?
+
+    For every start with at least MIN_STARTS prior ones, each measure is built
+    from the PRIOR starts only and scored against what actually happened in
+    that game. Strictly out of sample, and the same rows for every measure, so
+    the comparison is like for like.
+    """
+    rows_by_measure: dict[str, list[tuple[float, int]]] = {k: [] for k in MEASURES}
+    games = 0
+    for _pid, starts in (cache.get("starts") or {}).items():
+        starts = sorted(starts, key=lambda r: r[0])
+        for i in range(MIN_STARTS, len(starts)):
+            prior = starts[:i]
+            m = summarise(prior)
+            y = 1 if starts[i][1] <= SHORT_PA else 0
+            games += 1
+            for name, fn in MEASURES.items():
+                rows_by_measure[name].append((fn(m), y))
+    out = ["| measure | AUC |", "|---|---|"]
+    scored = []
+    for name, pairs in rows_by_measure.items():
+        a = _auc(pairs)
+        scored.append((a or 0.0, name))
+        out.append(f"| {name} | {a:.4f} |" if a else f"| {name} | — |")
+    scored.sort(reverse=True)
+    base = games and sum(y for _, y in rows_by_measure[next(iter(MEASURES))]
+                         ) / games
+    return ([f"**{games} starts** judged, "
+             f"{base:.1%} of them short (PA <= {SHORT_PA}).", "",
+             "_AUC is the chance a short night scores above a full one. "
+             "0.50 is a coin flip._", ""]
+            + out
+            + ["", f"**Best: {scored[0][1]} at AUC {scored[0][0]:.4f}.**", ""])
 
 
 # --- the report the threshold is set from -------------------------------------
@@ -197,6 +313,11 @@ def build(through: str) -> str:
             if want in (n or ""):
                 md.append(f"- {n}: {r['pulled']}/{r['starts']} "
                           f"= **{r['rate']:.1%}**")
+    md += ["", "## Which measure is best?", "",
+           "_Decided by forward test, not by argument: every measure built "
+           "from PRIOR starts only, scored against what happened that night._",
+           ""]
+    md += compare(cache)
     md += ["", "## Reading it", "",
            "- set the gate against the median, not a round number: it has to "
            "catch the pulled bats without condemning ordinary hitters",

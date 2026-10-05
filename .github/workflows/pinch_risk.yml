@@ -20,7 +20,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/pinch_risk.md output/pinch_risk_cache.json
+          git add output/pinch_risk.md output/pinch_risk_cache_v2.json
           if ! git diff --staged --quiet; then
             git commit -m "Pinch risk ($(date -u +%Y-%m-%dT%H:%MZ))"
             for i in 1 2 3 4; do
