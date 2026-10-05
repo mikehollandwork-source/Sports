@@ -1,0 +1,22 @@
+name: Short night vs form
+# Can a hot bat buy its way past the short-night gate? Read-only.
+on: {workflow_dispatch: {}}
+permissions: {contents: write}
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - run: python -m src.short_night_form
+      - if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/short_night_form.md output/short_night_logs.json
+          git diff --staged --quiet || { git commit -m "Short night vs form"; \
+            for i in 1 2 3 4; do git pull --rebase origin "${{ github.ref_name }}" \
+              && git push origin "HEAD:${{ github.ref_name }}" && break; sleep 5; done; }

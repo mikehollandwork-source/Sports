@@ -31,7 +31,7 @@ import logging
 import math
 from pathlib import Path
 
-from . import mlb_api, pinch_risk, props
+from . import pinch_risk, props
 
 log = logging.getLogger("short_night_form")
 
