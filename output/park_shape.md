@@ -13,8 +13,14 @@ _MLB's feed carries no batted-ball distance or coordinates, so this tests the ch
 
 difference **+0.203%** per PA — a multiplier of **×1.065** — permutation p = **0.1234**
 
-- left-handed bats (131): -0.036% per PA
-- right-handed bats (157): +0.427% per PA
+### Controlled for the park HR factor the model already applies
+
+- short 3.279% vs long 3.157% per park-adjusted PA
+- difference **+0.122%**, multiplier **×1.039**, permutation p = **0.3583**
+- _if this collapses toward zero, the aggregate park factor already contains the shape and there is nothing to add_
+
+- left-handed bats (131): raw -0.036%, park-controlled -0.145% per PA
+- right-handed bats (157): raw +0.427%, park-controlled +0.371% per PA
 
 ## What to conclude
 
