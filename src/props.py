@@ -20,12 +20,26 @@ from __future__ import annotations
 
 import logging
 
-from . import mlb_api
+from . import mlb_api, pinch_risk
 
 log = logging.getLogger("props")
 
 MIN_WINS_PLAYED = 12   # a real season sample of team wins
 MIN_AVG_PA = 3.2       # quality at-bats: everyday bats, effectively lineup top-6
+# No prop on a hitter who gets pulled out of his own starts. MIN_AVG_PA above is
+# a MEAN and cannot express this: a hitter who finishes 85% of his starts and is
+# lifted in the other 15% averages about 4.0 and sails through, while being
+# exactly the risk. See pinch_risk.py for how a pull is read off the boxscore.
+# 0.15 is the LEAGUE MEDIAN over 2,459 games (p25 7.0%, p50 15.3%, p75 27.6%),
+# chosen because it separates the two bats that prompted this - Lane Thomas
+# 18.3%, Sean Murphy 20.0%, both lifted on 2026-10-04 - from the everyday bats
+# it must not touch: Acuna 9.1%, Olson 4.8%, Albies 3.0%.
+# Set from that distribution BEFORE looking at our own record. Checking it
+# afterwards was directional only and is NOT what justifies it: blocked props
+# went 11-10 (52.4%) against 80-42 (65.6%) allowed, but n=21 gives p=0.246. The
+# gate rests on the mechanism - a hitter who leaves in the sixth cannot get the
+# plate appearances the prop needs - not on 21 bets.
+PULL_MAX = 0.15
 MAX_LINEUP_BATS = 9
 
 _WINS_CACHE: dict[tuple, set] = {}      # (team_id, date) -> {winning gamePks}
@@ -115,6 +129,7 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
         log.warning("lineup fetch failed (%s): %s", game_pk, exc)
         return []
     season = int(date[:4])
+    pull_cache = pinch_risk._load()      # read once, not once per hitter
     out: list[dict] = []
     for p in bats:
         played = with_hit = 0
@@ -147,6 +162,14 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
                 with_hit += 1
         if played < MIN_WINS_PLAYED or (pa_total / played) < MIN_AVG_PA:
             continue
+        # Unknown is not risky: a hitter under pinch_risk.MIN_STARTS returns
+        # None and is let through, so a short season or a feed outage cannot
+        # silently empty the board.
+        pull = pinch_risk.risk(p.player_id, pull_cache)
+        if pull and pull["rate"] > PULL_MAX:
+            log.info("prop skipped: %s pulled from %d of %d starts (%.0f%%)",
+                     p.name, pull["pulled"], pull["starts"], pull["rate"] * 100)
+            continue
         rate = with_hit / played
         all_rate = (all_with_hit / all_played) if all_played else None
         # form: his last-5 hit rate against his OWN season rate, so a 55% hitter
@@ -171,7 +194,12 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
                     "form": form, "super_hot": form is not None and form >= SUPER_HOT,
                     "bvp": bvp,
                     "wins_played": played, "games_played": all_played,
-                    "avg_pa": round(pa_total / played, 1)})
+                    "avg_pa": round(pa_total / played, 1),
+                    # carried so record_audit can assert from the board itself
+                    # that no posted prop ever sat above PULL_MAX
+                    "pull_rate": (None if not pull else round(pull["rate"], 3)),
+                    "pull": (None if not pull
+                             else f"{pull['pulled']}/{pull['starts']} starts")})
     out.sort(key=lambda c: (c["hit_rate"], c["avg_pa"]), reverse=True)
     return out
 

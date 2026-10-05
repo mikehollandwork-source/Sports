@@ -192,6 +192,27 @@ unit-testable with mock `Game`/`Team` objects.
   being watched rather than baked in. The air-rate trend alone is NULL (p=0.149);
   ISO alone carries it (p=0.0060), so "rising without hits" is specifically the
   half that does not work.
+- **No hits prop on a hitter who gets pulled out of his own starts**
+  (`pinch_risk.py`, `props.PULL_MAX`). A prop needs plate appearances and a
+  hitter lifted in the sixth got two; on 2026-10-04 the Braves did it twice in
+  one game. `props.MIN_AVG_PA` cannot catch this because it is a MEAN — a hitter
+  who finishes 85% of his starts and is lifted in the other 15% averages ~4.0
+  and sails through. A pull is read off the BOXSCORE, not inferred from a short
+  line: a starter's `battingOrder` ends in `00` and whoever replaces him in that
+  slot gets the next number up with `isSubstitute` true (`gamesStarted` is not
+  served for hitters). Any replacement counts — pinch hitter, pinch runner or
+  defensive sub — since each ends his night. The tally is cached by gamePk and
+  `main` calls `pinch_risk.refresh(date)` before props: one boxscore per newly
+  finished game. `PULL_MAX = 0.15` is the LEAGUE MEDIAN over 2,459 games (p25
+  7.0%, p75 27.6%), set from that distribution BEFORE our own record was looked
+  at; it separates Thomas 18.3% and Murphy 20.0% from Acuña 9.1%, Olson 4.8%,
+  Albies 3.0%. The retrospective is directional ONLY and is not what justifies
+  it — blocked props went 11-10 (52.4%) against 80-42 (65.6%), but n=21 gives
+  p=0.246. **Under `MIN_STARTS` returns None and is LET THROUGH** — unknown is
+  not risky, and a feed outage must not silently empty the board.
+  `record_audit.pull_gate_guard` asserts it from the boards. The HR PICK is
+  deliberately exempt and only reports its `pull_rate`: a home run needs one
+  plate appearance, not four.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`

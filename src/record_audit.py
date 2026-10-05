@@ -48,7 +48,7 @@ import statistics as st
 import subprocess
 from pathlib import Path
 
-from . import good_dog, grade, line_money, mlb_api, pitch_mix
+from . import good_dog, grade, line_money, mlb_api, pitch_mix, props
 
 log = logging.getLogger("record_audit")
 
@@ -344,6 +344,56 @@ def pitch_mix_guard() -> list[str]:
     return out + [""]
 
 
+def pull_gate_guard() -> list[str]:
+    """Assert no posted prop sat on a hitter who gets pulled from his starts.
+
+    A hits prop needs plate appearances, and a hitter lifted in the sixth got
+    two. `props.PULL_MAX` drops those candidates; this checks the boards rather
+    than trusting that it did, because the gate sits inside a loop that also
+    skips for several other reasons and a silent regression would look exactly
+    like nobody qualifying.
+
+    Boards written before the gate shipped carry no `pull_rate` at all, so they
+    are counted separately rather than reported as passes.
+    """
+    checked = breaches = legacy = 0
+    worst = None
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "picks_2026-*.json"))):
+        try:
+            day = json.loads(Path(f).read_text())
+        except (OSError, ValueError):
+            continue
+        for g in day.get("games", []):
+            prop = (g.get("pick_criteria") or {}).get("prop") or {}
+            if not prop:
+                continue
+            if "pull_rate" not in prop:
+                legacy += 1
+                continue
+            rate = prop.get("pull_rate")
+            if rate is None:
+                continue              # too few starts to judge; let through
+            checked += 1
+            if worst is None or rate > worst:
+                worst = rate
+            if rate > props.PULL_MAX:
+                breaches += 1
+    out = ["## Guard: no prop on a hitter who gets pulled from his starts", "",
+           f"_Threshold `props.PULL_MAX` = {props.PULL_MAX:.0%}, the league "
+           "median over 2,459 games._", "",
+           f"- posted props carrying a pull rate: **{checked}**",
+           f"- boards predating the gate (no rate stored): **{legacy}**"]
+    if not checked:
+        return out + ["- _none yet; the gate ships with tonight's board._", ""]
+    out += [f"- highest rate posted: **{worst:.1%}**",
+            f"- above the threshold: **{breaches}**"]
+    out.append("- " + ("**PASS** — every posted prop was under the gate"
+                       if breaches == 0 else
+                       f"**FAIL — {breaches} prop(s) posted above "
+                       f"{props.PULL_MAX:.0%}.** The gate is not holding."))
+    return out + [""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Record audit — what was posted vs what got graded", "",
@@ -557,6 +607,7 @@ def build() -> str:
     md += good_dog_guard()
     md += line_money_guard()
     md += pitch_mix_guard()
+    md += pull_gate_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "

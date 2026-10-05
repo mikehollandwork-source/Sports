@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for, hr_factor
-from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pitch_mix, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pinch_risk, pitch_mix, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -223,6 +223,14 @@ def run(date: str) -> dict:
     # Best 1+ hit prop for each PLAY (the picked team's most-consistent bat in its
     # season wins). Only upcoming/live plays; fails soft so it never blocks the board.
     gbypk = {g.game_pk: g for g in games}
+    # Bring the pulled-from-start tally up to yesterday before any prop is
+    # chosen. Incremental: one boxscore per newly finished game, roughly fifteen
+    # a day once the season has been walked once.
+    try:
+        pinch_risk.refresh(date)
+    except Exception as exc:
+        log.warning("pinch-risk refresh failed, props fall back to ungated: %s",
+                    exc)
     for r in results:
         if r.get("state") == "final":
             continue
@@ -1803,6 +1811,19 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "runner_up_p": (None if len(cands) < 2
                            else round(cands[1]["p_game"], 4)),
            "our_side": top.get("team") == (pc.get("bet_team") or team.name)}
+    # Pull risk, REPORTED not gated. Props are gated on this (props.PULL_MAX),
+    # but the HR pick was explicitly carved out, so the exposure is printed
+    # rather than acted on: a HR needs one plate appearance, not four.
+    try:
+        pr_risk = pinch_risk.risk(top["player_id"])
+        if pr_risk:
+            row["pull_rate"] = round(pr_risk["rate"], 3)
+            row["pull"] = (f"pulled from {pr_risk['pulled']} of "
+                           f"{pr_risk['starts']} starts "
+                           f"({pr_risk['rate']:.0%})")
+    except Exception as exc:
+        log.warning("pull risk unavailable for %s: %s", name, exc)
+
     # Pitch-type matchup, reported and applied to nothing. Called here, with the
     # winner already decided, so no code path exists by which it could reorder
     # the candidates - see pitch_mix's docstring.
