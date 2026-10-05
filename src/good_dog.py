@@ -29,6 +29,24 @@ FAV_RATE is 0.60 - a plain reading of "usually the favourite", chosen for its
 meaning rather than its backtest, because all four cuts tested (0.55 to 0.70)
 were statistically indistinguishable and picking the best-performing one would
 be the selection this project keeps getting caught by.
+
+REGULAR SEASON ONLY - AND NOT BECAUSE OCTOBER IS "DIFFERENT"
+In the postseason only good teams are left, so "favoured in 60% of his prior
+games" stops discriminating. Measured on this season's own boards: 92% of the
+teams still playing clear the bar (11 of 12) against 47% league-wide, and the
+tag fires on 50% of underdog games in October against 22% in the regular
+season. At that point the first condition is close to always true and the tag
+collapses into "is priced as an underdog tonight" - which is the ordinary-dog
+control it was built to be compared AGAINST. There is no contrast class left.
+
+So postseason games are not tagged. This is scoping, not re-tuning: FAV_RATE is
+untouched, and the backtest behind the tag (`dogs_and_line.md`) was regular
+season, so tagging in October was always an out-of-population extrapolation.
+Lowering or raising FAV_RATE to "fix" October would be exactly the re-tuning
+the docstring above warns against.
+
+Boards written before `game_type` was stored have no code and are read as
+regular season, which is what they are.
 """
 
 from __future__ import annotations
@@ -47,6 +65,9 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 CACHE = OUTPUT_DIR / "team_splits_cache.json"
 FAV_RATE = 0.60
 MIN_PRIOR = 20
+# MLB gameType codes for the postseason: wild card, division, league
+# championship, world series, and the legacy catch-all.
+POSTSEASON = frozenset({"F", "D", "L", "W", "P"})
 MIN_SPLIT = 8          # games needed before a split percentage is worth showing
 
 
@@ -85,7 +106,12 @@ def tag(game: dict, rates: dict[str, float]) -> dict | None:
     """{"team", "rate", "odds"} when this game holds a good dog, else None.
 
     Reads the board's own prices, so it works whether or not the game is a pick.
+    Postseason games are never tagged - see the module docstring: with only good
+    teams left the favourite-rate condition stops discriminating and the tag
+    degenerates into its own control group.
     """
+    if (game.get("game_type") or "R") in POSTSEASON:
+        return None
     m = game.get("matchup") or ""
     pc = game.get("pick_criteria") or {}
     adv = pc.get("advantage_team")

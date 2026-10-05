@@ -107,6 +107,7 @@ class Game:
     park_factor: float = 1.0
     start_time: str = ""   # first-pitch ISO datetime (UTC), e.g. "2026-06-25T23:10:00Z"
     weather: dict | None = None   # game-time conditions (main attaches pre-evaluation)
+    game_type: str = "R"   # MLB code: R regular, F/D/L/W postseason rounds
 
 
 # --- schedule -----------------------------------------------------------------
@@ -126,6 +127,7 @@ def schedule_for(date: str) -> list[Game]:
                     away=away,
                     park_factor=factor_for(home.name),
                     start_time=g.get("gameDate", ""),
+                    game_type=g.get("gameType", "R"),
                 )
             )
     return games

@@ -1032,6 +1032,10 @@ def evaluate_game(game: Game, consensus: dict, forum_counts: dict,
         "away_abbr": game.away.abbreviation or game.away.name,
         "home_abbr": game.home.abbreviation or game.home.name,
         "venue": game.venue,
+        # Carried so good_dog can tell a postseason game from a regular-season
+        # one OFFLINE. The tag has to stay a pure board function, since the
+        # ledger and the audit re-derive it by walking saved boards.
+        "game_type": getattr(game, "game_type", "R"),
         "park_factor": game.park_factor,
         "statistical_advantage": {
             "team": adv_team.name,
