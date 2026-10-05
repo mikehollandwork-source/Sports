@@ -345,10 +345,11 @@ def pitch_mix_guard() -> list[str]:
 
 
 def pull_gate_guard() -> list[str]:
-    """Assert no posted prop sat on a hitter who gets pulled from his starts.
+    """Assert no posted prop sat on a hitter whose nights tend to end early.
 
     A hits prop needs plate appearances, and a hitter lifted in the sixth got
-    two. `props.PULL_MAX` drops those candidates; this checks the boards rather
+    two. `props.SHORT_NIGHT_MAX` drops those candidates; this checks the boards
+    rather
     than trusting that it did, because the gate sits inside a loop that also
     skips for several other reasons and a silent regression would look exactly
     like nobody qualifying.
@@ -367,20 +368,21 @@ def pull_gate_guard() -> list[str]:
             prop = (g.get("pick_criteria") or {}).get("prop") or {}
             if not prop:
                 continue
-            if "pull_rate" not in prop:
+            if "short_night_rate" not in prop:
                 legacy += 1
                 continue
-            rate = prop.get("pull_rate")
+            rate = prop.get("short_night_rate")
             if rate is None:
                 continue              # too few starts to judge; let through
             checked += 1
             if worst is None or rate > worst:
                 worst = rate
-            if rate > props.PULL_MAX:
+            if rate > props.SHORT_NIGHT_MAX:
                 breaches += 1
-    out = ["## Guard: no prop on a hitter who gets pulled from his starts", "",
-           f"_Threshold `props.PULL_MAX` = {props.PULL_MAX:.0%}, the league "
-           "median over 2,459 games._", "",
+    out = ["## Guard: no prop on a hitter whose nights end early", "",
+           f"_Threshold `props.SHORT_NIGHT_MAX` = "
+           f"{props.SHORT_NIGHT_MAX:.0%}, the league median of the shrunk "
+           f"recent short-night rate over 2,459 games._", "",
            f"- posted props carrying a pull rate: **{checked}**",
            f"- boards predating the gate (no rate stored): **{legacy}**"]
     if not checked:
@@ -390,7 +392,8 @@ def pull_gate_guard() -> list[str]:
     out.append("- " + ("**PASS** — every posted prop was under the gate"
                        if breaches == 0 else
                        f"**FAIL — {breaches} prop(s) posted above "
-                       f"{props.PULL_MAX:.0%}.** The gate is not holding."))
+                       f"{props.SHORT_NIGHT_MAX:.0%}.** The gate is not "
+                       "holding."))
     return out + [""]
 
 

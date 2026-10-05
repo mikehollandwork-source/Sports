@@ -1811,18 +1811,21 @@ def _attach_hr_prop(r: dict, team, gm, is_home: bool, date: str) -> None:
            "runner_up_p": (None if len(cands) < 2
                            else round(cands[1]["p_game"], 4)),
            "our_side": top.get("team") == (pc.get("bet_team") or team.name)}
-    # Pull risk, REPORTED not gated. Props are gated on this (props.PULL_MAX),
-    # but the HR pick was explicitly carved out, so the exposure is printed
-    # rather than acted on: a HR needs one plate appearance, not four.
+    # Short-night risk, REPORTED not gated. Props are gated on this
+    # (props.SHORT_NIGHT_MAX); the HR pick was explicitly carved out, so the
+    # exposure is printed rather than acted on - a home run needs one plate
+    # appearance, not four.
     try:
         pr_risk = pinch_risk.risk(top["player_id"])
         if pr_risk:
-            row["pull_rate"] = round(pr_risk["rate"], 3)
-            row["pull"] = (f"pulled from {pr_risk['pulled']} of "
-                           f"{pr_risk['starts']} starts "
-                           f"({pr_risk['rate']:.0%})")
+            row["short_night_rate"] = round(pr_risk["rate"], 3)
+            row["mean_pa_per_start"] = round(pr_risk["mean_pa"], 2)
+            row["short_nights"] = (
+                f"{pr_risk['short']} of {pr_risk['starts']} starts ended in "
+                f"{pinch_risk.SHORT_PA} PA or fewer ({pr_risk['rate']:.0%}), "
+                f"{pr_risk['mean_pa']:.2f} PA per start")
     except Exception as exc:
-        log.warning("pull risk unavailable for %s: %s", name, exc)
+        log.warning("short-night risk unavailable for %s: %s", name, exc)
 
     # Pitch-type matchup, reported and applied to nothing. Called here, with the
     # winner already decided, so no code path exists by which it could reorder

@@ -26,20 +26,29 @@ log = logging.getLogger("props")
 
 MIN_WINS_PLAYED = 12   # a real season sample of team wins
 MIN_AVG_PA = 3.2       # quality at-bats: everyday bats, effectively lineup top-6
-# No prop on a hitter who gets pulled out of his own starts. MIN_AVG_PA above is
-# a MEAN and cannot express this: a hitter who finishes 85% of his starts and is
-# lifted in the other 15% averages about 4.0 and sails through, while being
-# exactly the risk. See pinch_risk.py for how a pull is read off the boxscore.
-# 0.15 is the LEAGUE MEDIAN over 2,459 games (p25 7.0%, p50 15.3%, p75 27.6%),
-# chosen because it separates the two bats that prompted this - Lane Thomas
-# 18.3%, Sean Murphy 20.0%, both lifted on 2026-10-04 - from the everyday bats
-# it must not touch: Acuna 9.1%, Olson 4.8%, Albies 3.0%.
-# Set from that distribution BEFORE looking at our own record. Checking it
-# afterwards was directional only and is NOT what justifies it: blocked props
-# went 11-10 (52.4%) against 80-42 (65.6%) allowed, but n=21 gives p=0.246. The
-# gate rests on the mechanism - a hitter who leaves in the sixth cannot get the
-# plate appearances the prop needs - not on 21 bets.
-PULL_MAX = 0.15
+# No prop on a hitter whose nights tend to end early. MIN_AVG_PA above cannot
+# express this: it is a mean over team WINS, and a hitter who finishes most
+# starts but is lifted in a quarter of them still averages about 4.0.
+#
+# The measure is pinch_risk's shrunk recent SHORT-NIGHT rate - how often a start
+# ends in 3 PA or fewer - not a count of pinch hits. That was settled by a
+# forward test on 32,989 out-of-sample starts, not assumed: counting pulls came
+# LAST of five candidates (AUC 0.681), because it cannot tell a ninth-inning
+# defensive sub from a fifth-inning pinch hit. The short-night rate reaches
+# 0.762, and beat mean-PA-per-start in 100% of a hitter-level bootstrap.
+#
+# 0.23 is the LEAGUE MEDIAN of that measure (p25 9.3%, p50 22.8%, p75 41.4%).
+# The window it has to hit is narrow and it sits inside: it must clear Bogaerts
+# at 19.0%, an everyday bat, and catch Lane Thomas at 28.3% and Sean Murphy at
+# 34.3%, both lifted on 2026-10-04. Albies 11.5%, Olson 13.9%, Harris 13.0%,
+# Acuna 3.6% all pass comfortably.
+#
+# Set from the distribution BEFORE our own record was consulted. Checking it
+# afterwards was directional only and is NOT the justification: blocked props
+# went 11-10 against 80-42 allowed, but n=21 gives p=0.246. The gate rests on
+# mechanism - a hitter who leaves in the sixth cannot get the plate appearances
+# the prop needs.
+SHORT_NIGHT_MAX = 0.23
 MAX_LINEUP_BATS = 9
 
 _WINS_CACHE: dict[tuple, set] = {}      # (team_id, date) -> {winning gamePks}
@@ -166,9 +175,11 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
         # None and is let through, so a short season or a feed outage cannot
         # silently empty the board.
         pull = pinch_risk.risk(p.player_id, pull_cache)
-        if pull and pull["rate"] > PULL_MAX:
-            log.info("prop skipped: %s pulled from %d of %d starts (%.0f%%)",
-                     p.name, pull["pulled"], pull["starts"], pull["rate"] * 100)
+        if pull and pull["rate"] > SHORT_NIGHT_MAX:
+            log.info("prop skipped: %s ends %.0f%% of starts in %d PA or fewer "
+                     "(%d of %d, %.2f PA per start)", p.name,
+                     pull["rate"] * 100, pinch_risk.SHORT_PA, pull["short"],
+                     pull["starts"], pull["mean_pa"])
             continue
         rate = with_hit / played
         all_rate = (all_with_hit / all_played) if all_played else None
@@ -196,10 +207,14 @@ def hit_in_wins_ranked(game_pk: int, team_id: int, date: str, home: bool,
                     "wins_played": played, "games_played": all_played,
                     "avg_pa": round(pa_total / played, 1),
                     # carried so record_audit can assert from the board itself
-                    # that no posted prop ever sat above PULL_MAX
-                    "pull_rate": (None if not pull else round(pull["rate"], 3)),
-                    "pull": (None if not pull
-                             else f"{pull['pulled']}/{pull['starts']} starts")})
+                    # that no posted prop sat above SHORT_NIGHT_MAX
+                    "short_night_rate": (None if not pull
+                                         else round(pull["rate"], 3)),
+                    "mean_pa_per_start": (None if not pull
+                                          else round(pull["mean_pa"], 2)),
+                    "short_nights": (None if not pull else
+                                     f"{pull['short']}/{pull['starts']} starts "
+                                     f"of {pinch_risk.SHORT_PA} PA or fewer")})
     out.sort(key=lambda c: (c["hit_rate"], c["avg_pa"]), reverse=True)
     return out
 

@@ -175,26 +175,39 @@ def risk(pid: int, cache: dict | None = None) -> dict | None:
 
 
 SHORT_PA = 3          # a start this short cannot carry a hits prop
+RECENT_N = 30         # the recency window the bake-off picked
+SHRINK_K = 10         # recent window shrunk toward the season by n/(n+K)
 
 
 def summarise(rows: list) -> dict:
-    """Every candidate measure over one hitter's starts, so they can be
-    compared on the same rows instead of argued about."""
+    """Every candidate measure over one hitter's starts.
+
+    `rate` is what the gate reads, and which measure that should be was decided
+    by `compare()` on 32,989 out-of-sample starts rather than assumed. Counting
+    PULLS - the first thing shipped - came last of five at AUC 0.681, because it
+    cannot tell a ninth-inning defensive sub from a fifth-inning pinch hit. The
+    winner is the recent short-night rate shrunk toward the season rate, at
+    0.762, and its edge over the next best (mean PA per start, 0.757) held in
+    100% of a hitter-level bootstrap, CI [+0.0010, +0.0093].
+    """
     n = len(rows)
     pulled = sum(1 for r in rows if r[2])
     short = sum(1 for r in rows if r[1] <= SHORT_PA)
     costly = sum(1 for r in rows if r[2] and r[1] <= SHORT_PA)
-    recent = rows[-30:]
-    rshort = sum(1 for r in recent if r[1] <= SHORT_PA)
+    season = short / n
+    recent = rows[-RECENT_N:]
+    rshort = sum(1 for r in recent if r[1] <= SHORT_PA) / len(recent)
+    w = len(recent) / (len(recent) + SHRINK_K)
     return {
         "starts": n,
         "pulled": pulled,
-        "rate": short / n,                 # MEASURE: the one the gate reads
+        "short": short,
+        "rate": w * rshort + (1 - w) * season,   # MEASURE the gate reads
         "pull_rate": pulled / n,
-        "short_rate": short / n,
+        "short_rate": season,
         "costly_rate": costly / n,
         "mean_pa": sum(r[1] for r in rows) / n,
-        "recent_short_rate": (rshort / len(recent)) if recent else None,
+        "recent_short_rate": rshort,
     }
 
 
