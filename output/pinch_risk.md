@@ -1,60 +1,59 @@
-# How often does a hitter get pulled before he finishes? — 2026
+# How often is a hitter pulled from a game he started? — 2026
 
-_A hits prop needs plate appearances. `props.MIN_AVG_PA` is a MEAN and cannot express "ever pinch-hit for"; this is the share of STARTS ending in 2 PA or fewer._
+_From the boxscore: a starter's `battingOrder` ends in 00, and anyone replacing him in that slot gets the next number up. Counts any replacement - pinch hitter, pinch runner or defensive sub - since each ends his night and kills a hits prop equally._
 
-Hitters with 20+ starts: **414**
+Games scanned: **2459** · hitters with 20+ starts: **497**
 
-gamesStarted available for 0 of 414 (rest use the PA fallback)
-
-| percentile | short-start rate |
+| percentile | pulled-from-start rate |
 |---|---|
-| p10 | 0.0% |
-| p25 | 0.0% |
-| p50 | 0.0% |
-| p75 | 0.0% |
-| p90 | 0.0% |
-| p95 | 0.0% |
-| p99 | 0.0% |
+| p10 | 3.6% |
+| p25 | 7.0% |
+| p50 | 15.3% |
+| p75 | 27.6% |
+| p90 | 42.3% |
+| p95 | 50.0% |
+| p99 | 64.0% |
 
-## Worst 25 — these are what the gate must catch
+## Worst 25 — what the gate has to catch
 
-| hitter | team | short starts | starts | rate |
-|---|---|---|---|---|
-| Alika Williams | ATH | 0 | 51 | **0.0%** |
-| Brian Serven | ATH | 0 | 21 | **0.0%** |
-| Carlos Cortes | ATH | 0 | 84 | **0.0%** |
-| Darell Hernaiz | ATH | 0 | 39 | **0.0%** |
-| Donovan Walton | ATH | 0 | 62 | **0.0%** |
-| Henry Bolte | ATH | 0 | 110 | **0.0%** |
-| Jeff McNeil | ATH | 0 | 120 | **0.0%** |
-| Jonah Heim | ATH | 0 | 92 | **0.0%** |
-| Lawrence Butler | ATH | 0 | 124 | **0.0%** |
-| Max Muncy | ATH | 0 | 68 | **0.0%** |
-| Shea Langeliers | ATH | 0 | 104 | **0.0%** |
-| Tommy White | ATH | 0 | 47 | **0.0%** |
-| Zack Gelof | ATH | 0 | 101 | **0.0%** |
-| Brandon Lowe | PIT | 0 | 143 | **0.0%** |
-| Bryan Reynolds | PIT | 0 | 156 | **0.0%** |
-| Esmerlyn Valdez | PIT | 0 | 66 | **0.0%** |
-| Henry Davis | PIT | 0 | 75 | **0.0%** |
-| Jacob Gonzalez | PIT | 0 | 48 | **0.0%** |
-| Jake Mangum | PIT | 0 | 108 | **0.0%** |
-| Jared Triolo | PIT | 0 | 84 | **0.0%** |
-| Konnor Griffin | PIT | 0 | 78 | **0.0%** |
-| Nick Gonzales | PIT | 0 | 140 | **0.0%** |
-| Nick Yorke | PIT | 0 | 23 | **0.0%** |
-| Oneil Cruz | PIT | 0 | 92 | **0.0%** |
-| Rafael Flores Jr. | PIT | 0 | 39 | **0.0%** |
+| hitter | pulled | starts | rate |
+|---|---|---|---|
+| Colby Thomas | 25 | 32 | **78.1%** |
+| Jahmai Jones | 30 | 41 | **73.2%** |
+| Travis d'Arnaud | 18 | 27 | **66.7%** |
+| Rob Refsnyder | 17 | 26 | **65.4%** |
+| David Fry | 34 | 53 | **64.2%** |
+| Joshua Báez | 16 | 25 | **64.0%** |
+| LaMonte Wade Jr. | 23 | 37 | **62.2%** |
+| Jesús Sánchez | 52 | 84 | **61.9%** |
+| Randal Grichuk | 34 | 55 | **61.8%** |
+| Zach Dezenzo | 12 | 20 | **60.0%** |
+| Braxton Fulford | 12 | 20 | **60.0%** |
+| Andrés Chaparro | 32 | 54 | **59.3%** |
+| Nelson Velázquez | 14 | 24 | **58.3%** |
+| Gabriel Rincones Jr. | 15 | 26 | **57.7%** |
+| Amed Rosario | 34 | 60 | **56.7%** |
+| Trevor Larnach | 58 | 104 | **55.8%** |
+| Kerry Carpenter | 35 | 64 | **54.7%** |
+| Miguel Rojas | 31 | 57 | **54.4%** |
+| Dustin Harris | 20 | 37 | **54.1%** |
+| Davis Schneider | 21 | 40 | **52.5%** |
+| Yohendrick Piñango | 24 | 46 | **52.2%** |
+| Colt Keith | 54 | 104 | **51.9%** |
+| Will Benson | 14 | 28 | **50.0%** |
+| Blake Perkins | 12 | 24 | **50.0%** |
+| Zack Short | 10 | 20 | **50.0%** |
 
 ## The two from 2026-10-04
 
-- Sean Murphy (ATL): 0/35 = **0.0%**
-- Thomas Saggese (STL): 0/41 = **0.0%**
-- Colby Thomas (PHI): 0/25 = **0.0%**
-- Lane Thomas (ATL): 0/81 = **0.0%**
-- Mike Yastrzemski (ATL): 0/91 = **0.0%**
+- Sean Murphy: 7/35 = **20.0%**
+- Lane Thomas: 15/82 = **18.3%**
+- Ozzie Albies: 5/164 = **3.0%**
+- Matt Olson: 8/166 = **4.8%**
+- Ronald Acuña Jr.: 10/110 = **9.1%**
 
 ## Reading it
 
-- the gate should sit where it catches the pulled bats without condemning ordinary hitters, so compare the worst list against the median rather than picking a round number
-- a hitter under MIN_STARTS returns None and is LET THROUGH: unknown is not the same as risky, and a feed outage must not silently drop every prop on the board
+- set the gate against the median, not a round number: it has to catch the pulled bats without condemning ordinary hitters
+- Albies, Olson and Acuña are printed as controls — they are the everyday bats the gate must NOT touch
+- a hitter under MIN_STARTS returns None and is let through
