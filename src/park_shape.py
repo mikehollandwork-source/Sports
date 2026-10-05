@@ -40,6 +40,7 @@ import random
 from pathlib import Path
 
 from . import mlb_api, props
+from .park_factors import hr_factor
 
 log = logging.getLogger("park_shape")
 
@@ -69,9 +70,15 @@ def venues() -> dict[int, dict]:
     return out
 
 
-def game_venues() -> dict[int, int]:
-    """{gamePk: venue_id} across the season, from one schedule call."""
+def game_venues() -> tuple[dict[int, int], dict[int, str]]:
+    """({gamePk: venue_id}, {gamePk: home team}) from one schedule call.
+
+    The home team is needed because the existing park HR factor is keyed by
+    team name, and the whole point of the control below is to ask whether SHAPE
+    adds anything once that factor is accounted for.
+    """
     out = {}
+    home = {}
     try:
         sched = mlb_api._get("schedule", sportId=1, gameType="R,P",
                              startDate=f"03/01/{SEASON}",
@@ -84,7 +91,9 @@ def game_venues() -> dict[int, int]:
             vid = (g.get("venue") or {}).get("id")
             if vid:
                 out[g["gamePk"]] = vid
-    return out
+                home[g["gamePk"]] = (((g.get("teams") or {}).get("home") or {})
+                                     .get("team") or {}).get("name") or ""
+    return out, home
 
 
 def _bat_sides(ids: list[int]) -> dict[int, str]:
@@ -108,7 +117,7 @@ def collect() -> list[dict]:
         cache = json.loads(CACHE.read_text())
     except (OSError, ValueError):
         cache = {}
-    vmap, gmap = venues(), game_venues()
+    vmap, (gmap, hmap) = venues(), game_venues()
     if not vmap or not gmap:
         return []
     pulls = sorted(v["leftCenter"] for v in vmap.values())
@@ -142,8 +151,8 @@ def collect() -> list[dict]:
         side = sides.get(pid)
         if side not in ("L", "R"):
             continue                 # switch hitters dropped, not guessed
-        short = {"hr": 0.0, "pa": 0.0}
-        long_ = {"hr": 0.0, "pa": 0.0}
+        short = {"hr": 0.0, "pa": 0.0, "exp": 0.0}
+        long_ = {"hr": 0.0, "pa": 0.0, "exp": 0.0}
         for sp in props._game_log(pid, SEASON):
             st = sp.get("stat") or {}
             pk = (sp.get("game") or {}).get("gamePk")
@@ -164,11 +173,16 @@ def collect() -> list[dict]:
             cell = short if is_short else long_
             cell["hr"] += hr
             cell["pa"] += pa
+            # exposure weighted by the park factor the model ALREADY applies,
+            # so the comparison below asks what SHAPE adds on top of it
+            cell["exp"] += pa * hr_factor(hmap.get(pk) or "")
         if short["pa"] >= MIN_SIDE and long_["pa"] >= MIN_SIDE \
                 and short["pa"] + long_["pa"] >= MIN_PA:
             rows.append({"pid": pid, "side": side,
                          "short_hr": short["hr"], "short_pa": short["pa"],
-                         "long_hr": long_["hr"], "long_pa": long_["pa"]})
+                         "short_exp": short["exp"],
+                         "long_hr": long_["hr"], "long_pa": long_["pa"],
+                         "long_exp": long_["exp"]})
     try:
         CACHE.write_text(json.dumps(cache))
     except OSError as exc:
@@ -176,16 +190,22 @@ def collect() -> list[dict]:
     return rows
 
 
-def _delta(rows: list[dict]) -> float:
-    """Pooled HR/PA at short pull-side parks minus long, within hitters."""
+def _delta(rows: list[dict], key: str = "pa") -> float:
+    """Pooled HR per unit exposure at short pull-side parks minus long.
+
+    key="pa" is the raw comparison. key="exp" divides by plate appearances
+    already weighted by the park's HR factor, which is the control that
+    matters: it asks what the SHAPE adds once the aggregate park factor the
+    model applies has been taken out.
+    """
     sh = sum(r["short_hr"] for r in rows)
-    sp = sum(r["short_pa"] for r in rows)
+    sp = sum(r["short_" + key] for r in rows)
     lh = sum(r["long_hr"] for r in rows)
-    lp = sum(r["long_pa"] for r in rows)
+    lp = sum(r["long_" + key] for r in rows)
     return (sh / sp - lh / lp) if sp and lp else 0.0
 
 
-def _perm_p(rows: list[dict], obs: float) -> float:
+def _perm_p(rows: list[dict], obs: float, key: str = "pa") -> float:
     """Flip each hitter's two cells at random: the null where the fence has no
     effect but each hitter keeps his own rate and his own two sample sizes."""
     rng = random.Random(SEED)
@@ -194,11 +214,15 @@ def _perm_p(rows: list[dict], obs: float) -> float:
         flipped = []
         for r in rows:
             if rng.random() < 0.5:
-                flipped.append({"short_hr": r["long_hr"], "short_pa": r["long_pa"],
-                                "long_hr": r["short_hr"], "long_pa": r["short_pa"]})
+                flipped.append({"short_hr": r["long_hr"],
+                                "short_pa": r["long_pa"],
+                                "short_exp": r["long_exp"],
+                                "long_hr": r["short_hr"],
+                                "long_pa": r["short_pa"],
+                                "long_exp": r["short_exp"]})
             else:
                 flipped.append(r)
-        if abs(_delta(flipped)) >= abs(obs):
+        if abs(_delta(flipped, key)) >= abs(obs):
             hits += 1
     return (hits + 1) / (PERMUTATIONS + 1)
 
@@ -227,12 +251,25 @@ def build() -> str:
            f"| long | {lh/lp:.3%} | {lh:.0f} | {lp:.0f} |", "",
            f"difference **{d:+.3%}** per PA — a multiplier of "
            f"**×{(sh/sp)/(lh/lp):.3f}** — permutation p = **{p:.4f}**", ""]
+    # THE CONTROL: does shape survive the park factor the model already uses?
+    dc = _delta(rows, "exp")
+    pc = _perm_p(rows, dc, "exp")
+    she = sum(r["short_exp"] for r in rows); lhe = sum(r["long_exp"] for r in rows)
+    md += ["### Controlled for the park HR factor the model already applies",
+           "",
+           f"- short {sh/she:.3%} vs long {lh/lhe:.3%} per park-adjusted PA",
+           f"- difference **{dc:+.3%}**, multiplier "
+           f"**×{(sh/she)/(lh/lhe):.3f}**, permutation p = **{pc:.4f}**",
+           "- _if this collapses toward zero, the aggregate park factor "
+           "already contains the shape and there is nothing to add_", ""]
     for lab, s in (("left-handed", "L"), ("right-handed", "R")):
         sub = [r for r in rows if r["side"] == s]
         if len(sub) < 10:
             continue
         dd = _delta(sub)
-        md.append(f"- {lab} bats ({len(sub)}): {dd:+.3%} per PA")
+        ddc = _delta(sub, "exp")
+        md.append(f"- {lab} bats ({len(sub)}): raw {dd:+.3%}, "
+                  f"park-controlled {ddc:+.3%} per PA")
     md += ["", "## What to conclude", "",
            "- compare the multiplier against what the selector already swings: "
            "form ×1.30, wind ×1.24, park ×1.12. A shape term below about ×1.03 "
