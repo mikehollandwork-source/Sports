@@ -1,0 +1,22 @@
+name: Spray probe
+on: {workflow_dispatch: {inputs: {batter: {required: false}}}}
+permissions: {contents: write}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - run: python -m src.spray_probe
+        env: {PROBE_BATTER: "${{ github.event.inputs.batter }}"}
+      - if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/spray_probe.md
+          git diff --staged --quiet || { git commit -m "Spray probe"; \
+            for i in 1 2 3 4; do git pull --rebase origin "${{ github.ref_name }}" \
+              && git push origin "HEAD:${{ github.ref_name }}" && break; sleep 5; done; }
