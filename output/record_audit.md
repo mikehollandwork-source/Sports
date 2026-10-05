@@ -2,29 +2,29 @@
 
 _The board is stateless and `settle_day` reads only the final committed version, so a pick that stops qualifying before its 15-minute lock window disappears. It was on Telegram; it is not in the ledger._
 
-- games that were a pick in SOME version, and are final: **438**
-- survived to the final board (graded): **241**
+- games that were a pick in SOME version, and are final: **439**
+- survived to the final board (graded): **242**
 - **dropped before the lock (never graded): 197** (45%)
 
 ## Does dropping them flatter the record?
 
 | population | at the price first posted |
 |---|---|
-| survived — what the ledger books | 142-99 (59%) · +3.99u · **+1.7%** (n=241) |
+| survived — what the ledger books | 143-99 (59%) · +4.49u · **+1.9%** (n=242) |
 | **dropped — never graded** | **96-101 (49%) · -27.92u · **-14.2%** (n=197)** |
-| everything ever posted | 238-200 (54%) · -23.93u · **-5.5%** (n=438) |
+| everything ever posted | 239-200 (54%) · -23.43u · **-5.3%** (n=439) |
 
-- the recorded population returns **+1.7%**; everything that actually appeared returns **-5.5%**
-- **bias from silent dropping: +7.1 points**
+- the recorded population returns **+1.9%**; everything that actually appeared returns **-5.3%**
+- **bias from silent dropping: +7.2 points**
 
-The ledger is FLATTERED by +7.1 points: the picks that quietly vanished did worse than the ones that stayed.
+The ledger is FLATTERED by +7.2 points: the picks that quietly vanished did worse than the ones that stayed.
 
 ## Is surviving to the lock actually predictive?
 
 _Permuting the survived/dropped labels keeps every outcome and price fixed and asks only whether the label carries information._
 
-- observed gap: **+15.8 points**
-- **permutation p = 0.0302**
+- observed gap: **+16.0 points**
+- **permutation p = 0.0283**
 
 **Real.** A pick that still qualifies at its own lock window is a materially better bet than one that has stopped qualifying, and that is implementable: check the board ~15 minutes before first pitch and skip anything that has fallen out.
 
@@ -97,16 +97,26 @@ _Boards from 2026-10-01 on, when the tag shipped._
 _Leader takes his own multiplier; runner-up is credited with the measured ceiling ×1.010, so this is a bound, not an observation._
 
 - HR picks carrying the context and a runner-up: **1**
-- narrowest margin over the runner-up: **+6.86%** of HR probability
+- narrowest margin over the runner-up: **+4.34%** of HR probability
 - picks it could have flipped: **0**
 - **PASS** — no pick could have changed
+
+## Guard: no prop on a hitter who gets pulled from his starts
+
+_Threshold `props.PULL_MAX` = 15%, the league median over 2,459 games._
+
+- posted props carrying a pull rate: **1**
+- boards predating the gate (no rate stored): **153**
+- highest rate posted: **3.0%**
+- above the threshold: **0**
+- **PASS** — every posted prop was under the gate
 
 ## Price drift on the picks that survived
 
 _The ledger books the frozen closing price; the channel showed the earlier one. If they differ, the recorded ROI is not the ROI a reader would have got._
 
-- survivors whose price changed: **176/241**
-- graded at the FIRST posted price: 142-99 (59%) · +3.99u · **+1.7%** (n=241)
-- graded at the FINAL recorded price: 139-102 (58%) · -0.63u · **-0.3%** (n=241)
+- survivors whose price changed: **177/242**
+- graded at the FIRST posted price: 143-99 (59%) · +4.49u · **+1.9%** (n=242)
+- graded at the FINAL recorded price: 139-103 (57%) · -1.63u · **-0.7%** (n=242)
 
-- difference: **+1.9 points** in favour of the posted price
+- difference: **+2.5 points** in favour of the posted price
