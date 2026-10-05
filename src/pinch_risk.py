@@ -288,8 +288,8 @@ def compare(cache: dict) -> list[str]:
 def build(through: str) -> str:
     cache = refresh(through)
     names = {}
-    tally = cache.get("tally") or {}
-    ids = [int(p) for p, c in tally.items() if c[1] >= MIN_STARTS]
+    starts = cache.get("starts") or {}
+    ids = [int(p) for p, r in starts.items() if len(r) >= MIN_STARTS]
     for i in range(0, len(ids), 100):
         try:
             for pe in mlb_api._get("people", personIds=",".join(
@@ -299,12 +299,12 @@ def build(through: str) -> str:
             log.warning("name lookup failed (%s)", exc)
     rows = [(names.get(i, str(i)), risk(i, cache)) for i in ids]
     rows = [(n, r) for n, r in rows if r]
-    md = [f"# How often is a hitter pulled from a game he started? — {through[:4]}",
-          "",
-          "_From the boxscore: a starter's `battingOrder` ends in 00, and "
-          "anyone replacing him in that slot gets the next number up. Counts "
-          "any replacement - pinch hitter, pinch runner or defensive sub - "
-          "since each ends his night and kills a hits prop equally._", "",
+    md = [f"# How often does a hitter's night end early? — {through[:4]}", "",
+          f"_A start is SHORT at {SHORT_PA} plate appearances or fewer. The "
+          "rate below is the last "
+          f"{RECENT_N} starts shrunk toward the season rate — the measure the "
+          "bake-off at the foot of this page picked over four others, "
+          "including the pull count this started as._", "",
           f"Games scanned: **{len(cache.get('games') or [])}** · "
           f"hitters with {MIN_STARTS}+ starts: **{len(rows)}**", ""]
     if not rows:
@@ -312,20 +312,22 @@ def build(through: str) -> str:
     rates = sorted(r["rate"] for _, r in rows)
     def q(p):
         return rates[int(p * (len(rates) - 1))]
-    md += ["| percentile | pulled-from-start rate |", "|---|---|"]
+    md += ["| percentile | short-night rate |", "|---|---|"]
     for p in (0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99):
         md.append(f"| p{int(p*100)} | {q(p):.1%} |")
     md += ["", "## Worst 25 — what the gate has to catch", "",
-           "| hitter | pulled | starts | rate |", "|---|---|---|---|"]
+           "| hitter | short nights | starts | PA/start | rate |",
+           "|---|---|---|---|---|"]
     for n, r in sorted(rows, key=lambda x: -x[1]["rate"])[:25]:
-        md.append(f"| {n} | {r['pulled']} | {r['starts']} | **{r['rate']:.1%}** |")
+        md.append(f"| {n} | {r['short']} | {r['starts']} | {r['mean_pa']:.2f} "
+                  f"| **{r['rate']:.1%}** |")
     md += ["", "## The two from 2026-10-04", ""]
     for want in ("Sean Murphy", "Lane Thomas", "Ozzie Albies",
                  "Matt Olson", "Ronald Acu"):
         for n, r in rows:
             if want in (n or ""):
-                md.append(f"- {n}: {r['pulled']}/{r['starts']} "
-                          f"= **{r['rate']:.1%}**")
+                md.append(f"- {n}: {r['short']}/{r['starts']} short "
+                          f"= **{r['rate']:.1%}**, {r['mean_pa']:.2f} PA/start")
     md += ["", "## Which measure is best?", "",
            "_Decided by forward test, not by argument: every measure built "
            "from PRIOR starts only, scored against what happened that night._",
