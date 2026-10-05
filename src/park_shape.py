@@ -227,8 +227,78 @@ def _perm_p(rows: list[dict], obs: float, key: str = "pa") -> float:
     return (hits + 1) / (PERMUTATIONS + 1)
 
 
+def homered_here(vmap: dict, gmap: dict) -> list[str]:
+    """Does having gone deep at a park before predict going deep there again?
+
+    The trap is that this conditions on a past outcome, so "has homered here"
+    correlates both with having BATTED here more and with being a better power
+    hitter generally. Both are controlled: hitter-venue pairs are matched on
+    prior plate appearances at that park, and the outcome is scored against the
+    hitter's OWN overall rate, so it compares a power hitter with himself
+    rather than with the league.
+    """
+    try:
+        cache = json.loads(CACHE.read_text())
+    except (OSError, ValueError):
+        cache = {}
+    ids = [int(x) for x in cache.get("ids", [])]
+    buckets = {"10-25 PA": [[0.0, 0.0], [0.0, 0.0]],
+               "25-50 PA": [[0.0, 0.0], [0.0, 0.0]],
+               "50+ PA":   [[0.0, 0.0], [0.0, 0.0]]}
+    for pid in ids:
+        log_ = sorted(props._game_log(pid, SEASON),
+                      key=lambda sp: sp.get("date") or "")
+        tot_hr = tot_pa = 0.0
+        for sp in log_:
+            st = sp.get("stat") or {}
+            try:
+                tot_hr += float(st.get("homeRuns", 0) or 0)
+                tot_pa += float(st.get("plateAppearances", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+        if tot_pa < MIN_PA:
+            continue
+        own = tot_hr / tot_pa
+        seen: dict[int, list[float]] = {}
+        for sp in log_:
+            st = sp.get("stat") or {}
+            pk = (sp.get("game") or {}).get("gamePk")
+            vid = gmap.get(pk)
+            if vid not in vmap:
+                continue
+            try:
+                pa = float(st.get("plateAppearances", 0) or 0)
+                hr = float(st.get("homeRuns", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            prior = seen.setdefault(vid, [0.0, 0.0])
+            ppa = prior[1]
+            if pa >= 1 and ppa >= 10:
+                band = ("10-25 PA" if ppa < 25 else
+                        "25-50 PA" if ppa < 50 else "50+ PA")
+                cell = buckets[band][1 if prior[0] > 0 else 0]
+                cell[0] += hr - own * pa      # HR above his OWN expectation
+                cell[1] += pa
+            prior[0] += hr
+            prior[1] += pa
+    out = ["| prior PA at the park | never homered here | has homered here |",
+           "|---|---|---|"]
+    for band, (no, yes) in buckets.items():
+        def fmt(c):
+            return f"{c[0]/c[1]:+.3%} ({c[1]:.0f} PA)" if c[1] else "—"
+        out.append(f"| {band} | {fmt(no)} | {fmt(yes)} |")
+    tn = [sum(b[0][i] for b in buckets.values()) for i in (0, 1)]
+    ty = [sum(b[1][i] for b in buckets.values()) for i in (0, 1)]
+    if tn[1] and ty[1]:
+        gap = ty[0] / ty[1] - tn[0] / tn[1]
+        out += ["", f"Pooled gap **{gap:+.3%}** per PA above each hitter's own "
+                f"rate — about **×{1 + gap / 0.0303:.3f}** on a league HR rate."]
+    return out
+
+
 def build() -> str:
     rows = collect()
+    vmap, gmap = venues(), game_venues()[0]
     md = ["# Does a park's SHAPE add to its home-run factor?", "",
           "_`hr_pick` already multiplies by a park HR factor, but that is one "
           "number for the whole field and cannot express a left-handed pull "
@@ -270,6 +340,12 @@ def build() -> str:
         ddc = _delta(sub, "exp")
         md.append(f"- {lab} bats ({len(sub)}): raw {dd:+.3%}, "
                   f"park-controlled {ddc:+.3%} per PA")
+    md += ["", "## Has he gone deep at THIS park before?", "",
+           "_Conditioning on a past outcome, so both confounds are controlled: "
+           "matched on prior plate appearances at the park, and scored against "
+           "the hitter's OWN rate so it is a power hitter against himself._",
+           ""]
+    md += homered_here(vmap, gmap)
     md += ["", "## What to conclude", "",
            "- compare the multiplier against what the selector already swings: "
            "form ×1.30, wind ×1.24, park ×1.12. A shape term below about ×1.03 "
