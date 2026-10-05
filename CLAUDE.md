@@ -224,6 +224,21 @@ unit-testable with mock `Game`/`Team` objects.
   deliberately exempt and only reports its rate: a home run needs one plate
   appearance, not four. NOTE Gavin Sheets sits at 48.5%, so that exemption is
   load-bearing, not theoretical.
+- **Do NOT add a "but he's red hot" override to the short-night gate.** It was
+  measured over 32,564 starts (`short_night_form.py`,
+  `output/short_night_form.md`) and the answer is no, for a blunter reason than
+  "not quite enough": **hot form barely predicts a hit at all.** Form as the
+  board defines it (last `props.RECENT_GAMES` games minus season, in points)
+  scores **AUC 0.5053** against getting a hit — a coin flip — and P(1+ hit) is
+  FLAT across the whole range: −20 or worse 64.0%, −10 to 0 64.4%, +10 to +20
+  65.3%, +30 or more 64.9%. The hot hand is not there. Meanwhile the gate is
+  worth +8.1 points (allowed 64.0% vs blocked 55.9%), and the hottest blocked
+  band reaches only 58.2% ± 3.4%, whose interval does not touch 64.0%. So no
+  form level buys back the lost plate appearances, and the gate stays absolute.
+  **Corollary worth acting on separately:** `main._prop_score` weights that same
+  near-inert `form` term, so it is contributing noise to which prop gets picked.
+  Short-night rate itself is only AUC 0.5467 — weak but real, and the strongest
+  of the two.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
