@@ -1,6 +1,6 @@
 {
   "date": "2026-10-05",
-  "generated_at": "2026-10-05T06:03:07.455083+00:00",
+  "generated_at": "2026-10-05T07:03:31.147594+00:00",
   "games": [
     {
       "game_pk": 849834,
@@ -110,7 +110,7 @@
           "agree": null,
           "forum_lean": null,
           "consensus_lean": null,
-          "blended_lean": 0.16,
+          "blended_lean": 0.11,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -123,6 +123,11 @@
               "away": 42,
               "home": 58,
               "lean": 0.16
+            },
+            "scoresodds_bets": {
+              "away": 47,
+              "home": 53,
+              "lean": 0.06
             }
           }
         }
@@ -130,21 +135,29 @@
       "public_check": {
         "sources": [
           {
+            "name": "scoresodds_bets",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "polymarket_bets",
             "side": "home",
             "agrees": true
           }
         ],
         "majority_side": "home",
-        "agree": 1,
+        "agree": 2,
         "dissent": 0,
         "trusted": true,
-        "verdict": "unconfirmed",
-        "note": "only one public source \u2014 can't cross-check",
-        "flags": [],
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "unknown",
-        "money_side": null
+        "money": "against public",
+        "money_side": "away",
+        "money_pct": 60
       },
       "bvp": {
         "home_eff": 0.547,
@@ -369,7 +382,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (unknown) \u2014 no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Cleveland Guardians",
         "public_edge": false,
         "public_trusted": true,
@@ -383,7 +396,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.16,
+            "blended_lean": 0.11,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -404,23 +417,25 @@
         },
         "form_edge": null,
         "form_gap": 0.009,
-        "sharp_money": null,
+        "sharp_money": false,
         "sp_dog_edge": 1.295,
         "pitching_dog": false,
         "signals_hit": 1,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Chicago White Sox",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Cleveland Guardians",
           "odds": -163,
-          "basis": "ticket %",
-          "hold_home": 449202,
-          "hold_away": 91000
+          "basis": "money %",
+          "hold_home": 2482209,
+          "hold_away": -2870000
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -575,15 +590,15 @@
           "consensus": {
             "pick": "Nyy",
             "pcts": {
-              "Nyy": 59.0,
-              "Tb": 41.0
+              "Nyy": 60.0,
+              "Tb": 40.0
             }
           },
           "forum": null,
           "agree": null,
           "forum_lean": null,
-          "consensus_lean": -0.18,
-          "blended_lean": -0.13,
+          "consensus_lean": -0.2,
+          "blended_lean": -0.24,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -596,6 +611,11 @@
               "away": 54,
               "home": 46,
               "lean": -0.08
+            },
+            "scoresodds_bets": {
+              "away": 72,
+              "home": 28,
+              "lean": -0.44
             }
           }
         }
@@ -608,21 +628,27 @@
             "agrees": true
           },
           {
+            "name": "scoresodds_bets",
+            "side": "away",
+            "agrees": true
+          },
+          {
             "name": "polymarket_bets",
             "side": "away",
             "agrees": true
           }
         ],
         "majority_side": "away",
-        "agree": 2,
+        "agree": 3,
         "dissent": 0,
         "trusted": true,
         "verdict": "corroborated",
-        "note": "all 2 sources agree on the public side",
+        "note": "all 3 sources agree on the public side",
         "flags": [],
         "line": "flat",
-        "money": "unknown",
-        "money_side": null
+        "money": "with public",
+        "money_side": "away",
+        "money_pct": 79
       },
       "bvp": {
         "home_eff": 0.648,
@@ -701,13 +727,13 @@
       "betting_lines": {
         "majority": {
           "team": "New York Yankees",
-          "consensus_pct": 59.0,
-          "moneyline": "-119"
+          "consensus_pct": 60.0,
+          "moneyline": "-133"
         },
         "non_majority": {
           "team": "Tampa Bay Rays",
-          "consensus_pct": 41.0,
-          "moneyline": "+108"
+          "consensus_pct": 40.0,
+          "moneyline": "+105"
         }
       },
       "consistency": {
@@ -858,7 +884,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (unknown) \u2014 no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "New York Yankees",
         "public_edge": false,
         "public_trusted": true,
@@ -872,7 +898,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.13,
+            "blended_lean": -0.24,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -893,7 +919,7 @@
         },
         "form_edge": true,
         "form_gap": 0.023,
-        "sharp_money": null,
+        "sharp_money": false,
         "sp_dog_edge": 1.793,
         "pitching_dog": false,
         "signals_hit": 3,
@@ -907,9 +933,9 @@
         "vegas": {
           "bet": "Tampa Bay Rays",
           "odds": 109,
-          "basis": "ticket %",
-          "hold_home": 635950,
-          "hold_away": 25916
+          "basis": "money %",
+          "hold_home": 3927700,
+          "hold_away": -2751374
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -1057,10 +1083,10 @@
       "game_datetime": "2026-10-06T00:00:00Z",
       "weather": {
         "temp_f": 81,
-        "wind_mph": 6,
-        "wind_dir": "N",
-        "wind_deg": 5,
-        "precip_pct": 0,
+        "wind_mph": 2,
+        "wind_dir": "NW",
+        "wind_deg": 313,
+        "precip_pct": 21,
         "roof": "dome"
       },
       "umpire_hp": null,
