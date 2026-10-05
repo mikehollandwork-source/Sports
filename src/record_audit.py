@@ -383,7 +383,7 @@ def pull_gate_guard() -> list[str]:
            f"_Threshold `props.SHORT_NIGHT_MAX` = "
            f"{props.SHORT_NIGHT_MAX:.0%}, the league median of the shrunk "
            f"recent short-night rate over 2,459 games._", "",
-           f"- posted props carrying a pull rate: **{checked}**",
+           f"- posted props carrying a short-night rate: **{checked}**",
            f"- boards predating the gate (no rate stored): **{legacy}**"]
     if not checked:
         return out + ["- _none yet; the gate ships with tonight's board._", ""]
