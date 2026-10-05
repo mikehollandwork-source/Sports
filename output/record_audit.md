@@ -101,15 +101,13 @@ _Leader takes his own multiplier; runner-up is credited with the measured ceilin
 - picks it could have flipped: **0**
 - **PASS** — no pick could have changed
 
-## Guard: no prop on a hitter who gets pulled from his starts
+## Guard: no prop on a hitter whose nights end early
 
-_Threshold `props.PULL_MAX` = 15%, the league median over 2,459 games._
+_Threshold `props.SHORT_NIGHT_MAX` = 23%, the league median of the shrunk recent short-night rate over 2,459 games._
 
-- posted props carrying a pull rate: **1**
-- boards predating the gate (no rate stored): **153**
-- highest rate posted: **3.0%**
-- above the threshold: **0**
-- **PASS** — every posted prop was under the gate
+- posted props carrying a pull rate: **0**
+- boards predating the gate (no rate stored): **154**
+- _none yet; the gate ships with tonight's board._
 
 ## Price drift on the picks that survived
 
