@@ -22,6 +22,18 @@ difference **+0.203%** per PA — a multiplier of **×1.065** — permutation p 
 - left-handed bats (131): raw -0.036%, park-controlled -0.145% per PA
 - right-handed bats (157): raw +0.427%, park-controlled +0.371% per PA
 
+## Has he gone deep at THIS park before?
+
+_Conditioning on a past outcome, so both confounds are controlled: matched on prior plate appearances at the park, and scored against the hitter's OWN rate so it is a power hitter against himself._
+
+| prior PA at the park | never homered here | has homered here |
+|---|---|---|
+| 10-25 PA | -0.235% (11442 PA) | -0.278% (6496 PA) |
+| 25-50 PA | -0.313% (3892 PA) | +0.082% (5563 PA) |
+| 50+ PA | +0.594% (4177 PA) | +0.080% (51430 PA) |
+
+Pooled gap **+0.117%** per PA above each hitter's own rate — about **×1.039** on a league HR rate.
+
 ## What to conclude
 
 - compare the multiplier against what the selector already swings: form ×1.30, wind ×1.24, park ×1.12. A shape term below about ×1.03 cannot change a pick and should not be wired
