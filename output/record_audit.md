@@ -105,9 +105,11 @@ _Leader takes his own multiplier; runner-up is credited with the measured ceilin
 
 _Threshold `props.SHORT_NIGHT_MAX` = 23%, the league median of the shrunk recent short-night rate over 2,459 games._
 
-- posted props carrying a pull rate: **0**
+- posted props carrying a short-night rate: **1**
 - boards predating the gate (no rate stored): **154**
-- _none yet; the gate ships with tonight's board._
+- highest rate posted: **0.3%**
+- above the threshold: **0**
+- **PASS** — every posted prop was under the gate
 
 ## Price drift on the picks that survived
 
