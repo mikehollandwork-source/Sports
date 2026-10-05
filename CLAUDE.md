@@ -239,6 +239,31 @@ unit-testable with mock `Game`/`Team` objects.
   near-inert `form` term, so it is contributing noise to which prop gets picked.
   Short-night rate itself is only AUC 0.5467 — weak but real, and the strongest
   of the two.
+- **Batted-ball distance, park SHAPE and "has he homered here" were all tested
+  for the HR pick and all came back empty** (`spray_probe.py`,
+  `park_shape.py`, `output/park_shape.md`).
+  **Distance/spray is not in MLB's feed at all** — a play record carries only
+  atBatNumber, count, details, isPitch, pitchNumber, playId, with no `hitData`,
+  so average fly-ball length and landing spot cannot come from there. Statcast
+  DOES serve it and IS reachable (`baseballsavant` CSV: `hc_x`, `hc_y`,
+  `hit_distance_sc`, `avg_hr_distance`, `brl_percent`) if ever needed.
+  **Park fence distances ARE available** — `/venues?hydrate=fieldInfo` for all
+  62 parks (leftLine, left, leftCenter, center, rightCenter, right, rightLine).
+  But shape adds nothing to the HR factor already applied: within-hitter, a
+  short pull-side fence is worth ×1.065 raw (p=0.1234) and only **×1.039
+  (p=0.3583)** once exposure is weighted by the existing park factor — and the
+  sign flips by handedness (RHB +0.371%, **LHB −0.145%**), which no real
+  short-fence mechanism would do. That asymmetry is the tell that it was
+  confounding, since hitter-friendly parks tend to have short fences.
+  By the module's pre-registered logic a null here also closes the expensive
+  Statcast version, which refines the same effect; the handedness proxy is
+  admittedly crude, but the headroom left after the park factor is ×1.039, so
+  the ceiling is low either way.
+  **"Homered here before" is Simpson's paradox** — pooled +0.117% looks like
+  ×1.039, but matched on prior PA at the park the signs alternate (10–25 PA
+  −0.04%, 25–50 PA +0.40%, 50+ PA **−0.51%**) and the largest, best-matched
+  bucket runs the wrong way. Nothing survives controlling for how often he has
+  batted there and for his own power.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
