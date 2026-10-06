@@ -193,6 +193,41 @@ def _fmt(rs) -> str:
     return f"{w}-{len(rs)-w} · **{_roi(rs):+.1%}**"
 
 
+def _anchor_test(back, fade) -> list[str]:
+    """A standalone interval for backing the money side.
+
+    Two benchmarks matter and they are different. ZERO is what a profitable
+    bet must beat. MINUS HALF THE HOLD is what a side carrying NO information
+    would return, and beating that only means the handle knows something - not
+    that it knows enough to pay for the privilege of betting it.
+    """
+    hold = -(_roi(back) + _roi(fade)) / 2        # per-side hold
+    obs = _roi(back)
+    rng = random.Random(SEED + 1)
+    plan = [(grade.american_profit(x["odds"]), x["p"]) for x in back]
+    draws = sorted(sum(w if rng.random() < p else -1 for w, p in plan)
+                   / len(plan) * 100 for _ in range(TRIALS))
+    lo, hi = draws[int(.025 * TRIALS)], draws[int(.975 * TRIALS)]
+    p_val = (sum(1 for d in draws if d >= obs * 100) + 1) / (TRIALS + 1)
+    beats_zero = obs > 0
+    return ["### Backing the money side on its own", "",
+            "_This one is not part of the search — it is the question as "
+            "asked, so it takes no multiple-comparison penalty._", "",
+            f"- backing the money side: **{obs:+.1%}** on {len(back)} bets",
+            f"- a no-information side at these prices returns about "
+            f"**{-hold:+.1%}** (half the hold)",
+            f"- simulating these same bets at their market prices: 95% of "
+            f"outcomes land in **{lo:+.1f}% to {hi:+.1f}%**, "
+            f"**p = {p_val:.3f}** for reaching {obs*100:+.1f}% by chance",
+            "- " + ("**beats zero**, which is the bar that matters"
+                    if beats_zero else
+                    f"**does not beat zero.** It is {obs*100 + hold*100:+.1f} "
+                    "points better than a no-information side, so the handle "
+                    "is carrying something — but not enough to pay the hold, "
+                    "which is the only thing that counts"),
+            ""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# The money side, crossed with everything else", "",
@@ -225,6 +260,12 @@ def build() -> str:
            "zero._", "",
            f"- cells at n≥{MIN_CELL}: **{len(cells)}** "
            f"(from {len(combos)} combinations × 2 directions)", ""]
+
+    # The bare anchor is NOT part of the search. It is the single hypothesis
+    # that was stated before any cell was looked at - "what side is the money
+    # on" - so it carries no multiple-comparison penalty and deserves its own
+    # interval rather than being buried among 326 searched cells.
+    md += _anchor_test(base_b, base_f)
 
     ranked = sorted(cells, key=lambda c: -_roi(c[1]))
     md += ["## The ten best cells — before correction", "",
