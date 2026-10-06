@@ -50,6 +50,17 @@ _Each trial simulates every game once at its market price and scores all cells o
 
 **Nothing clears.** The best cell is inside what this search produces from noise, so there is no rule here to ship.
 
+- split-half of **fade the money WHEN money AGAINST tickets AND pitcher-friendly park**: 15-7 · **+30.7%** (n=22) against 17-6 · **+34.6%** (n=23)
+## Is the top of the list just variance?
+
+- of the ten best cells, **10 are fades**
+- those ten cells: 44% plus-money, median price -105
+- all 1506 cells: 47% plus-money, median price -105
+- bare back the money: 12% plus-money, median price -136
+- bare fade the money: 79% plus-money, median price +122
+
+_A plus-money bet returns more than it risks, so at small n its ROI has a long right tail. If the leaderboard is mostly fades on plus-money prices, the ranking is sorting on variance, not edge — which is exactly what the correction above is for._
+
 
 ## How to read this
 
