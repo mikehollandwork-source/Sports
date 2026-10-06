@@ -15,6 +15,15 @@ _Those two sum to -6.2%, which is the hold paid twice. Any filtered cell has to 
 
 - cells at n≥40: **326** (from 172 combinations × 2 directions)
 
+### Backing the money side on its own
+
+_This one is not part of the search — it is the question as asked, so it takes no multiple-comparison penalty._
+
+- backing the money side: **-0.6%** on 905 bets
+- a no-information side at these prices returns about **-3.1%** (half the hold)
+- simulating these same bets at their market prices: 95% of outcomes land in **-8.2% to +3.4%**, **p = 0.270** for reaching -0.6% by chance
+- **does not beat zero.** It is +2.5 points better than a no-information side, so the handle is carrying something — but not enough to pay the hold, which is the only thing that counts
+
 ## The ten best cells — before correction
 
 | cell | n | result |
@@ -39,8 +48,8 @@ _These are the numbers a search of this width produces. Whether any of them is r
 
 **Nothing clears.** The best cell is inside what this search produces from noise, so there is no rule here to ship.
 
-- split-half of **fade the money WHEN money AGAINST tickets AND public sources trusted**: 26-12 · **+23.8%** (n=38) against 14-8 · **+13.2%** (n=22)
-- split-half of **back the money WHEN money AGAINST tickets AND public sources trusted**: 7-17 · **-38.9%** (n=24) against 13-23 · **-23.5%** (n=36)
+- split-half of **fade the money WHEN money AGAINST tickets AND public sources trusted**: 20-10 · **+19.0%** (n=30) against 20-10 · **+20.9%** (n=30)
+- split-half of **back the money WHEN money AGAINST tickets AND public sources trusted**: 7-22 · **-49.9%** (n=29) against 13-18 · **-10.7%** (n=31)
 
 ## How to read this
 
