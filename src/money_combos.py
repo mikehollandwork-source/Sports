@@ -52,7 +52,7 @@ import random
 import statistics as st
 from pathlib import Path
 
-from . import grade, mlb_api
+from . import consensus as C, grade, mlb_api
 from .pregame_money import _implied
 
 log = logging.getLogger("money_combos")
@@ -65,63 +65,121 @@ SEED = 20261006
 
 
 def _conditions(g: dict, money: str, other: str, price: dict,
-                adv: str, home: str) -> dict:
-    """Binary filters, all phrased RELATIVE TO THE MONEY SIDE.
+                adv: str, home: str, mm: dict | None) -> dict:
+    """Every signal and every recorded stat, all phrased RELATIVE TO THE
+    MONEY SIDE.
 
-    Phrasing them all one way matters: a condition that sometimes means "about
-    the money side" and sometimes "about the home team" would make the pairs
-    incoherent.
+    Phrasing them one way matters: a condition that sometimes meant "about the
+    money side" and sometimes "about the home team" would make the pairs
+    incoherent and the whole sweep unreadable.
+
+    A condition that cannot be read for a game is False, never a guess, so a
+    missing feed shrinks a cell rather than inventing membership for it.
     """
     pc = g.get("pick_criteria") or {}
     chk = g.get("public_check") or {}
-    maj = chk.get("majority_side")
-    maj_team = (home if maj == "home" else
-                (other if home == money else money)) if maj else None
+    money_is_home = money == home
+
+    def side_of(team_or_side):
+        """True when a named side or home/away token is the money side."""
+        if team_or_side in ("home", "away"):
+            return (team_or_side == "home") == money_is_home
+        return team_or_side == money
+
     shift = (pc.get("line_check") or {}).get("implied_shift")
-    toward_adv = (isinstance(shift, (int, float)) and shift > 0)
-    away_from_adv = (isinstance(shift, (int, float)) and shift < 0)
-    line_toward_money = ((toward_adv and money == adv)
-                         or (away_from_adv and money != adv))
-    line_against_money = ((away_from_adv and money == adv)
-                          or (toward_adv and money != adv))
-    b = g.get("bvp") or {}
+    toward_adv = isinstance(shift, (int, float)) and shift > 0
+    away_adv = isinstance(shift, (int, float)) and shift < 0
+    money_is_adv = money == adv
+    b, bp = g.get("bvp") or {}, g.get("bvp_pen") or {}
     form = g.get("form") or {}
-    fh = (form.get("home") or {}).get("delta")
-    fa = (form.get("away") or {}).get("delta")
-    hotter = None
-    if isinstance(fh, (int, float)) and isinstance(fa, (int, float)) and fh != fa:
-        hotter = home if fh > fa else other if home == money else money
+    fh, fa = form.get("home") or {}, form.get("away") or {}
+    dh, da = fh.get("delta"), fa.get("delta")
+    hot_h = sum(p.get("delta", 0) for p in (fh.get("hot") or []))
+    hot_a = sum(p.get("delta", 0) for p in (fa.get("hot") or []))
     sit = g.get("situational") or {}
 
-    def wp(s):
-        w, l = (s or {}).get("wins"), (s or {}).get("losses")
+    def wp(x):
+        w, l = (x or {}).get("wins"), (x or {}).get("losses")
         return w / (w + l) if isinstance(w, int) and isinstance(l, int) and (w + l) else None
     rh, ra = wp(sit.get("home")), wp(sit.get("away"))
-    better = None
-    if rh is not None and ra is not None and rh != ra:
-        better = home if rh > ra else (other if home == money else money)
+    cons = g.get("consistency") or {}
+    ch, ca = (cons.get("home") or {}).get("score"), (cons.get("away") or {}).get("score")
+    wx = g.get("weather") or {}
+    ump = g.get("ump_tend") or {}
+    stance = pc.get("book_stance") or {}
+    pmq = pc.get("pm_quote") or {}
+    proj = pc.get("projected") or {}
+    fair = proj.get("fair_american")
     mpct = chk.get("money_pct")
     pf = g.get("park_factor")
-    stance = pc.get("book_stance") or {}
+    conf = pc.get("confidence")
+    temp = wx.get("temp_f") if isinstance(wx, dict) else None
+    windmph = wx.get("wind_mph") if isinstance(wx, dict) else None
+
+    def cmp_side(h, a):
+        """The money side holds the higher of a home/away pair."""
+        if not isinstance(h, (int, float)) or not isinstance(a, (int, float)) \
+                or h == a:
+            return False
+        return (h > a) == money_is_home
+
     return {
+        # --- the handle itself
         "money agrees with tickets": chk.get("money") == "with public",
         "money AGAINST tickets": chk.get("money") == "against public",
-        "line moved against the money": line_against_money,
-        "line moved toward the money": line_toward_money,
+        "handle share 60%+": isinstance(mpct, (int, float)) and mpct >= 60,
+        "handle share 70%+": isinstance(mpct, (int, float)) and mpct >= 70,
+        # --- the line
+        "line moved against the money": (away_adv and money_is_adv) or (toward_adv and not money_is_adv),
+        "line moved toward the money": (toward_adv and money_is_adv) or (away_adv and not money_is_adv),
         "line flat": chk.get("line") == "flat",
+        "line vs money: against": pc.get("line_vs_money") == "against",
+        "line vs money: with": pc.get("line_vs_money") == "with",
+        # --- price
         "money side is the favourite": price[money] < price[other],
         "money side is the underdog": price[money] > price[other],
-        "money side is home": money == home,
+        "money side is a big favourite": price[money] <= -150,
+        "money side is a big dog": price[money] >= 130,
+        # --- the crowd
         "public sources corroborated": chk.get("verdict") == "corroborated",
         "public sources trusted": bool(chk.get("trusted")),
-        "money side has the stat edge": money == adv,
-        "money side has the BvP edge": b.get("edge_team") == money,
-        "money side has the better record": better == money,
-        "money side has hotter bats": hotter == money,
-        "hitter-friendly park": isinstance(pf, (int, float)) and pf > 1.0,
-        "handle share 65%+": isinstance(mpct, (int, float)) and mpct >= 65,
+        "ticket majority is the money side": side_of(chk.get("majority_side")),
+        "public edge flagged": bool(pc.get("public_edge")),
+        # --- the model and its parts
+        "money side has the stat edge": money_is_adv,
+        "stat edge is strong": bool(pc.get("edge_strong")),
+        "money side has the starter BvP": b.get("edge_team") == money,
+        "money side has the bullpen BvP": bp.get("edge_team") == money,
+        "money side has hotter bats": cmp_side(dh, da),
+        "money side has the hot bats": cmp_side(hot_h, hot_a),
+        "money side more consistent": cmp_side(ch, ca),
+        "money side has the better record": cmp_side(rh, ra),
+        "form edge present": pc.get("form_edge") is not None,
+        "sharp money flagged": bool(pc.get("sharp_money")),
+        "pitching dog": bool(pc.get("pitching_dog")),
+        "starter dog edge": bool(pc.get("sp_dog_edge")),
+        "3+ signals hit": isinstance(pc.get("signals_hit"), int) and pc["signals_hit"] >= 3,
+        "2+ consistency hits": isinstance(pc.get("consistency_hits"), int) and pc["consistency_hits"] >= 2,
+        "confidence above 0.3": isinstance(conf, (int, float)) and conf >= 0.3,
+        "board's fair price likes the money": (
+            isinstance(fair, int) and _implied(fair) > _implied(price[money])),
+        # --- the book
         "book looks fooled": bool(stance.get("fooled")),
-        "ticket majority is the money side": maj_team == money,
+        "book stance against us": bool(stance.get("against_us")),
+        # --- the other venue
+        "Polymarket drifts to the money": (
+            bool(mm) and ((mm["drift"] > 0) == money_is_adv)),
+        "Polymarket size leans money": (
+            bool(mm) and ((mm["imbalance"] > 0) == money_is_adv)),
+        "PM quote beats the book": pmq.get("vs_book") == "better",
+        # --- conditions
+        "hitter-friendly park": isinstance(pf, (int, float)) and pf > 1.0,
+        "pitcher-friendly park": isinstance(pf, (int, float)) and pf < 1.0,
+        "warm (75F+)": isinstance(temp, (int, float)) and temp >= 75,
+        "windy (10mph+)": isinstance(windmph, (int, float)) and windmph >= 10,
+        "umpire favours hitters": isinstance(ump.get("k_per_g"), (int, float)) and ump["k_per_g"] < 0,
+        # --- venue
+        "money side is home": money_is_home,
     }
 
 
@@ -131,6 +189,7 @@ def collect() -> list[dict]:
         date = Path(f).stem.split("picks_")[1]
         try:
             results = mlb_api.results_for(date)
+            metrics = C.book_metrics(date)
         except Exception as exc:
             log.warning("%s: results unavailable (%s)", date, exc)
             continue
@@ -163,9 +222,15 @@ def collect() -> list[dict]:
                 "date": date, "winner": res["winner"], "price": price,
                 "money": money, "other": other,
                 "p_money": (_implied(price[money]) / tot),
-                "cond": _conditions(g, money, other, price, adv, home),
+                "cond": _conditions(g, money, other, price, adv, home,
+                                    metrics.get(g.get("game_pk"))),
             })
     return rows
+
+
+def _members(rows, keys) -> list[int]:
+    return [i for i, r in enumerate(rows)
+            if all(r["cond"].get(k) for k in keys)]
 
 
 def _cell(rows, keys, fade=False):
@@ -240,15 +305,16 @@ def build() -> str:
 
     names = list(next(iter(rows))["cond"])
     combos = [()] + [(k,) for k in names] + list(itertools.combinations(names, 2))
-    cells = []
+    cells, combo_keys = [], []
     for keys in combos:
         for fade in (False, True):
-            s = _cell(rows, keys, fade)
-            if len(s) >= MIN_CELL:
+            cell = _cell(rows, keys, fade)
+            if len(cell) >= MIN_CELL:
                 label = ("fade the money" if fade else "back the money")
                 if keys:
                     label += " WHEN " + " AND ".join(keys)
-                cells.append((label, s))
+                cells.append((label, cell))
+                combo_keys.append((keys, fade))
 
     base_b, base_f = _cell(rows, ()), _cell(rows, (), fade=True)
     md += ["## The anchor, before any filter", "",
@@ -276,21 +342,48 @@ def build() -> str:
            "Whether any of them is real is the next section, and the answer "
            "is almost always no._", ""]
 
-    plan = [[(grade.american_profit(x["odds"]), x["p"]) for x in s]
-            for _, s in cells]
+    # --- the null, simulated PER GAME rather than per cell ---------------
+    # These cells overlap heavily - a game sits in dozens of them - and back
+    # and fade on the same game are perfectly anti-correlated. Drawing each
+    # cell independently, as signal_sweep does, would break both relationships
+    # and overstate the spread of the maximum. Here each TRIAL simulates every
+    # game once at its own market price, and every cell reads that same
+    # simulated slate, so the correlation structure of the search is preserved.
+    pb = [grade.american_profit(r["price"][r["money"]]) for r in rows]
+    pf_ = [grade.american_profit(r["price"][r["other"]]) for r in rows]
+    pm = [r["p_money"] for r in rows]
+    sim = [(_members(rows, keys), fade, len(_cell(rows, keys, fade)))
+           for keys, fade in combo_keys]
     rng = random.Random(SEED)
     hi, lo = [], []
     for _ in range(TRIALS):
-        vals = [sum(w if rng.random() < p else -1 for w, p in pl) / len(pl)
-                for pl in plan]
-        hi.append(max(vals) * 100)
-        lo.append(min(vals) * 100)
+        won = [rng.random() < q for q in pm]
+        back = [pb[i] if won[i] else -1.0 for i in range(len(rows))]
+        fade_p = [-1.0 if won[i] else pf_[i] for i in range(len(rows))]
+        best = -9e9
+        worst = 9e9
+        for idx, fade, n in sim:
+            arr = fade_p if fade else back
+            v = 0.0
+            for i in idx:
+                v += arr[i]
+            v = v / n * 100
+            if v > best:
+                best = v
+            if v < worst:
+                worst = v
+        hi.append(best)
+        lo.append(worst)
     best_l, best_s = ranked[0]
     worst_l, worst_s = ranked[-1]
     obs_hi, obs_lo = _roi(best_s) * 100, _roi(worst_s) * 100
     p_hi = (sum(1 for x in hi if x >= obs_hi) + 1) / (TRIALS + 1)
     p_lo = (sum(1 for x in lo if x <= obs_lo) + 1) / (TRIALS + 1)
     md += ["## Corrected for the width of the search", "",
+           "_Each trial simulates every game once at its market price and "
+           "scores all cells on that same slate, so the heavy overlap between "
+           "cells — and the fact that back and fade on one game cannot both "
+           "win — is preserved rather than assumed away._", "",
            f"- best: **{best_l}** at {obs_hi:+.1f}% (n={len(best_s)}) · "
            f"a redraw's best reaches {st.median(hi):+.1f}% median, "
            f"{sorted(hi)[int(.95*len(hi))]:+.1f}% at the 95th · "
