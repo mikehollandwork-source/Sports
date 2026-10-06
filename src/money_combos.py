@@ -404,6 +404,30 @@ def build() -> str:
         if min(len(a), len(b)) >= 20:
             md.append(f"- split-half of **{lbl}**: {_fmt(a)} (n={len(a)}) "
                       f"against {_fmt(b)} (n={len(b)})")
+    # Why does the top of the list look the way it does? If the leaders are
+    # mostly plus-money bets, their ROI simply has a fatter right tail at small
+    # n, and the ranking is reporting variance rather than edge.
+    def _price_profile(cs):
+        odds = [x["odds"] for _, c in cs for x in c]
+        if not odds:
+            return "—"
+        plus = sum(1 for o in odds if o > 0) / len(odds)
+        return (f"{plus:.0%} plus-money, median price "
+                f"{sorted(odds)[len(odds)//2]:+d}")
+    top10 = ranked[:10]
+    fades = sum(1 for lbl, _ in top10 if lbl.startswith("fade"))
+    md += ["## Is the top of the list just variance?", "",
+           f"- of the ten best cells, **{fades} are fades**",
+           f"- those ten cells: {_price_profile(top10)}",
+           f"- all {len(cells)} cells: {_price_profile(cells)}",
+           f"- bare back the money: {_price_profile([('b', base_b)])}",
+           f"- bare fade the money: {_price_profile([('f', base_f)])}",
+           "",
+           "_A plus-money bet returns more than it risks, so at small n its "
+           "ROI has a long right tail. If the leaderboard is mostly fades on "
+           "plus-money prices, the ranking is sorting on variance, not edge — "
+           "which is exactly what the correction above is for._", ""]
+
     md += ["", "## How to read this", "",
            "- the corrected p is the whole answer; an uncorrected +15% from a "
            "274-cell search is the expected best from noise, not an edge",
