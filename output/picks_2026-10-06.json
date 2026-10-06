@@ -1,6 +1,6 @@
 {
   "date": "2026-10-06",
-  "generated_at": "2026-10-06T05:02:32.504899+00:00",
+  "generated_at": "2026-10-06T06:03:51.187564+00:00",
   "games": [
     {
       "game_pk": 849819,
@@ -13,7 +13,7 @@
       "statistical_advantage": {
         "team": "Los Angeles Dodgers",
         "home_score": 0.2581,
-        "away_score": 0.34152244444444446,
+        "away_score": 0.33938044444444443,
         "home": {
           "name": "Atlanta Braves",
           "probable_pitcher": "Chris Sale",
@@ -109,15 +109,19 @@
           "consensus": {
             "pick": "Atl",
             "pcts": {
-              "Lad": 42.0,
-              "Atl": 58.0
+              "Lad": 43.0,
+              "Atl": 57.0
             }
           },
-          "forum": null,
-          "agree": null,
-          "forum_lean": null,
-          "consensus_lean": 0.16,
-          "blended_lean": 0.16,
+          "forum": {
+            "pick": "Atlanta Braves",
+            "home": 2,
+            "away": 1
+          },
+          "agree": true,
+          "forum_lean": 0.333,
+          "consensus_lean": 0.14,
+          "blended_lean": 0.272,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -142,21 +146,24 @@
             "agrees": true
           },
           {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "polymarket_bets",
             "side": "away",
             "agrees": false
           }
         ],
         "majority_side": "home",
-        "agree": 1,
+        "agree": 2,
         "dissent": 1,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (polymarket_bets differ)",
-        "flags": [
-          "reverse line move \u2014 money went against the public %"
-        ],
-        "line": "against public",
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "2/3 sources agree (polymarket_bets differ)",
+        "flags": [],
+        "line": "flat",
         "money": "unknown",
         "money_side": null
       },
@@ -237,13 +244,13 @@
       "betting_lines": {
         "majority": {
           "team": "Atlanta Braves",
-          "consensus_pct": 58.0,
-          "moneyline": "-108"
+          "consensus_pct": 57.0,
+          "moneyline": "+100"
         },
         "non_majority": {
           "team": "Los Angeles Dodgers",
-          "consensus_pct": 42.0,
-          "moneyline": "-111"
+          "consensus_pct": 43.0,
+          "moneyline": "-104"
         }
       },
       "consistency": {
@@ -397,19 +404,19 @@
         "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Los Angeles Dodgers",
         "public_edge": true,
-        "public_trusted": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.151,
+        "confidence": 0.193,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.083,
-            "strength": 0.209,
+            "margin": 0.081,
+            "strength": 0.203,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.16,
-            "strength": 0.08,
+            "blended_lean": 0.272,
+            "strength": 0.181,
             "weight": 0.45
           },
           "consistency": {
@@ -418,14 +425,14 @@
           }
         },
         "consistency_hits": 3,
-        "advantage_moneyline": -110,
-        "opponent_moneyline": -109,
+        "advantage_moneyline": -104,
+        "opponent_moneyline": -115,
         "line_check": {
           "open": -102,
-          "current": -110,
-          "implied_shift": 0.019,
+          "current": -104,
+          "implied_shift": 0.005,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-102\u2192-110, +1.9%)"
+          "reason": "only a slight move our way, below the 2% signal floor (-102\u2192-104, +0.5%)"
         },
         "form_edge": null,
         "form_gap": 0.009,
@@ -433,22 +440,20 @@
         "sp_dog_edge": -1.095,
         "pitching_dog": false,
         "signals_hit": 3,
-        "public_pct_against": 54,
+        "public_pct_against": 58,
         "book_stance": {
-          "side": "Los Angeles Dodgers",
+          "side": null,
           "against_us": false,
-          "tells": [
-            "reverse line move"
-          ],
-          "strength": 1,
-          "fooled": true
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Los Angeles Dodgers",
-          "odds": -110,
+          "odds": -104,
           "basis": "ticket %",
-          "hold_home": -247890,
-          "hold_away": 852727
+          "hold_home": -575894,
+          "hold_away": 1217821
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -456,14 +461,14 @@
         "pm_quote": {
           "pm_pct": 50,
           "pm_american": -100,
-          "edge_pts": 2.4,
+          "edge_pts": 1.0,
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 52.5,
+          "win_prob": 52.4,
           "fair_american": -110
         },
-        "line_vs_money": "against",
+        "line_vs_money": "flat",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": [],
@@ -474,10 +479,10 @@
       "pick": null,
       "game_datetime": "2026-10-06T22:00:00Z",
       "weather": {
-        "temp_f": 74,
+        "temp_f": 73,
         "wind_mph": 4,
-        "wind_dir": "ENE",
-        "wind_deg": 72,
+        "wind_dir": "E",
+        "wind_deg": 83,
         "precip_pct": 0,
         "roof": "open"
       },
@@ -731,12 +736,12 @@
         "majority": {
           "team": "San Diego Padres",
           "consensus_pct": 63.0,
-          "moneyline": "-127"
+          "moneyline": "-137"
         },
         "non_majority": {
           "team": "Milwaukee Brewers",
           "consensus_pct": 37.0,
-          "moneyline": "+125"
+          "moneyline": "+110"
         }
       },
       "consistency": {
@@ -911,15 +916,15 @@
           }
         },
         "consistency_hits": 4,
-        "advantage_moneyline": -144,
-        "opponent_moneyline": 119,
+        "advantage_moneyline": -136,
+        "opponent_moneyline": 113,
         "line_check": {
           "open": -121,
-          "current": -144,
-          "implied_shift": 0.043,
+          "current": -136,
+          "implied_shift": 0.029,
           "status": "confirms",
           "tier": "moderate",
-          "reason": "moderate sharp move toward the pick (-121\u2192-144, +4.3%)"
+          "reason": "moderate sharp move toward the pick (-121\u2192-136, +2.9%)"
         },
         "form_edge": true,
         "form_gap": 0.028,
@@ -936,10 +941,10 @@
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": 119,
+          "odds": 113,
           "basis": "ticket %",
-          "hold_home": 1944,
-          "hold_away": 714700
+          "hold_home": -166765,
+          "hold_away": 886900
         },
         "play": "stay_away",
         "starred": [],
@@ -948,7 +953,7 @@
         "pm_quote": {
           "pm_pct": 55,
           "pm_american": -122,
-          "edge_pts": 4.0,
+          "edge_pts": 2.6,
           "vs_book": "better"
         },
         "projected": {
