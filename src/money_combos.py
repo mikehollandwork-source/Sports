@@ -404,9 +404,11 @@ def build() -> str:
         if min(len(a), len(b)) >= 20:
             md.append(f"- split-half of **{lbl}**: {_fmt(a)} (n={len(a)}) "
                       f"against {_fmt(b)} (n={len(b)})")
-    # Why does the top of the list look the way it does? If the leaders are
-    # mostly plus-money bets, their ROI simply has a fatter right tail at small
-    # n, and the ranking is reporting variance rather than edge.
+    # Why does the top of the list look the way it does? Every condition set
+    # is entered TWICE, as back and as fade, and the two are mirror images -
+    # on the same games they sum to the hold paid twice. So the leaderboard is
+    # a mirrored list, and the direction label on its top rows carries no
+    # information at all.
     def _price_profile(cs):
         odds = [x["odds"] for _, c in cs for x in c]
         if not odds:
@@ -416,17 +418,30 @@ def build() -> str:
                 f"{sorted(odds)[len(odds)//2]:+d}")
     top10 = ranked[:10]
     fades = sum(1 for lbl, _ in top10 if lbl.startswith("fade"))
-    md += ["## Is the top of the list just variance?", "",
+    mirrored = best_l.split(" WHEN ", 1)[-1] == worst_l.split(" WHEN ", 1)[-1]
+    md += ["## Why the leaderboard looks one-sided", "",
            f"- of the ten best cells, **{fades} are fades**",
-           f"- those ten cells: {_price_profile(top10)}",
+           "- but every condition set is entered **twice**, as back and as "
+           "fade, and the pair are mirror images: on the same games they sum "
+           "to the hold paid twice",
+           (f"- the best and worst cells are the SAME condition set "
+            f"({best_l.split(' WHEN ', 1)[-1]}) in opposite directions, "
+            f"{obs_hi:+.1f}% against {obs_lo:+.1f}% on the same "
+            f"{len(best_s)} games" if mirrored else
+            "- best and worst are different condition sets"),
+           "- so a top row being a fade means only that the money side LOST "
+           "in that cell. It is not evidence that fading works; the mirrored "
+           "back row is sitting at the bottom of the same list",
+           "",
+           "_A plausible alternative was that fades crowd the top because "
+           "they take plus-money prices, whose ROI has a long right tail at "
+           "small n. The data does not support that here:_", "",
+           f"- the ten best cells: {_price_profile(top10)}",
            f"- all {len(cells)} cells: {_price_profile(cells)}",
            f"- bare back the money: {_price_profile([('b', base_b)])}",
-           f"- bare fade the money: {_price_profile([('f', base_f)])}",
-           "",
-           "_A plus-money bet returns more than it risks, so at small n its "
-           "ROI has a long right tail. If the leaderboard is mostly fades on "
-           "plus-money prices, the ranking is sorting on variance, not edge — "
-           "which is exactly what the correction above is for._", ""]
+           f"- bare fade the money: {_price_profile([('f', base_f)])}", "",
+           "_The leaders are no more plus-money than the pool, so the "
+           "one-sidedness is the mirroring, not the price._", ""]
 
     md += ["", "## How to read this", "",
            "- the corrected p is the whole answer; an uncorrected +15% from a "
