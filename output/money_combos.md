@@ -50,16 +50,23 @@ _Each trial simulates every game once at its market price and scores all cells o
 
 **Nothing clears.** The best cell is inside what this search produces from noise, so there is no rule here to ship.
 
-- split-half of **fade the money WHEN money AGAINST tickets AND pitcher-friendly park**: 15-7 · **+30.7%** (n=22) against 17-6 · **+34.6%** (n=23)
-## Is the top of the list just variance?
+- split-half of **fade the money WHEN money AGAINST tickets AND pitcher-friendly park**: 17-5 · **+45.4%** (n=22) against 15-8 · **+20.6%** (n=23)
+- split-half of **back the money WHEN money AGAINST tickets AND pitcher-friendly park**: 6-16 · **-46.9%** (n=22) against 7-16 · **-35.7%** (n=23)
+## Why the leaderboard looks one-sided
 
 - of the ten best cells, **10 are fades**
-- those ten cells: 44% plus-money, median price -105
+- but every condition set is entered **twice**, as back and as fade, and the pair are mirror images: on the same games they sum to the hold paid twice
+- the best and worst cells are the SAME condition set (money AGAINST tickets AND pitcher-friendly park) in opposite directions, +32.7% against -41.1% on the same 45 games
+- so a top row being a fade means only that the money side LOST in that cell. It is not evidence that fading works; the mirrored back row is sitting at the bottom of the same list
+
+_A plausible alternative was that fades crowd the top because they take plus-money prices, whose ROI has a long right tail at small n. The data does not support that here:_
+
+- the ten best cells: 44% plus-money, median price -105
 - all 1506 cells: 47% plus-money, median price -105
 - bare back the money: 12% plus-money, median price -136
 - bare fade the money: 79% plus-money, median price +122
 
-_A plus-money bet returns more than it risks, so at small n its ROI has a long right tail. If the leaderboard is mostly fades on plus-money prices, the ranking is sorting on variance, not edge — which is exactly what the correction above is for._
+_The leaders are no more plus-money than the pool, so the one-sidedness is the mirroring, not the price._
 
 
 ## How to read this
