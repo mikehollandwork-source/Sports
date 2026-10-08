@@ -1,9 +1,6 @@
 name: Covers diagnostic
 on: {workflow_dispatch: {}}
 permissions: {contents: write}
-concurrency:
-  group: covers-diag
-  cancel-in-progress: false
 jobs:
   diag:
     runs-on: ubuntu-latest
@@ -14,28 +11,20 @@ jobs:
         with: {python-version: "3.11"}
       - run: pip install -r requirements.txt
       - name: Diagnose
-        env: {COVERS_DEBUG: "1"}
         run: python -m src.covers_diag
       - name: Commit
         if: always()
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # rebase FIRST, like source_health does: this branch takes a bot
-          # commit every few minutes and a push that races one is lost
-          git pull --rebase -X theirs origin "${{ github.ref_name }}" || true
           git add output/covers_diag.md
-          if ! git diff --staged --quiet; then
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
             git commit -m "covers diagnostic"
-            ok=0
             for i in 1 2 3 4; do
-              if git pull --rebase -X theirs origin "${{ github.ref_name }}" \
-                 && git push origin "HEAD:${{ github.ref_name }}"; then
-                ok=1; break
-              fi
-              sleep $((i * 5))
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
             done
-            # fail loudly rather than reporting success on a lost push
-            [ "$ok" = "1" ]
           fi
