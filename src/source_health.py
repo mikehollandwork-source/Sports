@@ -65,6 +65,10 @@ def _has_tickets(g: dict) -> bool:
 # VSIN coverage fell from 100% to 61% and a quarter of the slate stopped
 # clearing gate 1.
 USABLE_MONEY = ("with public", "against public")
+# "sources split" means two or more money sources DID return a side for this
+# game and disagreed. That is a real read arriving and failing to resolve, not
+# a feed that went quiet, and the two need different responses.
+ARRIVED_MONEY = USABLE_MONEY + ("sources split",)
 
 
 def _has_handle(g: dict) -> bool:
@@ -117,6 +121,19 @@ CHECKS = {
 }
 
 
+def _handle_arrived(g: dict) -> bool:
+    """Did any money source return a side for this game, usable or not?"""
+    return ((g.get("public_check") or {}).get("money") or "") in ARRIVED_MONEY
+
+
+# A dead row in the table is not automatically an outage. Where a probe exists
+# here, it answers the different question "did the data arrive at all", and
+# only a NO to that wakes anyone. Without it a one-game slate whose two money
+# sources happened to disagree reads 0/1 and fires the same alarm as a dead
+# feed - which is how an alert gets trained into noise.
+ARRIVED = {"handle (usable)": _handle_arrived}
+
+
 def assess(date: str | None = None) -> dict:
     date = date or dt.datetime.now(EASTERN).date().isoformat()
     path = OUTPUT_DIR / f"picks_{date}.json"
@@ -161,8 +178,18 @@ def assess(date: str | None = None) -> dict:
     out["dead"] = [k for k, v in out["sources"].items() if v["state"] == "dead"]
     out["degraded"] = [k for k, v in out["sources"].items()
                        if v["state"] == "degraded"]
+    # Split the dead rows: a feed that returned nothing is an outage, one that
+    # returned data the rule could not use is a judgement the rule made.
+    no_data, unresolved = [], []
+    for k in out["dead"]:
+        probe = ARRIVED.get(k)
+        if probe and any(probe(g) for g in games):
+            unresolved.append(k)      # data arrived, the rule could not use it
+        else:
+            no_data.append(k)         # nothing came back at all
+    out["no_data"], out["unresolved"] = no_data, unresolved
     # the case the board cannot report on its own
-    out["silent_failure"] = bool(out["dead"]) and picks == 0
+    out["silent_failure"] = bool(out["no_data"]) and picks == 0
     return out
 
 
@@ -173,7 +200,8 @@ def _append_history(rec: dict) -> None:
         hist = []
     hist = [h for h in hist if h.get("date") != rec.get("date")]
     hist.append({k: rec.get(k) for k in
-                 ("date", "games", "picks", "dead", "degraded", "silent_failure")})
+                 ("date", "games", "picks", "dead", "no_data", "unresolved",
+                  "degraded", "silent_failure")})
     hist.sort(key=lambda h: h.get("date") or "")
     HISTORY.write_text(json.dumps(hist[-120:], indent=1))
 
@@ -191,14 +219,22 @@ def report(rec: dict) -> str:
         mark = {"ok": "✅", "degraded": "⚠️", "dead": "❌"}[v["state"]]
         md.append(f"| {label} | {v['have']}/{v['of']} ({v['pct']}%) | {mark} {v['state']} |")
     md.append("")
+    unres = rec.get("unresolved") or []
+    if unres:
+        md += [f"_Returned data the rule could not use: "
+               f"**{', '.join(unres)}**. Counted dead above, which measures "
+               "USABILITY by design, but the feed answered — for the handle "
+               "that means the money sources disagreed on the side. Not an "
+               "outage, and it does not alert._", ""]
     if rec.get("silent_failure"):
         md += ["## ❌ SILENT FAILURE", "",
-               f"The board shows **0 picks** while these inputs are dead: "
-               f"**{', '.join(rec['dead'])}**. That empty board is a data "
-               "outage, not a quiet slate - the two are indistinguishable from "
-               "the board alone, which is the reason this check exists.", ""]
-    elif rec.get("dead"):
-        md += [f"## ❌ Dead inputs: {', '.join(rec['dead'])}", "",
+               f"The board shows **0 picks** while these inputs returned "
+               f"nothing: **{', '.join(rec['no_data'])}**. That empty board is "
+               "a data outage, not a quiet slate - the two are "
+               "indistinguishable from the board alone, which is the reason "
+               "this check exists.", ""]
+    elif rec.get("no_data"):
+        md += [f"## ❌ Dead inputs: {', '.join(rec['no_data'])}", "",
                "Picks are still being produced, so the board is not empty - but "
                "it is running on fewer gates than it is supposed to.", ""]
     elif rec.get("degraded"):
