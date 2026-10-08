@@ -1,6 +1,6 @@
 {
   "date": "2026-10-08",
-  "generated_at": "2026-10-08T06:01:54.713237+00:00",
+  "generated_at": "2026-10-08T07:02:14.055440+00:00",
   "games": [
     {
       "game_pk": 849832,
@@ -115,7 +115,7 @@
           "agree": null,
           "forum_lean": 0.2,
           "consensus_lean": null,
-          "blended_lean": 0.254,
+          "blended_lean": 0.186,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -128,11 +128,6 @@
               "away": 52,
               "home": 48,
               "lean": -0.04
-            },
-            "scoresodds_bets": {
-              "away": 23,
-              "home": 77,
-              "lean": 0.54
             },
             "vsin_bets": {
               "away": 31,
@@ -150,11 +145,6 @@
             "agrees": true
           },
           {
-            "name": "scoresodds_bets",
-            "side": "home",
-            "agrees": true
-          },
-          {
             "name": "vsin_bets",
             "side": "home",
             "agrees": true
@@ -166,17 +156,18 @@
           }
         ],
         "majority_side": "home",
-        "agree": 3,
+        "agree": 2,
         "dissent": 1,
         "trusted": true,
         "verdict": "mostly agrees",
-        "note": "3/4 sources agree (polymarket_bets differ)",
+        "note": "2/3 sources agree (polymarket_bets differ)",
         "flags": [
-          "money sources disagree"
+          "money is on the other side from the public tickets"
         ],
         "line": "flat",
-        "money": "sources split",
-        "money_side": null
+        "money": "against public",
+        "money_side": "away",
+        "money_pct": 58
       },
       "bvp": {
         "home_eff": 0.691,
@@ -401,7 +392,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (sources split) \u2014 no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Chicago White Sox",
         "public_edge": false,
         "public_trusted": true,
@@ -415,7 +406,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.254,
+            "blended_lean": 0.186,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -436,28 +427,29 @@
         },
         "form_edge": null,
         "form_gap": -0.009,
-        "sharp_money": null,
+        "sharp_money": false,
         "sp_dog_edge": 0.529,
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Cleveland Guardians",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
-          "bet": "Cleveland Guardians",
-          "odds": -117,
-          "basis": "ticket %",
-          "hold_home": -1760534,
-          "hold_away": 2261239
+          "bet": "Chicago White Sox",
+          "odds": -103,
+          "basis": "money %",
+          "hold_home": 1205631,
+          "hold_away": -530085
         },
         "play": "stay_away",
-        "starred": [],
-        "win_prob": 76,
-        "win_driver": "bvp + consistency + favorite",
+        "stay_bet": null,
+        "stay_odds": null,
         "pm_quote": {
           "pm_pct": 48,
           "pm_american": 108,
@@ -471,6 +463,7 @@
         "line_vs_money": "against",
         "bet_team": null,
         "bet_moneyline": null,
+        "starred": [],
         "good_dog": null,
         "line_money": null
       },
@@ -481,7 +474,7 @@
         "temp_f": 60,
         "wind_mph": 4,
         "wind_dir": "E",
-        "wind_deg": 84,
+        "wind_deg": 90,
         "precip_pct": 2,
         "roof": "open"
       },
