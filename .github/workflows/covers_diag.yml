@@ -1,0 +1,22 @@
+name: Covers diagnostic
+on: {workflow_dispatch: {}}
+permissions: {contents: write}
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - run: python -m src.covers_diag
+        env: {COVERS_DEBUG: "1"}
+      - if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/covers_diag.md
+          git diff --staged --quiet || { git commit -m "covers diagnostic"; \
+            for i in 1 2 3 4; do git pull --rebase origin "${{ github.ref_name }}" \
+              && git push origin "HEAD:${{ github.ref_name }}" && break; sleep 5; done; }
