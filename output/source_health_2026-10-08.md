@@ -1,6 +1,6 @@
 # Source health — 2026-10-08
 
-- board generated: `2026-10-08T22:25:33.838229+00:00`
+- board generated: `2026-10-08T22:32:11.606995+00:00`
 - games on slate: **1** · picks: **0**
 
 | input | games covered | state |
@@ -15,6 +15,8 @@
 | src: scoresodds_bets | 1/1 (100%) | ✅ ok |
 | src: vsin_bets | 1/1 (100%) | ✅ ok |
 
-## ❌ SILENT FAILURE
+_Returned data the rule could not use: **handle (usable)**. Counted dead above, which measures USABILITY by design, but the feed answered — for the handle that means the money sources disagreed on the side. Not an outage, and it does not alert._
 
-The board shows **0 picks** while these inputs are dead: **handle (usable)**. That empty board is a data outage, not a quiet slate - the two are indistinguishable from the board alone, which is the reason this check exists.
+## ✅ All inputs healthy
+
+An empty board today would be a genuinely quiet slate.
