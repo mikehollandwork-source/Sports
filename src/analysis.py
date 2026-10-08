@@ -1130,13 +1130,27 @@ def _matches(game: Game, names: list[str]) -> bool:
 def _name_hit(team: Team, names: list[str]) -> bool:
     """True if any covers label identifies this team. covers uses abbreviations
     (e.g. 'Bos'), so match team.abbreviation as an exact token first, then fall
-    back to the nickname as a substring."""
-    names_l = [n.lower() for n in names]
-    abbr = (team.abbreviation or "").lower()
+    back to the nickname as a substring.
+
+    Both sides go through `_canon_abbr`, because covers and MLB disagree on
+    eight clubs - covers writes Chw, Sdp, Sfg, Tbr, Kcr, Az, Was/Wsn where MLB
+    has CWS, SD, SF, TB, KC, ARI, WSH. Without this the row is silently
+    discarded for every game involving one of them: on 2026-10-08 a one-game
+    slate of Cle @ Chw read "covers tickets 0/1" and the board posted no play,
+    which source_health correctly flagged as an outage. The fetch and the
+    selectors were fine the whole time.
+
+    The nickname fallback cannot rescue those: it takes the LAST word of the
+    team name, so Chicago White Sox looks for "sox" in a list of abbreviations
+    and finds nothing. (It is also ambiguous between the two Sox, which is a
+    separate reason not to lean on it.)
+    """
+    names_l = {_canon_abbr(n) for n in names}
+    abbr = _canon_abbr(team.abbreviation or "")
     if abbr and abbr in names_l:
         return True
     nick = team.name.lower().split()[-1] if team.name else ""
-    return bool(nick) and nick in " ".join(names_l)
+    return bool(nick) and nick in " ".join(n.lower() for n in names)
 
 
 def _resolve(game: Game, label: str) -> Team:

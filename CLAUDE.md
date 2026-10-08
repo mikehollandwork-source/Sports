@@ -116,6 +116,19 @@ unit-testable with mock `Game`/`Team` objects.
 - **covers.com selectors are best-effort and unverified** — they will likely need
   tweaking after the first live run. All covers parsers fail *soft* (log a warning,
   return empty) so MLB-stats analysis still produces output.
+- **Any covers↔MLB team match MUST go through `analysis._canon_abbr`.** The two
+  disagree on eight clubs (covers: Chw, Sdp, Sfg, Tbr, Kcr, Az, Was/Wsn — MLB:
+  CWS, SD, SF, TB, KC, ARI, WSH). `find_slate_line` canonicalised; `_name_hit`
+  did not, so `_match_consensus` silently dropped the covers row for every game
+  involving one of those teams. Measured cost before the fix: consensus missing
+  on **36% of the 447 games involving an aliased club against 8% elsewhere** —
+  roughly 125 games that lost their ticket % and handle read all season. It
+  surfaced on 2026-10-08 when a one-game slate of Cle @ Chw reported "covers
+  tickets 0/1" and the board posted no play; `source_health` correctly called it
+  an outage while the fetch and the selectors had been fine throughout. The
+  nickname fallback cannot cover for this — it takes the LAST word of the team
+  name, so Chicago White Sox hunts for "sox" among abbreviations, and it is
+  ambiguous between the two Sox anyway.
 - **The advantage metric is documented in `src/analysis.py`** (and the README) and
   is meant to be tuned. All weights, league baselines, and the wOBA/FIP constants
   live at the top of `analysis.py` — keep the formula in one place. It is
