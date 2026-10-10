@@ -1,6 +1,6 @@
 {
   "date": "2026-10-10",
-  "generated_at": "2026-10-10T20:02:02.712225+00:00",
+  "generated_at": "2026-10-10T21:01:54.708851+00:00",
   "games": [
     {
       "game_pk": 849831,
@@ -12,7 +12,7 @@
       "park_factor": 0.99,
       "statistical_advantage": {
         "team": "Cleveland Guardians",
-        "home_score": 0.328895,
+        "home_score": 0.33299,
         "away_score": 0.0201,
         "home": {
           "name": "Cleveland Guardians",
@@ -104,7 +104,7 @@
         }
       },
       "public_majority": {
-        "team": "Cleveland Guardians",
+        "team": "Chicago White Sox",
         "detail": {
           "consensus": {
             "pick": "Cle",
@@ -115,13 +115,13 @@
           },
           "forum": {
             "pick": "Chicago White Sox",
-            "home": 6,
-            "away": 7
+            "home": 7,
+            "away": 10
           },
           "agree": false,
-          "forum_lean": -0.077,
+          "forum_lean": -0.176,
           "consensus_lean": 0.08,
-          "blended_lean": 0.03,
+          "blended_lean": -0.011,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -153,35 +153,35 @@
           {
             "name": "covers",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "forum",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "vsin_bets",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 3,
-        "dissent": 2,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "3/5 sources agree (forum, vsin_bets differ)",
+        "majority_side": "away",
+        "agree": 2,
+        "dissent": 3,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets, polymarket_bets differ)",
         "flags": [
           "money sources disagree"
         ],
@@ -265,14 +265,14 @@
       },
       "betting_lines": {
         "majority": {
+          "team": "Chicago White Sox",
+          "consensus_pct": 46.0,
+          "moneyline": "+124"
+        },
+        "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 54.0,
           "moneyline": "-135"
-        },
-        "non_majority": {
-          "team": "Chicago White Sox",
-          "consensus_pct": 46.0,
-          "moneyline": "+125"
         }
       },
       "consistency": {
@@ -425,20 +425,20 @@
         "status": "PICK",
         "reason": "fade \u2014 standing bet on Chicago White Sox",
         "advantage_team": "Cleveland Guardians",
-        "public_edge": false,
-        "public_trusted": true,
+        "public_edge": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.425,
+        "confidence": 0.432,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.309,
-            "strength": 0.772,
+            "margin": 0.313,
+            "strength": 0.782,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.03,
-            "strength": 0.0,
+            "blended_lean": -0.011,
+            "strength": 0.004,
             "weight": 0.45
           },
           "consistency": {
@@ -448,7 +448,7 @@
         },
         "consistency_hits": 2,
         "advantage_moneyline": -143,
-        "opponent_moneyline": 118,
+        "opponent_moneyline": 119,
         "line_check": {
           "open": -151,
           "current": -143,
@@ -467,6 +467,7 @@
         "sp_dog_edge": 0.288,
         "pitching_dog": false,
         "signals_hit": 2,
+        "public_pct_against": 49,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -478,8 +479,8 @@
           "bet": "Cleveland Guardians",
           "odds": -143,
           "basis": "ticket %",
-          "hold_home": 763305,
-          "hold_away": -259065
+          "hold_home": 881718,
+          "hold_away": -444969
         },
         "play": "pick",
         "stay_bet": null,
@@ -491,12 +492,12 @@
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 59.3,
+          "win_prob": 59.4,
           "fair_american": -146
         },
-        "line_vs_money": "against",
+        "line_vs_money": "with",
         "bet_team": "Chicago White Sox",
-        "bet_moneyline": 118,
+        "bet_moneyline": 119,
         "starred": [],
         "good_dog": null,
         "line_money": null,
@@ -631,15 +632,15 @@
           "player_id": 808959,
           "team": "Chicago White Sox",
           "market": "1+ home run",
-          "p_game": 0.2607,
+          "p_game": 0.2389,
           "season": "35/553",
           "recent": "4/68",
           "iso": 0.271,
           "pitcher_factor": 0.99,
           "park": 0.97,
-          "wind": "8 mph out (x1.09)",
-          "temp": "67F (x0.99)",
-          "wind_factor": 1.09,
+          "wind": "no readable wind",
+          "temp": "64F (x0.98)",
+          "wind_factor": 1.0,
           "slot": 4,
           "expected_pa": 4.35,
           "form_factor": 0.91,
@@ -655,7 +656,7 @@
           "pool": "both lineups",
           "considered": 10,
           "runner_up": "Travis Bazzana",
-          "runner_up_p": 0.2127,
+          "runner_up_p": 0.1948,
           "our_side": true,
           "short_night_rate": 0.004,
           "mean_pa_per_start": 4.48,
@@ -674,11 +675,11 @@
       "pick": null,
       "game_datetime": "2026-10-11T00:00:00Z",
       "weather": {
-        "temp_f": 67,
-        "wind_mph": 8,
-        "wind_dir": "SE",
-        "wind_deg": 125,
-        "precip_pct": 1,
+        "temp_f": 64,
+        "wind_mph": 6,
+        "wind_dir": "ESE",
+        "wind_deg": 122,
+        "precip_pct": 2,
         "roof": "open"
       },
       "umpire_hp": "Vic Carapazza",
