@@ -1,6 +1,6 @@
 {
   "date": "2026-10-10",
-  "generated_at": "2026-10-10T04:02:22.320296+00:00",
+  "generated_at": "2026-10-10T05:02:28.173652+00:00",
   "games": [
     {
       "game_pk": 849831,
@@ -121,7 +121,7 @@
           "agree": null,
           "forum_lean": 0.0,
           "consensus_lean": 0.14,
-          "blended_lean": 0.107,
+          "blended_lean": 0.113,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -136,9 +136,9 @@
               "lean": 0.12
             },
             "vsin_bets": {
-              "away": 47,
-              "home": 53,
-              "lean": 0.06
+              "away": 46,
+              "home": 54,
+              "lean": 0.08
             }
           }
         }
@@ -168,13 +168,12 @@
         "verdict": "corroborated",
         "note": "all 3 sources agree on the public side",
         "flags": [
-          "money is on the other side from the public tickets",
           "reverse line move \u2014 money went against the public %"
         ],
         "line": "against public",
-        "money": "against public",
-        "money_side": "away",
-        "money_pct": 53
+        "money": "with public",
+        "money_side": "home",
+        "money_pct": 67
       },
       "bvp": {
         "home_eff": 0.709,
@@ -254,12 +253,12 @@
         "majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 57.0,
-          "moneyline": "-150"
+          "moneyline": "-139"
         },
         "non_majority": {
           "team": "Chicago White Sox",
           "consensus_pct": 43.0,
-          "moneyline": "+105"
+          "moneyline": "+115"
         }
       },
       "consistency": {
@@ -409,8 +408,8 @@
         }
       },
       "pick_criteria": {
-        "status": "stay_away",
-        "reason": "no handle/ticket agreement (against public) \u2014 no play",
+        "status": "pick",
+        "reason": "handle+tickets agree, line moved against us",
         "advantage_team": "Cleveland Guardians",
         "public_edge": false,
         "public_trusted": true,
@@ -424,7 +423,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.107,
+            "blended_lean": 0.113,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -453,20 +452,19 @@
           "side": "Chicago White Sox",
           "against_us": true,
           "tells": [
-            "money vs tickets",
             "reverse line move"
           ],
-          "strength": 2,
+          "strength": 1,
           "fooled": true
         },
         "vegas": {
-          "bet": "Cleveland Guardians",
-          "odds": -137,
+          "bet": "Chicago White Sox",
+          "odds": 114,
           "basis": "money %",
-          "hold_home": 1308540,
-          "hold_away": -939400
+          "hold_home": -1113358,
+          "hold_away": 2056600
         },
-        "play": "stay_away",
+        "play": "pick",
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
@@ -480,11 +478,192 @@
           "fair_american": -146
         },
         "line_vs_money": "against",
-        "bet_team": null,
-        "bet_moneyline": null,
+        "bet_team": "Cleveland Guardians",
+        "bet_moneyline": -137,
         "starred": [],
+        "consensus": {
+          "drift": 0.0,
+          "imbalance": -0.42,
+          "line": "against"
+        },
+        "win_prob": 68,
+        "win_driver": "consensus",
         "good_dog": null,
-        "line_money": null
+        "line_money": {
+          "team": "Cleveland Guardians",
+          "odds": -137,
+          "move": 0.024,
+          "strong": false,
+          "line_team": "Chicago White Sox"
+        },
+        "opp_starter": "Sean Burke",
+        "prop": {
+          "player": "Chase DeLauter",
+          "player_id": 800050,
+          "hit_rate": 68,
+          "all_rate": 66,
+          "gap": 2,
+          "form": 14,
+          "super_hot": false,
+          "bvp": {
+            "pa": 5,
+            "ops": 0.65
+          },
+          "wins_played": 72,
+          "games_played": 137,
+          "avg_pa": 4.2,
+          "short_night_rate": 0.063,
+          "mean_pa_per_start": 4.34,
+          "short_nights": "7/131 starts of 3 PA or fewer",
+          "platoon": {
+            "hand": "R",
+            "avg": 0.269,
+            "pa": 380,
+            "delta": -0.017,
+            "shrunk": -0.0097
+          },
+          "odds": -217,
+          "fit": 2,
+          "prop_score": 0.7283,
+          "selector": "all_rate+form+bvp+fit+platoon"
+        },
+        "shadow_hrr": {
+          "player": "Chase DeLauter",
+          "player_id": 800050,
+          "market": "hits+runs+RBIs over 1.5",
+          "over": -117,
+          "under": -114,
+          "bet": false
+        },
+        "hit_bats": [
+          {
+            "player": "Chase DeLauter",
+            "player_id": 800050,
+            "hit_rate": 68,
+            "all_rate": 66,
+            "gap": 2,
+            "form": 14,
+            "super_hot": false,
+            "bvp": {
+              "pa": 5,
+              "ops": 0.65
+            },
+            "wins_played": 72,
+            "games_played": 137,
+            "avg_pa": 4.2,
+            "short_night_rate": 0.063,
+            "mean_pa_per_start": 4.34,
+            "short_nights": "7/131 starts of 3 PA or fewer",
+            "platoon": {
+              "hand": "R",
+              "avg": 0.269,
+              "pa": 380,
+              "delta": -0.017,
+              "shrunk": -0.0097
+            },
+            "odds": -217,
+            "fit": 2,
+            "prop_score": 0.7283,
+            "selector": "all_rate+form+bvp+fit+platoon"
+          },
+          {
+            "player": "Jo Adell",
+            "player_id": 666176,
+            "hit_rate": 70,
+            "all_rate": 60,
+            "gap": 10,
+            "form": 20,
+            "super_hot": true,
+            "bvp": {
+              "pa": 7,
+              "ops": 0.572
+            },
+            "wins_played": 33,
+            "games_played": 163,
+            "avg_pa": 4.4,
+            "short_night_rate": 0.079,
+            "mean_pa_per_start": 4.23,
+            "short_nights": "18/155 starts of 3 PA or fewer",
+            "platoon": {
+              "hand": "R",
+              "avg": 0.209,
+              "pa": 469,
+              "delta": -0.032,
+              "shrunk": -0.0196
+            },
+            "fit": 0
+          },
+          {
+            "player": "Angel Genao",
+            "player_id": 694197,
+            "hit_rate": 40,
+            "all_rate": 45,
+            "gap": -5,
+            "form": -5,
+            "super_hot": false,
+            "bvp": {
+              "pa": 0,
+              "ops": 0.0
+            },
+            "wins_played": 25,
+            "games_played": 42,
+            "avg_pa": 3.3,
+            "short_night_rate": 0.13,
+            "mean_pa_per_start": 4.06,
+            "short_nights": "4/33 starts of 3 PA or fewer",
+            "platoon": {
+              "hand": "R",
+              "avg": 0.218,
+              "pa": 95,
+              "delta": 0.006,
+              "shrunk": 0.0014
+            },
+            "fit": 4
+          }
+        ],
+        "hr_prop": {
+          "player": "Munetaka Murakami",
+          "player_id": 808959,
+          "team": "Chicago White Sox",
+          "market": "1+ home run",
+          "p_game": 0.2654,
+          "season": "35/553",
+          "recent": "4/68",
+          "iso": 0.271,
+          "pitcher_factor": 0.99,
+          "park": 0.97,
+          "wind": "10 mph out (x1.14)",
+          "temp": "70F (x1.00)",
+          "wind_factor": 1.14,
+          "slot": 10,
+          "expected_pa": 4.2,
+          "form_factor": 0.91,
+          "form": "air 45% vs 49% own, ISO 0.246 vs 0.271 -> x0.91",
+          "trend_factor": 1.0,
+          "trend": "trend window too thin",
+          "win_factor": 0.97,
+          "win": "p(win) 45% (x0.97)",
+          "vs_hand": "28/384 vs RHP",
+          "opposing": "1.32 HR/9 over 190 IP, 0.59 over last 3 starts (1 HR / 15.3 IP, x20%) -> 1.17 HR/9 x85% + bullpen 0.97 HR/9 x15% -> x0.99",
+          "bullpen_ip": 546.7,
+          "floor": 0.1211,
+          "pool": "both lineups",
+          "considered": 11,
+          "runner_up": "Angel Mart\u00ednez",
+          "runner_up_p": 0.2301,
+          "our_side": false,
+          "short_night_rate": 0.004,
+          "mean_pa_per_start": 4.48,
+          "short_nights": "2 of 124 starts ended in 3 PA or fewer (0%), 4.48 PA per start",
+          "pitch_mix": {
+            "starter_fastball_share": 0.485,
+            "hitter_fastball_tilt": 0.09,
+            "hitter_fastball_hr": "21/35",
+            "multiplier_not_applied": 0.9981,
+            "note": "starter ends 49% of PA on fastballs (lg 56%) \u00b7 hitter +0.09 fastball tilt (21 of 35 HR) \u2192 neutral, \u00d70.998 if it were applied"
+          },
+          "odds": 370
+        }
       },
       "flagged": false,
       "pick": null,
@@ -494,7 +673,7 @@
         "wind_mph": 10,
         "wind_dir": "SE",
         "wind_deg": 133,
-        "precip_pct": 2,
+        "precip_pct": 3,
         "roof": "open"
       },
       "umpire_hp": null,
@@ -514,7 +693,9 @@
       "state": "upcoming"
     }
   ],
-  "picks": [],
+  "picks": [
+    "Cleveland Guardians"
+  ],
   "coin_flips": [],
   "leans": []
 }
