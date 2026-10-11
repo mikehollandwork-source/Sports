@@ -284,6 +284,39 @@ def build() -> str:
         u = sum(bets)
         md.append(f"| edge ≥ {thr:.0%} | {len(bets)} | {w}-{len(bets)-w} "
                   f"| {u:+.2f}u | **{u/len(bets):+.1%}** |")
+    # Significance, because +17% on 52 bets is exactly the kind of number that
+    # looks like a system and is usually a coin landing well.
+    import random as _rnd
+    rng = _rnd.Random(20261011)
+    md += ["", "### Is any of that real?", ""]
+    for thr in (0.00, 0.01):
+        sel = []
+        for r in rows:
+            prop_home = r["edge"] > 0
+            if prop_home != (r["ml_home_prob"] > 0.5) and abs(r["edge"]) >= thr:
+                team = r["home"] if prop_home else r["away"]
+                odds = r["home_ml"] if prop_home else r["away_ml"]
+                p = r["ml_home_prob"] if prop_home else 1 - r["ml_home_prob"]
+                sel.append((odds, r["winner"] == team, p))
+        if len(sel) < 15:
+            continue
+        obs = sum(_profit(o, w) for o, w, _ in sel) / len(sel)
+        # null: these same bets settling at their own market prices
+        draws = sorted(
+            sum(_profit(o, rng.random() < p) for o, _, p in sel) / len(sel)
+            for _ in range(4000))
+        lo, hi = draws[100], draws[3899]
+        pv = (sum(1 for d in draws if d >= obs) + 1) / 4001
+        md.append(f"- **edge ≥ {thr:.0%}** ({len(sel)} bets): {obs:+.1%} · "
+                  f"fairly-priced bets land in {lo:+.1%} to {hi:+.1%} 95% of "
+                  f"the time · **p = {pv:.3f}**")
+    md += ["",
+           "_The betting rows are also NON-MONOTONIC: the return falls as the "
+           "disagreement widens. A real edge gets better with conviction, not "
+           "worse, and the control buckets above disagree in sign — one third "
+           "runs the wrong way. Both are signatures of a single lucky cell, "
+           "not a signal._", ""]
+
     md += ["", "## How to read this", "",
            "- section 1 proves nothing: a lineup the book prices highly wins "
            "more often, which is the moneyline restated",
