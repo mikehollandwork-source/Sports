@@ -48,9 +48,12 @@ def main() -> None:
           "are the constraint: the bulk endpoint bills once for the whole "
           "slate, per-event bills per game._", ""]
 
-    before = prop_odds.credits_check()
+    # credits_check() returns a human STRING; remaining() is the int. Comparing
+    # the string against MIN_FREE is what crashed the first run.
+    prop_odds.credits_check()                  # free call, refreshes the headers
+    before = prop_odds.remaining()
     md.append(f"- credits before: **{before}**")
-    if before is not None and before < MIN_FREE:
+    if isinstance(before, int) and before < MIN_FREE:
         md.append(f"- **refusing to probe**: under {MIN_FREE}, the posted bets "
                   "need what is left")
         (OUTPUT_DIR / "market_probe.md").write_text("\n".join(md))
@@ -113,9 +116,9 @@ def main() -> None:
             md.append(f"- `{mk}`: **{len(out)}** outcome(s)"
                       + (f" · e.g. `{json.dumps(out[:2])[:170]}`" if out else ""))
 
-    after = prop_odds.credits_check()
+    after = prop_odds.remaining()
     md += ["", f"- credits after: **{after}**"]
-    if before is not None and after is not None:
+    if isinstance(before, int) and isinstance(after, int):
         md.append(f"- **this probe cost {before - after} credit(s)**")
     md += ["", "## What it decides", "",
            "- a key that returns outcomes on the BULK endpoint can be logged "
