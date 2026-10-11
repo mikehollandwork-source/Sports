@@ -1,6 +1,6 @@
 # Source health — 2026-10-11
 
-- board generated: `2026-10-11T20:01:51.015593+00:00`
+- board generated: `2026-10-11T23:44:52.990421+00:00`
 - games on slate: **1** · picks: **0**
 
 | input | games covered | state |
@@ -11,7 +11,6 @@
 | moneylines | 1/1 (100%) | ✅ ok |
 | PM order book | 1/1 (100%) | ✅ ok |
 | src: covers | 1/1 (100%) | ✅ ok |
-| src: forum | 1/1 (100%) | ✅ ok |
 | src: polymarket_bets | 1/1 (100%) | ✅ ok |
 | src: scoresodds_bets | 1/1 (100%) | ✅ ok |
 | src: vsin_bets | 1/1 (100%) | ✅ ok |
