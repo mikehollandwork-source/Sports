@@ -40,7 +40,7 @@ import statistics as st
 import unicodedata
 from pathlib import Path
 
-from . import mlb_api
+from . import mlb_api, prop_odds
 from .pregame_money import _implied
 
 log = logging.getLogger("lineup_price")
@@ -135,11 +135,18 @@ def collect() -> list[dict]:
                     continue
                 cache[ck] = s
             starters = cache[ck]
-            priced = {_norm(k): v for k, v in hitters.items()
-                      if isinstance(v, dict) and isinstance(v.get("over"), int)}
+            # The cache changed shape mid-season: older files store the over
+            # price as a bare int, newer ones as {"over","under"}. Reusing
+            # prop_odds._as_row rather than re-checking the type here - my own
+            # version saw only the new shape and matched 4 games out of 306.
+            priced = {}
+            for nm_, v in hitters.items():
+                o = prop_odds._as_row(v).get("over")
+                if isinstance(o, int):
+                    priced[_norm(nm_)] = o
             team_p = {}
             for team, names in starters.items():
-                ps = [_implied(priced[_norm(n)]["over"]) for n in names
+                ps = [_implied(priced[_norm(n)]) for n in names
                       if _norm(n) in priced]
                 if len(ps) >= MIN_PRICED:
                     team_p[team] = (st.mean(ps), len(ps))
