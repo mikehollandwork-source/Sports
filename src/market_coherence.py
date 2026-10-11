@@ -211,6 +211,51 @@ def build() -> str:
                 md.append(f"| {nm} | {n} | {imp:.1%} | {act:.1%} | {act-imp:+.1%} |")
         md.append("")
 
+    # --- 2b. is the per-hitter spread bigger than noise?
+    if len(pairs) >= 50:
+        gaps, exp_var = [], []
+        for imp, act, n, nm in pairs:
+            gaps.append(act - imp)
+            exp_var.append(imp * (1 - imp) / n)
+        obs_v = st.pvariance(gaps)
+        exp_v = st.mean(exp_var)
+        chi = sum(g * g / e for g, e in zip(gaps, exp_var))
+        z = (chi - len(pairs)) / math.sqrt(2 * len(pairs))
+        md += ["### Are those outliers real, or the tails of 197 coin flips?",
+               "",
+               f"- spread of (actual − implied): observed **{obs_v:.5f}**, "
+               f"expected from binomial noise alone **{exp_v:.5f}** "
+               f"(**{obs_v/exp_v:.2f}×**)",
+               f"- chi-square {chi:.1f} on {len(pairs)} df → **z = {z:+.2f}**",
+               "- " + ("**Real per-hitter mispricing** beyond sampling noise."
+                       if z > 2 else
+                       "**Consistent with pure sampling noise.** The names "
+                       "above are the tails of 197 samples, not prices to "
+                       "fade — picking the worst four of 197 is what finds "
+                       "them."), ""]
+
+    # --- 2c. where the market's margin actually comes from
+    md += ["## 2c. The margin is in the PLATE APPEARANCES", "",
+           "_Same prices, same hitters, split by how long his night ran._", "",
+           "| appearance | n | implied | actual | gap |", "|---|---|---|---|---|"]
+    for lo, lbl in ((1, "all (as priced)"), (2, "2+ PA"), (3, "3+ PA"),
+                    (4, "4+ PA")):
+        sel = [r for r in rows if r["pa"] >= lo]
+        if len(sel) < 100:
+            continue
+        imp = st.mean(r["implied"] for r in sel)
+        act = sum(r["hit"] for r in sel) / len(sel)
+        md.append(f"| {lbl} | {len(sel)} | {imp:.1%} | {act:.1%} | "
+                  f"**{act-imp:+.1%}** |")
+    md += ["",
+           "_**This is conditioning on the outcome and cannot be bet "
+           "directly** — nobody knows in advance that a hitter will bat four "
+           "times. But it locates the margin: the book's edge on these props "
+           "is largely the chance of a short night, not a view on whether the "
+           "hitter can hit. `pinch_risk` predicts short nights at AUC 0.762, "
+           "so that is a lever we already hold and are currently using only "
+           "as a crude on/off gate at SHORT_NIGHT_MAX._", ""]
+
     # --- 3 & 4. the new markets
     md += ["## 3-4. The new markets", ""]
     logs = sorted(glob.glob(str(OUTPUT_DIR / "market_log_*.json")))
