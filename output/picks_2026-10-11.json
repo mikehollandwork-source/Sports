@@ -1,6 +1,6 @@
 {
   "date": "2026-10-11",
-  "generated_at": "2026-10-11T06:02:27.437986+00:00",
+  "generated_at": "2026-10-11T07:02:31.840372+00:00",
   "games": [
     {
       "game_pk": 849809,
@@ -115,13 +115,13 @@
           },
           "forum": {
             "pick": "Milwaukee Brewers",
-            "home": 2,
-            "away": 1
+            "home": 3,
+            "away": 2
           },
           "agree": false,
-          "forum_lean": 0.333,
+          "forum_lean": 0.2,
           "consensus_lean": -0.08,
-          "blended_lean": 0.202,
+          "blended_lean": 0.089,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -134,6 +134,11 @@
               "away": 50,
               "home": 50,
               "lean": 0.0
+            },
+            "scoresodds_bets": {
+              "away": 49,
+              "home": 51,
+              "lean": 0.02
             }
           }
         }
@@ -151,21 +156,29 @@
             "agrees": true
           },
           {
+            "name": "scoresodds_bets",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "polymarket_bets",
             "side": "away",
             "agrees": false
           }
         ],
         "majority_side": "home",
-        "agree": 1,
+        "agree": 2,
         "dissent": 2,
         "trusted": false,
         "verdict": "sources split",
         "note": "sources disagree on the public side (covers, polymarket_bets differ)",
-        "flags": [],
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "unknown",
-        "money_side": null
+        "money": "against public",
+        "money_side": "away",
+        "money_pct": 73
       },
       "bvp": {
         "home_eff": 0.579,
@@ -401,7 +414,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (unknown) \u2014 no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
         "public_trusted": false,
@@ -415,7 +428,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.202,
+            "blended_lean": 0.089,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -436,28 +449,29 @@
         },
         "form_edge": null,
         "form_gap": 0.007,
-        "sharp_money": null,
+        "sharp_money": false,
         "sp_dog_edge": 0.423,
         "pitching_dog": false,
         "signals_hit": 2,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Los Angeles Dodgers",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
-          "bet": "Los Angeles Dodgers",
-          "odds": -107,
-          "basis": "ticket %",
-          "hold_home": -154454,
-          "hold_away": 800748
+          "bet": "Milwaukee Brewers",
+          "odds": -113,
+          "basis": "money %",
+          "hold_home": 3437434,
+          "hold_away": -2885701
         },
         "play": "stay_away",
-        "starred": [],
-        "win_prob": 68,
-        "win_driver": "consistency",
+        "stay_bet": null,
+        "stay_odds": null,
         "pm_quote": {
           "pm_pct": 50,
           "pm_american": -100,
@@ -471,6 +485,7 @@
         "line_vs_money": "against",
         "bet_team": null,
         "bet_moneyline": null,
+        "starred": [],
         "good_dog": null,
         "line_money": null
       },
