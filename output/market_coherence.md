@@ -38,6 +38,25 @@ _197 hitters with 10+ priced games._
 | seiya suzuki | 10 | 66.0% | 90.0% | +24.0% |
 | dominic canzone | 16 | 65.8% | 87.5% | +21.7% |
 
+### Are those outliers real, or the tails of 197 coin flips?
+
+- spread of (actual − implied): observed **0.01717**, expected from binomial noise alone **0.01692** (**1.02×**)
+- chi-square 214.2 on 197 df → **z = +0.87**
+- **Consistent with pure sampling noise.** The names above are the tails of 197 samples, not prices to fade — picking the worst four of 197 is what finds them.
+
+## 2c. The margin is in the PLATE APPEARANCES
+
+_Same prices, same hitters, split by how long his night ran._
+
+| appearance | n | implied | actual | gap |
+|---|---|---|---|---|
+| all (as priced) | 3998 | 63.1% | 58.8% | **-4.4%** |
+| 2+ PA | 3869 | 63.2% | 60.0% | **-3.2%** |
+| 3+ PA | 3669 | 63.4% | 61.6% | **-1.8%** |
+| 4+ PA | 3119 | 64.1% | 65.1% | **+1.0%** |
+
+_**This is conditioning on the outcome and cannot be bet directly** — nobody knows in advance that a hitter will bat four times. But it locates the margin: the book's edge on these props is largely the chance of a short night, not a view on whether the hitter can hit. `pinch_risk` predicts short nights at AUC 0.762, so that is a lever we already hold and are currently using only as a crude on/off gate at SHORT_NIGHT_MAX._
+
 ## 3-4. The new markets
 
 **First five against the full game** — runs through five innings are normally 55–60% of a game.
