@@ -140,18 +140,32 @@ def collect() -> list[dict]:
             wx = g.get("weather") or {}
             sa = g.get("statistical_advantage") or {}
 
-            def fip(side):
-                v = (sa.get(side) or {}).get("starter_fip")
-                return float(v) if isinstance(v, (int, float)) else None
-            fh, fa = fip("home"), fip("away")
+            # The board's own fields. My first pass guessed "starter_fip",
+            # which does not exist, so pitching - the main driver of a run
+            # total - went untested at n=0.
+            def both(key, sub=None):
+                vals = []
+                for side in ("home", "away"):
+                    d = sa.get(side) or {}
+                    if sub:
+                        d = d.get(sub) or {}
+                    v = d.get(key)
+                    if isinstance(v, (int, float)):
+                        vals.append(float(v))
+                return st.mean(vals) if vals else None
             rows.append({
                 "date": date, "pk": pk,
                 "total": s["total"], "f5": s["f5"],
                 "park": float(g.get("park_factor") or 1.0),
                 "temp": wx.get("temp_f"), "wind": wx.get("wind_mph"),
                 "lineup_rate": lineup_rate,
-                "fip": (st.mean([x for x in (fh, fa) if x is not None])
-                        if (fh is not None or fa is not None) else None),
+                "starter_fip": both("starter_fip_season"),
+                "starter_fip_l5": both("starter_fip_last5"),
+                "bullpen_fip": both("bullpen_fip_last5"),
+                "combined_fip": both("combined_fip_sos_adj"),
+                "offense_index": both("offense_index"),
+                "pitching_index": both("pitching_index"),
+                "woba": both("woba", "offense"),
             })
             for nm, line in (box.get(pk) or {}).items():
                 if isinstance(line, list) and len(line) >= 2 and line[1] >= 1:
@@ -177,7 +191,9 @@ def _pearson(xs, ys):
     return sxy / math.sqrt(sxx * syy) if sxx > 0 and syy > 0 else None
 
 
-SIGNALS = ("park", "temp", "wind", "lineup_rate", "fip")
+SIGNALS = ("park", "temp", "wind", "lineup_rate", "woba", "offense_index",
+           "starter_fip", "starter_fip_l5", "bullpen_fip", "combined_fip",
+           "pitching_index")
 
 
 def build() -> str:
@@ -240,7 +256,9 @@ def build() -> str:
            "season, the test is: does the signal beat the CLOSING line, "
            "corrected for the width of the search, with both tails checked._",
            "",
-           "- full game: park, temperature, wind, lineup hit rate, starter FIP",
+           "- full game: park, temperature, wind, lineup hit rate, team wOBA, "
+           "offense index, starter FIP (season and last-5), bullpen FIP, "
+           "SoS-adjusted combined FIP, pitching index",
            "- first five: the same, since the starters pitch it",
            "- strikeout line: the starter's K price against the opposing "
            "lineup's hit prices, which should move opposite",
