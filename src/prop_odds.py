@@ -55,7 +55,10 @@ def _key() -> str | None:
 # do not.
 STATE = OUTPUT_DIR / "odds_credits.json"
 RESERVE = int(os.environ.get("ODDS_RESERVE", "40"))
-PRIORITY = {"bet": 0, "shadow": 1}      # lower spends first
+# Lower spends first. An UNREGISTERED tier falls to 0 below and is treated as a
+# bet, so anything new that spends credits must be added here or it will outrank
+# the posted bets and drain the budget they depend on.
+PRIORITY = {"bet": 0, "shadow": 1, "log": 2}
 
 
 def _state() -> dict:
@@ -104,9 +107,12 @@ def may_spend(tier: str = "bet") -> bool:
     rem = remaining()
     if rem is None:
         return True
-    if rem <= RESERVE:
-        log.warning("odds credits: %d left (reserve %d) - skipping %s fetch",
-                    rem, RESERVE, tier)
+    # The reserve scales with priority, so the tiers yield in order rather than
+    # all stopping at the same line: shadow holds back 40, plain logging 80.
+    floor = RESERVE * PRIORITY.get(tier, 0)
+    if rem <= floor:
+        log.warning("odds credits: %d left (floor %d for %s) - skipping fetch",
+                    rem, floor, tier)
         return False
     return True
 

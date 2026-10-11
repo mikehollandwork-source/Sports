@@ -1,0 +1,43 @@
+name: Market log
+# Totals, first-five and strikeout lines. LOGGING ONLY - stakes nothing, changes
+# no pick. Separate from the board so it cannot break it, and its own
+# concurrency group so two polls never collide.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 16,19,22 * * *"   # noon, 3pm, 6pm ET
+permissions:
+  contents: write
+concurrency:
+  group: market-log
+  cancel-in-progress: false
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - name: Log markets
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+          MARKET_LOG_MAX: "4"
+        run: python -m src.market_log
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/market_log_*.json output/odds_credits.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Market log ($(date -u +%Y-%m-%dT%H:%MZ))"
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" && break
+              echo "push retry $i"; sleep 5
+            done
+          fi
