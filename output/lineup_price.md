@@ -42,6 +42,14 @@ _Back the side the props favour, whenever they disagree with the moneyline by mo
 | edge ≥ 2% | 16 | 6-10 | -3.38u | **-21.1%** |
 | edge ≥ 3% | 4 | _too few_ | | |
 
+### Is any of that real?
+
+- **edge ≥ 0%** (52 bets): +17.1% · fairly-priced bets land in -30.8% to +27.1% 95% of the time · **p = 0.102**
+- **edge ≥ 1%** (30 bets): +5.0% · fairly-priced bets land in -38.2% to +34.4% 95% of the time · **p = 0.365**
+
+_The betting rows are also NON-MONOTONIC: the return falls as the disagreement widens. A real edge gets better with conviction, not worse, and the control buckets above disagree in sign — one third runs the wrong way. Both are signatures of a single lucky cell, not a signal._
+
+
 ## How to read this
 
 - section 1 proves nothing: a lineup the book prices highly wins more often, which is the moneyline restated
