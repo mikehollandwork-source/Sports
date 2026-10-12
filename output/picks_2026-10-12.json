@@ -1,6 +1,6 @@
 {
   "date": "2026-10-12",
-  "generated_at": "2026-10-12T20:30:45.970658+00:00",
+  "generated_at": "2026-10-12T22:28:39.775393+00:00",
   "games": [
     {
       "game_pk": 849812,
@@ -536,9 +536,9 @@
         },
         "prop_pool": {
           "candidates": 14,
-          "probed": 8,
-          "rising": 3,
-          "window_too_thin": 2,
+          "probed": 14,
+          "rising": 2,
+          "window_too_thin": 6,
           "by_side": {
             "Los Angeles Dodgers": 9,
             "Milwaukee Brewers": 5
@@ -573,8 +573,8 @@
               "delta": 0.001,
               "shrunk": 0.0004
             },
-            "trend_factor": 0.96,
-            "trend": "falling: last 5 vs prior 10 \u2014 air 88% vs 47%, ISO 0.000 vs 0.026 -> x0.96"
+            "trend_factor": 1.0,
+            "trend": "trend window too thin"
           },
           {
             "player": "Brice Turang",
@@ -604,8 +604,10 @@
               "delta": 0.022,
               "shrunk": 0.0137
             },
-            "trend_factor": 0.96,
-            "trend": "falling: last 5 vs prior 10 \u2014 air 46% vs 36%, ISO 0.167 vs 0.237 -> x0.96"
+            "trend_factor": 1.05,
+            "trend": "rising: last 5 vs prior 10 \u2014 air 45% vs 33%, ISO 0.250 vs 0.243 -> x1.05",
+            "prop_score": 0.7142,
+            "selector": "all_rate+bvp+fit+platoon+rising"
           },
           {
             "player": "Jake Bauers",
@@ -642,113 +644,78 @@
         "prop_withheld": {
           "player": "William Contreras",
           "score": 0.6089,
-          "need": 0.6377,
-          "odds": -176,
-          "real_line": true,
-          "reason": "conditions against the bat and the read (61%) is under the 64% that -176 needs"
+          "need": 0.6667,
+          "odds": -200,
+          "real_line": false,
+          "reason": "conditions against the bat and the read (61%) is under the 67% that -200 needs"
         },
         "props": [
           {
-            "player": "Max Muncy",
-            "player_id": 571970,
-            "hit_rate": 65,
-            "all_rate": 56,
-            "gap": 10,
-            "form": 24,
-            "super_hot": true,
-            "bvp": {
-              "pa": 5,
-              "ops": 1.0
-            },
-            "wins_played": 92,
-            "games_played": 153,
-            "avg_pa": 4.0,
-            "short_night_rate": 0.175,
-            "mean_pa_per_start": 4.07,
-            "short_nights": "27/134 starts of 3 PA or fewer",
-            "team": "Los Angeles Dodgers",
-            "opp_sp": "Logan Henderson",
-            "fit": 0,
-            "platoon": {
-              "hand": "R",
-              "avg": 0.249,
-              "pa": 427,
-              "delta": -0.003,
-              "shrunk": -0.0017
-            },
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 50% vs 56%, ISO 0.562 vs 0.212 -> x1.05",
-            "prop_score": 0.6163,
-            "selector": "all_rate+bvp+fit+platoon+rising",
-            "odds": -133
-          },
-          {
-            "player": "Teoscar Hern\u00e1ndez",
-            "player_id": 606192,
-            "hit_rate": 75,
-            "all_rate": 64,
-            "gap": 11,
-            "form": -4,
+            "player": "Brice Turang",
+            "player_id": 668930,
+            "hit_rate": 71,
+            "all_rate": 66,
+            "gap": 5,
+            "form": -6,
             "super_hot": false,
             "bvp": {
               "pa": 4,
-              "ops": 0.5
+              "ops": 0.833
             },
-            "wins_played": 83,
-            "games_played": 130,
-            "avg_pa": 4.0,
-            "short_night_rate": 0.118,
-            "mean_pa_per_start": 4.0,
-            "short_nights": "21/123 starts of 3 PA or fewer",
-            "team": "Los Angeles Dodgers",
-            "opp_sp": "Logan Henderson",
-            "fit": 0,
+            "wins_played": 100,
+            "games_played": 155,
+            "avg_pa": 4.6,
+            "short_night_rate": 0.003,
+            "mean_pa_per_start": 4.55,
+            "short_nights": "2/152 starts of 3 PA or fewer",
+            "team": "Milwaukee Brewers",
+            "opp_sp": "Yoshinobu Yamamoto",
+            "fit": 2,
             "platoon": {
               "hand": "R",
-              "avg": 0.252,
-              "pa": 338,
-              "delta": -0.016,
-              "shrunk": -0.0084
+              "avg": 0.291,
+              "pa": 478,
+              "delta": 0.022,
+              "shrunk": 0.0137
             },
             "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 62% vs 50%, ISO 0.150 vs 0.103 -> x1.05",
-            "prop_score": 0.5966,
+            "trend": "rising: last 5 vs prior 10 \u2014 air 45% vs 33%, ISO 0.250 vs 0.243 -> x1.05",
+            "prop_score": 0.7142,
             "selector": "all_rate+bvp+fit+platoon+rising"
           }
         ],
         "prop": {
-          "player": "Max Muncy",
-          "player_id": 571970,
-          "hit_rate": 65,
-          "all_rate": 56,
-          "gap": 10,
-          "form": 24,
-          "super_hot": true,
+          "player": "Brice Turang",
+          "player_id": 668930,
+          "hit_rate": 71,
+          "all_rate": 66,
+          "gap": 5,
+          "form": -6,
+          "super_hot": false,
           "bvp": {
-            "pa": 5,
-            "ops": 1.0
+            "pa": 4,
+            "ops": 0.833
           },
-          "wins_played": 92,
-          "games_played": 153,
-          "avg_pa": 4.0,
-          "short_night_rate": 0.175,
-          "mean_pa_per_start": 4.07,
-          "short_nights": "27/134 starts of 3 PA or fewer",
-          "team": "Los Angeles Dodgers",
-          "opp_sp": "Logan Henderson",
-          "fit": 0,
+          "wins_played": 100,
+          "games_played": 155,
+          "avg_pa": 4.6,
+          "short_night_rate": 0.003,
+          "mean_pa_per_start": 4.55,
+          "short_nights": "2/152 starts of 3 PA or fewer",
+          "team": "Milwaukee Brewers",
+          "opp_sp": "Yoshinobu Yamamoto",
+          "fit": 2,
           "platoon": {
             "hand": "R",
-            "avg": 0.249,
-            "pa": 427,
-            "delta": -0.003,
-            "shrunk": -0.0017
+            "avg": 0.291,
+            "pa": 478,
+            "delta": 0.022,
+            "shrunk": 0.0137
           },
           "trend_factor": 1.05,
-          "trend": "rising: last 5 vs prior 10 \u2014 air 50% vs 56%, ISO 0.562 vs 0.212 -> x1.05",
-          "prop_score": 0.6163,
-          "selector": "all_rate+bvp+fit+platoon+rising",
-          "odds": -133
+          "trend": "rising: last 5 vs prior 10 \u2014 air 45% vs 33%, ISO 0.250 vs 0.243 -> x1.05",
+          "prop_score": 0.7142,
+          "selector": "all_rate+bvp+fit+platoon+rising"
         }
       },
       "flagged": false,
@@ -782,7 +749,7 @@
           "losses": 33
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 849820,
@@ -897,13 +864,13 @@
           },
           "forum": {
             "pick": "Tampa Bay Rays",
-            "home": 11,
-            "away": 7
+            "home": 10,
+            "away": 9
           },
           "agree": true,
-          "forum_lean": 0.222,
+          "forum_lean": 0.053,
           "consensus_lean": 0.54,
-          "blended_lean": 0.365,
+          "blended_lean": 0.317,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -918,9 +885,9 @@
               "lean": 0.2
             },
             "scoresodds_bets": {
-              "away": 17,
-              "home": 83,
-              "lean": 0.66
+              "away": 11,
+              "home": 89,
+              "lean": 0.78
             }
           }
         }
@@ -958,7 +925,7 @@
         "line": "flat",
         "money": "with public",
         "money_side": "home",
-        "money_pct": 85
+        "money_pct": 89
       },
       "bvp": {
         "home_eff": 0.672,
@@ -1038,12 +1005,12 @@
         "majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 77.0,
-          "moneyline": "-164"
+          "moneyline": "-179"
         },
         "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 23.0,
-          "moneyline": "+150"
+          "moneyline": "+138"
         }
       },
       "consistency": {
@@ -1208,7 +1175,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.365,
+            "blended_lean": 0.317,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1252,17 +1219,17 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -172,
-        "opponent_moneyline": 142,
+        "advantage_moneyline": -169,
+        "opponent_moneyline": 139,
         "line_check": {
           "open": -168,
-          "current": -172,
-          "implied_shift": 0.005,
+          "current": -169,
+          "implied_shift": 0.001,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-168\u2192-172, +0.5%)",
+          "reason": "only a slight move our way, below the 2% signal floor (-168\u2192-169, +0.1%)",
           "morning": -175,
           "early_shift": 0.009,
-          "late_shift": -0.004,
+          "late_shift": -0.008,
           "timing": null,
           "pinny_morning": -167
         },
@@ -1273,30 +1240,27 @@
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
-          "side": "Cleveland Guardians",
-          "against_us": true,
-          "tells": [
-            "line frozen under 70% public"
-          ],
-          "strength": 1,
-          "fooled": true
+          "side": null,
+          "against_us": false,
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Cleveland Guardians",
-          "odds": 142,
+          "odds": 139,
           "basis": "money %",
-          "hold_home": -2409302,
-          "hold_away": 4459000
+          "hold_home": -2916391,
+          "hold_away": 5159700
         },
         "play": "stay_away",
         "starred": [],
-        "stance_warning": "book's informed money is on Cleveland Guardians",
         "win_prob": 76,
         "win_driver": "bvp + consistency + favorite",
         "pm_quote": {
           "pm_pct": 60,
           "pm_american": -150,
-          "edge_pts": 3.2,
+          "edge_pts": 2.8,
           "vs_book": "better"
         },
         "projected": {
