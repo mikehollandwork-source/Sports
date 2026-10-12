@@ -52,26 +52,12 @@ _True joint probability from the observed rate, against what the real median pri
 _The table above pairs a rate measured on QUALITY hitters with a median price taken over EVERY hitter the book listed. Good hitters are priced shorter, so that mismatch alone could manufacture the edge. Here each quoted name is resolved to the player and scored against his own held-out rate._
 
 - captured prices resolved to a measured hitter: **42** (0 unresolved)
-- median price **+115**, median rate **48.2%**
-- **mean edge: +0.0 points** (median +0.0)
-- prices the hitter's own rate beat: **24/42**
+- median price **+115**, so the average quote needs **46.7%**
+- POOLED rate of those hitters over **1571** held-out games: **50.8%**
+- **pooled edge: +4.1 points**
+- quotes the hitter's own (noisy) rate beat: **24/42** = 57%, against 50% by chance (±15%)
 
-| hitter | price | needs | his rate | edge |
-|---|---|---|---|---|
-| Junior Caminero | +112 | 47.2% | 65.2% | **+0.2 pts** |
-| Jonathan Aranda | +140 | 41.7% | 59.5% | **+0.2 pts** |
-| Jackson Chourio | -105 | 51.2% | 68.9% | **+0.2 pts** |
-| George Lombard Jr. | +140 | 41.7% | 58.3% | **+0.2 pts** |
-| Brice Turang | +134 | 42.7% | 58.5% | **+0.2 pts** |
-| William Contreras | +125 | 44.4% | 57.5% | **+0.1 pts** |
-| Ty France | +126 | 44.2% | 57.1% | **+0.1 pts** |
-| Fernando Tatis Jr. | +112 | 47.2% | 60.0% | **+0.1 pts** |
-| Jackson Chourio | -130 | 56.5% | 68.9% | **+0.1 pts** |
-| Miguel Vargas | +115 | 46.5% | 58.7% | **+0.1 pts** |
-| Yandy Diaz | +105 | 48.8% | 60.5% | **+0.1 pts** |
-| Manny Machado | +137 | 42.2% | 53.3% | **+0.1 pts** |
-
-- **the edge survives price-matching**, so the market table above is not a population artifact
+- **NOT ESTABLISHED.** The pooled edge is +4.1 points, but 24 of 42 quotes beaten is inside chance at this sample. 42 prices from four October dates cannot settle it, and the per-hitter edges are far too noisy to rank — six games is the minimum half, so a rate can read 65% off four of six.
 
 ## Caveats
 
