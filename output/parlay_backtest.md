@@ -18,7 +18,7 @@ _Of 248 past plays, **241 stored no `hit_bats` pool at all** and most of the res
 | that same hitter, 2+ total bases | 55/142 | **38.7%** |
 
 - **both together: 48/142 = 33.8%**, against 34.4% if they were independent → same-game lift **×0.984**
-  _Positive is expected and is the only thing that makes a parlay better than its legs: a team winning and its hitter getting a hit are the same night going one way. Note the prop may be on EITHER team since 2026-10-12, which weakens exactly this._
+  _Positive was expected - a team winning and its hitter getting a hit are the same night going one way - and it is NOT THERE. These two legs are independent to within noise, so the ML + prop pair gets none of the correlation subsidy that made a same-team hit-prop pair worth ×1.035. One hit barely moves a game's outcome, and a game's outcome barely moves one hitter's chance of a hit. Pairing the pick with a prop is therefore just paying two holds._
 
 ## Does the pair beat its price?
 
@@ -29,12 +29,22 @@ _Of 248 past plays, **241 stored no `hit_bats` pool at all** and most of the res
 | + 2 total bases at +140 (3 legs) | 30/142 (21.1%) | +545 | **+29.0%** |
 | + 2 total bases at +180 (3 legs) | 30/142 (21.1%) | +653 | **+50.5%** |
 
-_The three-leg rows add total bases on the SAME hitter as the hit leg, which is a NESTED leg the live builder now forbids — 2+ total bases cannot happen without a hit. They are shown because the history has no second hitter to use, and they therefore FLATTER the structure: the real four-leg version needs a third hitter to also come through._
+### Those three-leg rows are NOT an edge — read this before the numbers above
+
+_They put 2+ total bases on the SAME hitter as the hit leg, which the live builder forbids. **2+ total bases cannot happen without a hit**, so such a ticket wins exactly when the moneyline and the total bases land — two legs of risk — while being PAID for three. The redundant hit leg multiplies the payout for free, and that free multiplier is the entire positive number. It is the classic nested-leg artifact and no book will price it that way; it is shown only because the history has no second hitter to put there._
+
+_Here is the same risk priced honestly, with the redundant leg removed:_
+
+| structure | wins | mean price | ROI |
+|---|---|---|---|
+| ML + 2 total bases at +100 (2 real legs) | 30/142 (21.1%) | +258 | **-28.2%** |
+| ML + 2 total bases at +140 (2 real legs) | 30/142 (21.1%) | +329 | **-13.9%** |
+| ML + 2 total bases at +180 (2 real legs) | 30/142 (21.1%) | +401 | **+0.5%** |
 
 ## What this says about the total-bases leg
 
-- the board's own posted hitters reach 2+ total bases **38.7%** of the time, so a fair price is about **+158** before any hold
-- that is the first measured number for that leg; it was a guess before
+- the board's own posted hitters reach 2+ total bases **38.7%** of the time, so a FAIR price is about **+158** before any hold — the first measured number for that leg, where it used to be a guess
+- so +140 is already WORSE than fair: it demands 41.7% and the leg delivers 38.7%. Any price under about +158 is a losing leg before the parlay even multiplies it.
 
 ## Caveats
 
