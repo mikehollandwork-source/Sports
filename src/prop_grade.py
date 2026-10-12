@@ -122,11 +122,13 @@ def grade_date(date: str) -> tuple[list, list, list]:
                     "odds": price, "real_line": True, "hr": hrs,
                     "profit": round(grade.american_profit(price) if won
                                     else -STAKE, 2)})
-        prop = pc.get("prop")
+        # THREE props a game since 2026-10-12, drawn from both lineups.
+        # `props` is the list; `prop` stays the top one so anything still
+        # reading the old field keeps working.
+        plist = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
         adv = pc.get("advantage_team")
-        pid = (prop or {}).get("player_id")
         res = results.get(g.get("game_pk"))
-        if not prop or not pid or not adv or not res or not res.get("final"):
+        if not plist or not adv or not res or not res.get("final"):
             continue
         # Book only a game that was actually a PLAY. A prop is also computed for
         # watch-listed good dogs so their hit block can be shown, and without
@@ -137,32 +139,40 @@ def grade_date(date: str) -> tuple[list, list, list]:
         # are; this stops it happening again.
         if pc.get("play") != "pick":
             continue
-        hits = mlb_api.player_hits(g.get("game_pk"), pid)
-        if hits is None:
-            continue                       # can't confirm the prop -> skip, retry later
-        got_hit = hits >= 1
         team_won = res.get("winner") == adv
         score = f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}"
-        key = f"{date}#{g['game_pk']}"
-        # real captured 1+ hit line if we have one, else the assumed fallback
-        prop_price = int(prop.get("odds", PROP_PRICE))
-        # single: the prop alone
-        singles.append({
-            "key": key, "date": date, "matchup": g["matchup"],
-            "bet": f"{prop['player']} 1+ H", "result": "W" if got_hit else "L",
-            "score": score, "odds": prop_price, "real_line": "odds" in prop,
-            "profit": round(grade.american_profit(prop_price) if got_hit else -STAKE, 2)})
-        # parlay: team ML + prop; needs a real team price
         ml = pc.get("advantage_moneyline")
-        if ml is not None and not PARLAYS_RETIRED:
-            won = team_won and got_hit
-            po = parlay_odds(int(ml), prop_price)
-            parlays.append({
+        for prop in plist:
+            pid = prop.get("player_id")
+            if not pid:
+                continue
+            hits = mlb_api.player_hits(g.get("game_pk"), pid)
+            if hits is None:
+                continue                   # can't confirm it -> retry later
+            got_hit = hits >= 1
+            # Keyed per PLAYER. On the game key alone, three props would
+            # collide and grade._add would keep only the first.
+            key = f"{date}#{g['game_pk']}#{pid}"
+            # real captured 1+ hit line if we have one, else the assumed fallback
+            prop_price = int(prop.get("odds", PROP_PRICE))
+            singles.append({
                 "key": key, "date": date, "matchup": g["matchup"],
-                "bet": f"{adv} ML + {prop['player']} 1+ H",
-                "result": "W" if won else "L", "score": score, "odds": po,
-                "real_line": "odds" in prop,
-                "profit": round(grade.american_profit(po) if won else -STAKE, 2)})
+                "bet": f"{prop['player']} 1+ H",
+                "result": "W" if got_hit else "L",
+                "score": score, "odds": prop_price, "real_line": "odds" in prop,
+                "profit": round(grade.american_profit(prop_price) if got_hit
+                                else -STAKE, 2)})
+            # parlay: team ML + prop; needs a real team price
+            if ml is not None and not PARLAYS_RETIRED:
+                won = team_won and got_hit
+                po = parlay_odds(int(ml), prop_price)
+                parlays.append({
+                    "key": key, "date": date, "matchup": g["matchup"],
+                    "bet": f"{adv} ML + {prop['player']} 1+ H",
+                    "result": "W" if won else "L", "score": score, "odds": po,
+                    "real_line": "odds" in prop,
+                    "profit": round(grade.american_profit(po) if won
+                                    else -STAKE, 2)})
     return singles, parlays, homers
 
 

@@ -290,3 +290,29 @@ unit-testable with mock `Game`/`Team` objects.
 - Use clear, descriptive commit messages.
 - Push with `git push -u origin <branch-name>`.
 - Open a pull request only when explicitly requested.
+- **THREE props a game, from BOTH lineups, and the bat must be rising**
+  (`main.PROPS_POSTED`, `PROP_SELECTOR`). A hitter's chance of a hit has nothing
+  to do with which side the moneyline rule landed on, so the old picked-team-only
+  pool threw away half the candidates; each side is ranked against ITS OWN
+  opposing starter, since the fit and platoon terms are matchup-specific.
+  **`_prop_score` no longer carries `form`** — the five-game hit-rate delta scores
+  **AUC 0.5053** against getting a hit over 32,564 starts and its sampling SD
+  (21.6 points) swamped the signal spread, so it was noise deciding which prop
+  got picked. Do not reinstate it without a measurement that beats 0.5053.
+  The replacement is the BATTED-BALL trend (`hr_pick.trend_factor`: air rate and
+  ISO, last 5 against the prior 10) used as a FILTER, not a weight — rising
+  62.3% got a hit against falling 60.3% over 22,516 games, p=0.0025
+  (`form_trend.hits_test`). An unreadable window returns exactly 1.0 and is
+  excluded: unknown is not rising. It is probed **lazily down the score order**
+  and stops once enough bats have risen — each probe is a full-season gamelog, so
+  scoring all ~18 candidates would be ~160 fetches a slate to use three. It
+  cannot reorder anything; the score is already fixed.
+  **Ledger keys are now `date#game_pk#player_id`.** On the game key alone the
+  three would collide and `grade._add` would keep only the first. `prop_audit`
+  parses both shapes; entries up to 2026-10-11 keep the two-part key.
+  `pick_criteria["props"]` is the list and `["prop"]` stays the top one for
+  older readers; `["hit_bats"]` is now ARCHIVAL only — it is the top of the pool
+  BEFORE the rising filter, which is what a later backtest of that filter needs.
+  Extra props cost no odds credits (`prop_odds.hit_line` caches the game's whole
+  batter_hits board per day), but a good-dog watch entry still gets one, because
+  that block is context and not a bet.

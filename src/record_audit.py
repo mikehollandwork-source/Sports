@@ -365,20 +365,23 @@ def pull_gate_guard() -> list[str]:
         except (OSError, ValueError):
             continue
         for g in day.get("games", []):
-            prop = (g.get("pick_criteria") or {}).get("prop") or {}
-            if not prop:
-                continue
-            if "short_night_rate" not in prop:
-                legacy += 1
-                continue
-            rate = prop.get("short_night_rate")
-            if rate is None:
-                continue              # too few starts to judge; let through
-            checked += 1
-            if worst is None or rate > worst:
-                worst = rate
-            if rate > props.SHORT_NIGHT_MAX:
-                breaches += 1
+            pc = g.get("pick_criteria") or {}
+            # THREE props a game since 2026-10-12. `props` is the list; older
+            # boards carry only `prop`, and every one of them must still be
+            # checked or the guard would quietly stop covering them.
+            plist = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
+            for prop in plist:
+                if "short_night_rate" not in prop:
+                    legacy += 1
+                    continue
+                rate = prop.get("short_night_rate")
+                if rate is None:
+                    continue          # too few starts to judge; let through
+                checked += 1
+                if worst is None or rate > worst:
+                    worst = rate
+                if rate > props.SHORT_NIGHT_MAX:
+                    breaches += 1
     out = ["## Guard: no prop on a hitter whose nights end early", "",
            f"_Threshold `props.SHORT_NIGHT_MAX` = "
            f"{props.SHORT_NIGHT_MAX:.0%}, the league median of the shrunk "

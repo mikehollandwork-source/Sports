@@ -251,27 +251,66 @@ def run(date: str) -> dict:
         is_home = adv == gm.home.name
         team = gm.home if is_home else gm.away
         try:
-            # one fetch serves both: the prop (top bat) and the board's ranked
-            # hit-in-wins line. Calling best_hit_prop separately would re-pull
-            # the lineup and every game log.
-            opp_sp = (gm.away if is_home else gm.home).probable_pitcher
-            ranked = props.hit_in_wins_ranked(
-                gm.game_pk, team.team_id, date, is_home,
-                opp_pitcher_id=opp_sp.player_id if opp_sp else None)
-            if opp_sp:
-                r["pick_criteria"]["opp_starter"] = opp_sp.name
-            # the conditions term, per hitter, from his batted-ball profile
-            fits = _fits_for(r, ranked, team.team_id, date)
-            # the platoon term: his AVG against THIS starter's hand, a
-            # several-hundred-PA sample, against BvP's handful
-            plat = _platoon_for(ranked, getattr(opp_sp, "hand", None), int(date[:4]))
-            for b in ranked:
-                if b.get("player_id") in plat:
-                    b["platoon"] = plat[b["player_id"]]
+            # BOTH lineups. A hitter's chance of a hit has nothing to do with
+            # which side the moneyline rule landed on, so restricting the pool
+            # to our own team threw away half the candidates for no reason.
+            # Each side is ranked against ITS OWN opposing starter - the fits
+            # and platoon terms are matchup-specific and cannot be shared.
+            season_ = int(date[:4])
+            ranked, fits = [], {}
+            for bat_t, opp_t, is_h in ((gm.home, gm.away, True),
+                                       (gm.away, gm.home, False)):
+                osp = opp_t.probable_pitcher
+                rk = props.hit_in_wins_ranked(
+                    gm.game_pk, bat_t.team_id, date, is_h,
+                    opp_pitcher_id=getattr(osp, "player_id", None))
+                if not rk:
+                    continue
+                side_fits = _fits_for(r, rk, bat_t.team_id, date)
+                plat = _platoon_for(rk, getattr(osp, "hand", None), season_)
+                for b in rk:
+                    pid_ = b.get("player_id")
+                    b["team"] = bat_t.name
+                    # each bat's OWN opposing starter - the pool spans both
+                    # lineups now, so one `opp_starter` cannot describe it.
+                    b["opp_sp"] = getattr(osp, "name", None)
+                    b["fit"] = side_fits.get(pid_, 0)
+                    fits[pid_] = b["fit"]
+                    if pid_ in plat:
+                        b["platoon"] = plat[pid_]
+                ranked += rk
+            bet_sp = (gm.away if is_home else gm.home).probable_pitcher
+            if bet_sp:
+                r["pick_criteria"]["opp_starter"] = bet_sp.name
             scored = sorted(ranked,
-                            key=lambda b: _prop_score(b, fits.get(b.get("player_id"), 0)),
+                            key=lambda b: _prop_score(b, b.get("fit", 0)),
                             reverse=True)
-            prop = scored[0] if scored else None
+            # IS HE GENUINELY TRENDING UP? Not the five-game hit rate, which is
+            # a coin flip (AUC 0.5053) and was cut from the score - the
+            # BATTED-BALL trend: air rate and ISO over the last five games
+            # against the prior ten. Measured against hits on 22,516 games:
+            # rising 62.3% against falling 60.3%, gap +2.0 points, permutation
+            # p=0.0025 (`form_trend.py`). Real, and worth about half the 3.5
+            # points the book's price is ahead of our hit rate.
+            #
+            # Probed LAZILY, down the score order, stopping once enough bats
+            # have risen. Each probe is a full-season gamelog; the pool is both
+            # lineups now, so scoring every candidate would be ~18 fetches a
+            # game and ~160 a slate to use three of them. It cannot reorder
+            # anything - the score is already fixed - it only filters.
+            need = PROPS_POSTED if _play(r) == "pick" else 1
+            rising = []
+            for b in scored:
+                if len(rising) >= need:
+                    break
+                tf, tnote = hr_pick.trend_factor(b.get("player_id"), season_)
+                b["trend_factor"], b["trend"] = round(tf, 2), tnote
+                # An unreadable window returns exactly 1.0 and is excluded too:
+                # "genuinely trending upwards" is what was asked, and unknown
+                # is not rising.
+                if tf > 1.0:
+                    rising.append(b)
+            prop = rising[0] if rising else None
             if prop:
                 # Only buy a price for a game that has NOT started. An in-game
                 # price answers a different question - the market probe proved
@@ -281,27 +320,48 @@ def run(date: str) -> dict:
                 # day. Skipping it also stops spending credits on games that can
                 # no longer be bet.
                 upcoming = r.get("state") == "upcoming"
-                line = (prop_odds.hit_line(date, prop["player"], gm.away.name,
-                                           gm.home.name)
-                        if upcoming else None)
-                if line is not None:
-                    prop["odds"] = line          # real 1+ hit price (else assumed at grade time)
-                fit = fits.get(prop.get("player_id"), 0)
-                prop["fit"] = fit
-                prop["prop_score"] = round(_prop_score(prop, fit), 4)
-                # Stamped so the prop ledger stays separable: entries before this
-                # were chosen by hit-rate-in-wins, which is a different population.
-                prop["selector"] = PROP_SELECTOR
-                # The gate applies to a POSTED prop, i.e. a play. A good-dog
-                # watch entry's hit block is context, not a bet, so it is left
-                # alone - it is already labelled NOT A BET.
-                held = _prop_withheld(prop, r) if _play(r) == "pick" else None
-                if held:
-                    r["pick_criteria"]["prop_withheld"] = held
-                    log.info("prop withheld on %s: %s", r.get("game_pk"),
-                             held["reason"])
-                else:
-                    r["pick_criteria"]["prop"] = prop
+                is_play = _play(r) == "pick"
+                posted, withheld = [], []
+                # Up to PROPS_POSTED of them, from both lineups. They cost no
+                # extra odds credits - `prop_odds.hit_line` caches the game's
+                # whole batter_hits board per day, so the second and third are
+                # already paid for. `need` above still holds a good-dog watch
+                # entry to one: that block is context, not a bet.
+                for cand in rising:
+                    fit = cand.get("fit", 0)
+                    cand["prop_score"] = round(_prop_score(cand, fit), 4)
+                    # Stamped so the prop ledger stays separable: entries before
+                    # this were chosen by hit-rate-in-wins, a different
+                    # population, and earlier ones still carried the form term.
+                    cand["selector"] = PROP_SELECTOR
+                    if upcoming:
+                        try:
+                            ln = prop_odds.hit_line(date, cand["player"],
+                                                    gm.away.name, gm.home.name)
+                            if ln is not None:
+                                cand["odds"] = ln
+                        except Exception as exc:
+                            log.warning("hit line failed for %s: %s",
+                                        cand.get("player"), exc)
+                    # The gate applies to a POSTED prop, i.e. a play. A good-dog
+                    # watch entry's hit block is context, not a bet, so it is
+                    # left alone - it is already labelled NOT A BET.
+                    held = _prop_withheld(cand, r) if is_play else None
+                    if held:
+                        withheld.append({**held, "player": cand.get("player")})
+                        log.info("prop withheld on %s: %s %s",
+                                 r.get("game_pk"), cand.get("player"),
+                                 held["reason"])
+                    else:
+                        posted.append(cand)
+                if withheld:
+                    r["pick_criteria"]["prop_withheld"] = (
+                        withheld[0] if len(withheld) == 1 else withheld)
+                if posted:
+                    r["pick_criteria"]["props"] = posted
+                    # `prop` stays the top one so the existing grading path and
+                    # every reader of it keep working unchanged.
+                    r["pick_criteria"]["prop"] = posted[0]
                 # SHADOW ONLY, NEVER BET: the same hitter's hits+runs+RBIs over
                 # 1.5. 1+ hit is a ~63% event priced near -200 (66.7% break-even)
                 # so the hold eats the edge; H+R+RBI 1.5 was +105 on 2026-10-03,
@@ -326,6 +386,9 @@ def run(date: str) -> dict:
                                     r.get("game_pk"), exc)
                 for b in scored:
                     b["fit"] = fits.get(b.get("player_id"), 0)
+                # ARCHIVAL ONLY since the board reads `props`. Kept because it
+                # is the top of the candidate pool BEFORE the rising filter,
+                # which is exactly what a later backtest of that filter needs.
                 r["pick_criteria"]["hit_bats"] = scored[:3]
                 # HOME RUN PICK, from the WHOLE lineup - see _attach_hr_prop
                 # for why the three posted bats are the wrong pool for it.
@@ -1623,7 +1686,8 @@ PROP_FIT_SCALE = 100.0
 # display, so it is left alone, but the two matchup terms are not on the same
 # scale and that is worth knowing.)
 PLATOON_PRIOR_PA = 300
-PROP_SELECTOR = "all_rate+bvp+fit+platoon"   # stamped so the ledger stays separable
+PROPS_POSTED = 3        # props per game, from BOTH lineups
+PROP_SELECTOR = "all_rate+bvp+fit+platoon+rising"   # stamped so the ledger stays separable
 
 
 def _prop_score(b: dict, fit: int = 0) -> float:
@@ -1961,34 +2025,51 @@ def _conditions_against(g: dict) -> bool:
 
 
 def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
-    """Who is most likely to get a hit if this pick wins, and the conditions.
+    """The posted 1+ hit props, and why each one.
 
     The percentage is hit rate in the team's season WINS, with the hitter's
     ALL-GAMES rate in brackets. That bracket is the point: the first number
     conditions on the outcome, so every regular's rate rises inside wins and a
     big gap mostly says "the team wins when he hits". A SMALL gap is the
     dependable bat, so the gap is what to read.
+
+    It used to print the three best bats on the picked team as context. Now it
+    prints what is actually booked: up to `PROPS_POSTED` props drawn from BOTH
+    lineups, each required to be trending up.
     """
     pc = g.get("pick_criteria") or {}
+    out: list[str] = []
+    # `prop_withheld` is one entry or a list of them since three props post.
     held = pc.get("prop_withheld")
-    if held:
-        # the conditions line is the justification, so it stays
-        out = [f"     NO PROP — {held['reason']}"]
-        cond = _contact_conditions(g, winner or _bet_side(pc)[0])
-        if cond:
-            out.append(f"       {cond}")
+    held = [held] if isinstance(held, dict) else (held or [])
+    posted = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
+    if not posted:
+        if held:
+            # the conditions line is the justification, so it stays
+            out = [f"     NO PROP — {held[0]['reason']}"]
+            cond = _contact_conditions(g, winner or _bet_side(pc)[0])
+            if cond:
+                out.append(f"       {cond}")
         return out
-    bats = pc.get("hit_bats") or []
-    if not bats:
-        return []
-    sp = _surname(pc.get("opp_starter") or "") or "the starter"
-    who = _abbr_of(g, winner) if winner else "they"
-    out = [f"     LIKELY HITS (if {who} win{'s' if winner else ''})"]
-    for b in bats:
-        bits = [f"{b.get('player') or '?'}"]
-        f = b.get("form")
-        if f is not None:
-            bits.append(f"form {f:+d}%" + ("  🔥" if b.get("super_hot") else ""))
+    # POSTED PROPS. Drawn from BOTH lineups and required to be trending up, so
+    # neither "if they win" nor one shared starter describes the list any more -
+    # each line carries its own team and its own pitcher.
+    # Only claim the new pool on a board that actually used it. Replaying an
+    # older board through this renderer would otherwise label a single
+    # picked-team prop "both lineups, rising bats only".
+    both = any(b.get("selector") == PROP_SELECTOR for b in posted)
+    out.append(f"     🎯 1+ HIT PROP{'S' if len(posted) > 1 else ''}"
+               + (f" ({len(posted)}, both lineups, rising bats only)"
+                  if both else ""))
+    for b in posted:
+        # legacy props carry no `team` - there, the bat was the pick's own
+        side = b.get("team") or pc.get("advantage_team")
+        bits = [f"{_abbr_of(g, side) or '?'} {b.get('player') or '?'}"]
+        od = b.get("odds")
+        bits.append(f"{od:+d}" if isinstance(od, int) else "no line")
+        if b.get("trend"):
+            bits.append(f"trend {b['trend']}")
+        sp = _surname(b.get("opp_sp") or pc.get("opp_starter") or "") or "the starter"
         bits.append(_bvp_bit(b.get("bvp"), sp))
         # the vs-hand line, which is the big sample next to BvP's handful
         pl = b.get("platoon") or {}
@@ -2002,6 +2083,8 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
+    for h in held:
+        out.append(f"       ✖ {h.get('player') or '?'} held — {h['reason']}")
     hw = pc.get("hr_withheld")
     if hw:
         out.append(f"       {hw['reason']}")

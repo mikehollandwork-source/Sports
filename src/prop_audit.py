@@ -58,7 +58,12 @@ def collect() -> list[dict]:
             continue
     rows = []
     for e in entries:
-        date, pk = e["key"].split("#")
+        # Ledger keys are `date#game_pk` up to 2026-10-11 and
+        # `date#game_pk#player_id` from 2026-10-12, when three props a game
+        # started posting and the game key stopped being unique.
+        parts = e["key"].split("#")
+        date, pk = parts[0], parts[1]
+        pid = parts[2] if len(parts) > 2 else None
         board = boards.get(date)
         if not board:
             continue
@@ -67,13 +72,20 @@ def collect() -> list[dict]:
         if not g:
             continue
         pc = g.get("pick_criteria") or {}
-        prop = pc.get("prop") or {}
+        plist = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
+        prop = next((x for x in plist if str(x.get("player_id")) == pid),
+                    plist[0] if plist else {})
         w = g.get("weather") or {}
         sa = g.get("statistical_advantage") or {}
         tend = g.get("ump_tend") or {}
         away, home = (g.get("matchup") or " @ ").split(" @ ")
         adv = pc.get("advantage_team")
-        is_home = adv == home
+        # The HITTER'S side, not the bet side. Since 2026-10-12 the prop pool
+        # spans both lineups, so `opp_k9` has to be the starter HE faces -
+        # reading it off `advantage_team` would hand half the rows the wrong
+        # pitcher. Older boards store no `team`, where the two coincide.
+        bat_team = prop.get("team") or adv
+        is_home = bat_team == home
         opp_side = "away" if is_home else "home"
         rows.append({
             "date": date, "won": e["result"] == "W",
