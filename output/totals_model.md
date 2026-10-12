@@ -93,7 +93,26 @@ _`k_extra` is raw K/game, so over a dozen games it largely measures which PITCHE
 - umpires with 12+ starts in the first half: **40**
 - second-half starts under one of them: **432**
 - spread of their residual tendencies: SD **0.57** K/start, range -1.51 to +1.24
+- noise floor for that spread: **0.64** (per-start residual SD 2.36 over √14 starts each)
+- **the spread is 0.90× the floor, i.e. no larger than pure sampling noise.** Umpires that genuinely differed would spread WIDER than this. There is no umpire-level variance to find, which is a stronger result than the correlation below: it is not that the table is stale or built wrong, it is that the quantity it is trying to measure is not there.
 
 - **OUT-OF-SAMPLE correlation, first-half tendency vs second-half residual: -0.067** (n=432, SE about 0.048)
 - second-half residual by first-half tendency: low third **+0.01** K/start (154), high third **-0.37** (152), gap **-0.38**
 - **still nothing.** Removing the pitcher confound does not rescue it, so the umpire is not a usable strikeout term in this data - not because the table is stale or built wrong, but because the effect is too small to survive one start's variance.
+
+## 9. Temperature and wind-out as ONE carry term
+
+_Both are the same mechanism - how far a struck ball carries - and section 7 leaves each at about 1.5 standard errors with the right sign. Read as one standardized index instead. The combination was chosen after seeing both halves, so the correlation is not a clean p-value; the MAE line is what decides it._
+
+- games with temperature and a readable wind: **803**
+- carry index vs full-game runs: **+0.084** (SE about 0.035)
+- carry index vs first-five runs: **+0.057**
+- full-game runs: low third **8.51**, high third **9.46**, gap **+0.95**
+- derived slope: **+0.509 runs per unit of the index** (one unit is about 10°F and the same again in wind)
+
+| model | n | bias | MAE | r |
+|---|---|---|---|---|
+| full game — shipped (starter + pen) | 801 | -0.23 | 3.55 | +0.100 |
+| full game — + carry term | 801 | -0.23 | 3.53 | +0.121 |
+
+- ΔMAE (with carry − without), day-block bootstrap: **[-0.041, +0.002]** → **do not ship.** The interval spans zero: the term is the right sign and the right mechanism and still does not lower the error, which is what a 1.5-sigma signal looks like when it is real but too small to matter
