@@ -31,13 +31,34 @@ from . import mlb_api
 
 log = logging.getLogger("projections")
 
-# Measured in totals_signal.py over 251 graded games.
-LEAGUE_FULL_RUNS = 8.66
-LEAGUE_F5_RUNS = 4.71
+# The league means these scalings hang off, re-measured in totals_model.py over
+# 1286 finished board games - up from the 251 totals_signal.py had. Not a tuned
+# coefficient: the constant is DEFINED as the league mean of the thing being
+# projected, and this is a better estimate of the same quantity. It also removes
+# most of a measured bias, the projection having run 0.45 runs cold full-game
+# and 0.35 cold through five on the old pair.
+LEAGUE_FULL_RUNS = 8.92    # was 8.66 on 251 games
+LEAGUE_F5_RUNS = 4.96      # was 4.71; 55.6% of the game, not the 54% assumed
 LEAGUE_FIP = 4.20          # the league baseline analysis.py works from
 LEAGUE_K9 = 8.6
 STARTER_IP_DEFAULT = 5.3
 CLAMP = (0.70, 1.40)
+
+# THE UMPIRE IS DELIBERATELY ABSENT, and it was asked for. Measured in
+# totals_model.py over 1038 board games, every one of them out of sample for
+# the `ump_tendencies_2026.json` table (built through 2026-07-02):
+#
+#   k_extra vs the game's actual strikeouts   r = -0.044
+#   high-k_extra third of umpires             16.36 K/gm
+#   low-k_extra third                         17.14 K/gm   -> gap -0.78
+#   k_extra vs what the K projection MISSES   r = +0.012
+#   applying it as a multiplier, dMAE         [-0.008, +0.018]
+#
+# The sign is BACKWARDS - umpires the table calls big-zone presided over fewer
+# strikeouts, not more - and the magnitude is inside noise at this sample. An
+# umpire term would be decoration. See `totals_model.md` for whether the
+# tendency is a stable trait at all; if a rebuilt table ever shows one, the
+# multiplier is `totals_model.ump_k_mult` and this is where it goes.
 
 
 def _clamp(v, lo=CLAMP[0], hi=CLAMP[1]):
@@ -53,24 +74,58 @@ def _fip(side: dict) -> float | None:
     return None
 
 
+def _pen_fip(side: dict) -> float | None:
+    v = (side or {}).get("bullpen_fip_last5")
+    return float(v) if isinstance(v, (int, float)) and v > 0 else None
+
+
 def runs(sa: dict) -> dict:
     """Projected full-game and first-five runs for the game.
 
-    Scaled off the league mean by how the two starters' FIP compares with the
-    league. Park and weather are deliberately ABSENT: they are game-level and
-    affect both sides, which is right for a total - but they measured at
-    r=+0.023 and +0.101 against actual runs, so adding them would dress the
-    number up without improving it.
+    THE TWO NUMBERS DO NOT SHARE A MULTIPLIER, because they are not pitched by
+    the same people. The starters pitch the first five, so that one is scaled by
+    starter FIP alone. The full game is scaled by starter and bullpen FIP
+    weighted by INNINGS - `STARTER_IP_DEFAULT` of nine from the starters, the
+    rest from the pen.
+
+    That is mechanism, and the measurements agree twice over. Bullpen FIP
+    correlates +0.139 with full-game runs and +0.030 with the first five
+    (`totals_signal.md`), exactly the asymmetry the innings split implies. And
+    the split beats the old shared multiplier head to head on 1284 games: MAE
+    3.60 -> 3.53 full-game, r +0.075 -> +0.097, day-block bootstrap dMAE
+    [-0.105, -0.038], an interval entirely below zero (`totals_model.md`). The
+    first-five number is unchanged by construction, which is why its row in
+    that table is identical.
+
+    Park and weather are deliberately ABSENT: they are game-level and affect
+    both sides, which is right for a total - but they measured at r=+0.023 and
+    +0.101 against actual runs, so adding them would dress the number up
+    without improving it.
     """
     fips = [f for f in (_fip(sa.get("home")), _fip(sa.get("away")))
             if f is not None]
     if not fips:
         return {}
-    mult = _clamp(sum(fips) / len(fips) / LEAGUE_FIP)
-    return {"full": round(LEAGUE_FULL_RUNS * mult, 2),
-            "f5": round(LEAGUE_F5_RUNS * mult, 2),
-            "basis": f"starter FIP {sum(fips)/len(fips):.2f} vs league "
-                     f"{LEAGUE_FIP:.2f} (x{mult:.2f})"}
+    sp = sum(fips) / len(fips)
+    m_f5 = _clamp(sp / LEAGUE_FIP)
+    pens = [f for f in (_pen_fip(sa.get("home")), _pen_fip(sa.get("away")))
+            if f is not None]
+    if pens:
+        pen = sum(pens) / len(pens)
+        w = STARTER_IP_DEFAULT / 9.0
+        m_full = _clamp((w * sp + (1 - w) * pen) / LEAGUE_FIP)
+        basis = (f"starter FIP {sp:.2f} + pen {pen:.2f} weighted "
+                 f"{w:.0%}/{1 - w:.0%} by innings vs league {LEAGUE_FIP:.2f} "
+                 f"(full x{m_full:.2f}, F5 x{m_f5:.2f} starters only)")
+    else:
+        # no pen number on this board: fall back to the starters for both, which
+        # is what shipped before the split
+        m_full = m_f5
+        basis = (f"starter FIP {sp:.2f} vs league {LEAGUE_FIP:.2f} "
+                 f"(x{m_full:.2f}, no bullpen number)")
+    return {"full": round(LEAGUE_FULL_RUNS * m_full, 2),
+            "f5": round(LEAGUE_F5_RUNS * m_f5, 2),
+            "basis": basis}
 
 
 def strikeouts(pitcher_id: int, name: str, season: int,
@@ -87,11 +142,21 @@ def strikeouts(pitcher_id: int, name: str, season: int,
     except Exception as exc:
         log.warning("K projection unavailable for %s: %s", name, exc)
         return None
-    ip, k, gs = line.get("ip") or 0, line.get("k") or 0, line.get("gs") or 0
+    ip, gs = line.get("ip") or 0, line.get("gs") or 0
+    ip_gs, k_gs = line.get("ip_gs") or 0, line.get("k_gs") or 0
     if ip < 20:
         return None
-    k9 = k * 9.0 / ip
-    exp_ip = (ip / gs) if gs >= 3 else STARTER_IP_DEFAULT
+    # STARTS ONLY for both rates. Dividing all-appearance innings by games
+    # STARTED overstates how long he goes for anyone who also relieved, and
+    # that one line was worth +0.71 strikeouts of bias on every projection
+    # (measured over 2353 starts in totals_model.md). A pitcher with no
+    # recorded starts yet falls back to the all-appearance rate.
+    if ip_gs > 0 and gs >= 3:
+        k9 = k_gs * 9.0 / ip_gs
+        exp_ip = ip_gs / gs
+    else:
+        k9 = (line.get("k") or 0) * 9.0 / ip
+        exp_ip = STARTER_IP_DEFAULT
     opp = 1.0
     note = ""
     if isinstance(opp_k_pct, (int, float)) and opp_k_pct > 0:

@@ -53,7 +53,7 @@ import random
 import statistics as st
 from pathlib import Path
 
-from . import mlb_api, projections, totals_signal
+from . import mlb_api, park_factors, projections, totals_signal
 
 log = logging.getLogger("totals_model")
 
@@ -150,12 +150,21 @@ def collect() -> list[dict]:
             sa = g.get("statistical_advantage") or {}
             wx = g.get("weather") or {}
             tend = g.get("ump_tend") or {}
+            home_name = ((sa.get("home") or {}).get("name")
+                          or (g.get("matchup") or " @ ").split(" @ ")[-1])
             rows.append({
                 "date": date, "pk": pk,
                 "total": s["total"], "f5": s["f5"],
                 "k_total": box["k_total"], "starters": box["starters"],
                 "park": g.get("park_factor"), "temp": wx.get("temp_f"),
                 "k_extra": tend.get("k_extra"), "ump_games": tend.get("games"),
+                "ump": g.get("umpire_hp"),
+                # SIGNED wind, which is the only form that can carry anything:
+                # `totals_signal` tested wind SPEED, where a 15 mph gale blowing
+                # in and one blowing out are the same number, so they cancel.
+                "wind_signed": _wind_signed(g, home_name),
+                "pen_down": _both(sa, "pen_arms_down"),
+                "pen_ip": _both(sa, "bullpen_ip_last5"),
                 "sa": sa})
     if dirty:
         try:
@@ -165,6 +174,38 @@ def collect() -> list[dict]:
         except OSError as exc:
             log.warning("cache not written (%s)", exc)
     return rows
+
+
+def _both(sa: dict, key: str):
+    """The two sides' mean for a board field, or None."""
+    vals = []
+    for side in ("home", "away"):
+        v = (sa.get(side) or {}).get(key)
+        if isinstance(v, (int, float)):
+            vals.append(float(v))
+    return st.mean(vals) if vals else None
+
+
+def _wind_signed(g: dict, home_name: str):
+    """+mph when the wind blows OUT to centre, -mph when it blows in, None for
+    a crosswind, a closed roof or an unknown park bearing.
+
+    Same geometry `main._wind_component` uses for the contact line; the sign is
+    the whole point here.
+    """
+    wx = g.get("weather") or {}
+    if (wx.get("roof") or "") == "closed":
+        return None
+    deg, mph = wx.get("wind_deg"), wx.get("wind_mph")
+    bearing = park_factors.bearing_for(home_name)
+    if bearing is None or not isinstance(deg, (int, float)) \
+            or not isinstance(mph, (int, float)):
+        return None
+    toward = (deg + 180) % 360              # from-direction -> blowing-toward
+    comp = math.cos(math.radians(bearing - toward))
+    if abs(comp) < 0.5:
+        return None                         # crosswind says nothing
+    return mph * comp
 
 
 # --- statistics ---------------------------------------------------------------
@@ -294,7 +335,8 @@ def ump_k_mult(k_extra) -> float:
                                  (LEAGUE_UMP_K_PG + k_extra) / LEAGUE_UMP_K_PG))
 
 
-def starter_k_proj(row: dict, s: dict, with_ump: bool) -> float | None:
+def starter_k_proj(row: dict, s: dict, with_ump: bool,
+                   starts_only: bool = False) -> float | None:
     """`projections.strikeouts` recomputed point-in-time for one start, with the
     umpire multiplier optionally applied.
 
@@ -309,8 +351,13 @@ def starter_k_proj(row: dict, s: dict, with_ump: bool) -> float | None:
     ip, k, gs = line.get("ip") or 0, line.get("k") or 0, line.get("gs") or 0
     if ip < 20:
         return None
-    k9 = k * 9.0 / ip
-    exp_ip = (ip / gs) if gs >= 3 else projections.STARTER_IP_DEFAULT
+    ip_gs, k_gs = line.get("ip_gs") or 0, line.get("k_gs") or 0
+    if starts_only and ip_gs > 0 and gs >= 3:
+        k9 = k_gs * 9.0 / ip_gs
+        exp_ip = ip_gs / gs
+    else:
+        k9 = k * 9.0 / ip
+        exp_ip = (ip / gs) if gs >= 3 else projections.STARTER_IP_DEFAULT
     opp_side = "away" if s["side"] == "home" else "home"
     opp_k = (((row["sa"].get(opp_side) or {}).get("offense") or {}).get("k_pct"))
     opp = 1.0
@@ -471,7 +518,119 @@ def build() -> str:
                "  _This is the cleanest form of the question: a positive "
                "number means a big-zone umpire adds strikeouts the projection "
                "does not already account for._", ""]
+    # --- 5. is the umpire's strikeout rate a TRAIT at all? -------------------
+    md += ["## 5. Is an umpire's strikeout rate a stable trait?", "",
+           "_Section 1 says the table does not predict. Two things could cause "
+           "that: the table is three months stale, or there is nothing there "
+           "to measure. This separates them. Each umpire's games are split "
+           "into alternate halves and his K/game in one half is correlated "
+           "with the other, across umpires - then Spearman-Brown lifts that "
+           "to the reliability of his full record. A near-zero split-half "
+           "means more games will not help._", ""]
+    md += _reliability(rows)
+
+    # --- 6. the strikeout bias, and the starts-only fix ----------------------
+    md += ["## 6. Starter strikeouts: innings per START, not per appearance",
+           "",
+           "_The projection divided ALL-APPEARANCE innings by games STARTED, "
+           "which overstates how long a pitcher goes whenever he also "
+           "relieved. Both rates below are point-in-time. `k9/exp_ip from "
+           "starts` also takes his K rate from starts only, which is the rate "
+           "a start should be projected at._", "",
+           "| model | n | bias | MAE | r |", "|---|---|---|---|---|"]
+    fixed = []
+    for r in rows:
+        for st_ in r["starters"]:
+            if st_["ip"] < 1:
+                continue
+            v = starter_k_proj(r, st_, with_ump=False, starts_only=True)
+            if v is not None:
+                fixed.append((v, st_["k"], r["date"]))
+    md += _pair_block("starter K — current (all appearances / starts)", base)
+    md += _pair_block("starter K — CANDIDATE (starts only)", fixed)
+    md.append("")
+    if len(fixed) == len(base):
+        lo, hi = _boot_delta_mae(fixed, base)
+        if lo is not None:
+            verdict = ("**better**" if hi < 0 else
+                       "**no improvement - interval spans zero**"
+                       if lo < 0 <= hi else "**worse**")
+            md += [f"- ΔMAE (starts-only − current): **[{lo:+.3f}, "
+                   f"{hi:+.3f}]** → {verdict}", ""]
+    else:
+        md += [f"- _not paired ({len(fixed)} vs {len(base)} usable), so no "
+               "bootstrap - compare the rows above directly._", ""]
+
+    # --- 7. signed wind, and a depleted bullpen ------------------------------
+    md += ["## 7. Two signals the earlier sweep could not have found", "",
+           "_`totals_signal` tested wind SPEED, where a gale blowing in and "
+           "one blowing out are the same number and cancel; this is the signed "
+           "component toward centre field. A depleted bullpen can only matter "
+           "AFTER the starters leave, so it is read against the full game and "
+           "the first five separately - if it is real, the full-game number is "
+           "the larger of the two._", "",
+           "| signal | n | r vs full game | r vs first five | low third runs | "
+           "high third runs | gap |", "|---|---|---|---|---|---|---|"]
+    for key, label in (("wind_signed", "wind out (+) / in (−), mph"),
+                       ("pen_down", "bullpen arms down"),
+                       ("pen_ip", "bullpen innings last 5"),
+                       ("temp", "temperature °F")):
+        rs = [r for r in rows if isinstance(r.get(key), (int, float))]
+        if len(rs) < 30:
+            md.append(f"| {label} | {len(rs)} | — | — | — | — | — |")
+            continue
+        rf = _pearson([r[key] for r in rs], [r["total"] for r in rs])
+        r5 = _pearson([r[key] for r in rs], [r["f5"] for r in rs])
+        t = _tercile(rs, key, "total")
+        lo = f"{t[0]:.2f}" if t else "—"
+        hi = f"{t[1]:.2f}" if t else "—"
+        gap = f"**{t[1] - t[0]:+.2f}**" if t else "—"
+        md.append(f"| {label} | {len(rs)} | {_fmt_r(rf)} | {_fmt_r(r5)} | "
+                  f"{lo} | {hi} | {gap} |")
+    md += ["", f"_At n around a thousand the standard error on a correlation "
+           f"is about {1 / math.sqrt(1000):.3f}, so anything inside roughly "
+           "±0.06 is not distinguishable from nothing._", ""]
     return "\n".join(md)
+
+
+def _reliability(rows: list[dict]) -> list[str]:
+    """Split-half reliability of an umpire's K/game, across umpires."""
+    by_ump: dict = {}
+    for r in rows:
+        if r.get("ump"):
+            by_ump.setdefault(r["ump"], []).append(r["k_total"])
+    pairs = [(st.mean(ks[0::2]), st.mean(ks[1::2]))
+             for ks in by_ump.values() if len(ks) >= 10]
+    if len(pairs) < 20:
+        return [f"- only {len(pairs)} umpires with 10+ games here; not "
+                "measurable.", ""]
+    r = _pearson([a for a, _ in pairs], [b for _, b in pairs])
+    out = [f"- umpires with 10+ board games: **{len(pairs)}** "
+           f"(mean {st.mean(len(k) for k in by_ump.values()):.1f} games each)",
+           f"- split-half correlation of K/game: **{_fmt_r(r)}**"]
+    if isinstance(r, float) and r > -0.99:
+        sb = 2 * r / (1 + r) if (1 + r) else None
+        if sb is not None:
+            out.append(f"- Spearman-Brown, lifted to the full record: "
+                       f"**{sb:+.3f}**")
+        out.append("- " + ("**there is a trait here** — a rebuilt, "
+                           "sample-shrunk table is worth trying before the "
+                           "umpire is written off"
+                           if isinstance(r, float) and r >= 0.2 else
+                           "**no trait to find** — his half-seasons barely "
+                           "agree with each other, so a bigger table cannot "
+                           "rescue a term the outcome already rejected"))
+    return out + [""]
+
+    """(row, base projection, starter) for every usable start - so the residual
+    test reuses exactly the projections table 4 scored."""
+    for r in rows:
+        for s in r["starters"]:
+            if s["ip"] < 1:
+                continue
+            b = starter_k_proj(r, s, with_ump=False)
+            if b is not None:
+                yield r, b, s
 
 
 def _residual_rows(rows: list[dict]):

@@ -322,21 +322,37 @@ def batter_vs_pitcher(batter_id: int, pitcher_id: int) -> dict:
 
 
 def pitcher_season_line(pitcher_id: int, season: int, as_of: str | None = None) -> dict:
-    """A pitcher's season-to-date totals (point-in-time): {ip, hr, bb, hbp, k, gs}.
-    Caller computes FIP so the FIP constant stays in one place (analysis)."""
-    ip = 0.0
-    tot = {"hr": 0, "bb": 0, "hbp": 0, "k": 0, "gs": 0}
+    """A pitcher's season-to-date totals (point-in-time):
+    {ip, hr, bb, hbp, k, gs, ip_gs, k_gs}.
+
+    Caller computes FIP so the FIP constant stays in one place (analysis).
+
+    `ip_gs` and `k_gs` count STARTS ONLY, while `ip` and `k` count every
+    appearance. Both are needed and they are not interchangeable: innings per
+    START is `ip_gs / gs`, and dividing the all-appearance `ip` by `gs`
+    overstates it for anyone who also relieved - which was adding 0.7
+    strikeouts to every projection in `projections.strikeouts`.
+    """
+    ip = ip_gs = 0.0
+    tot = {"hr": 0, "bb": 0, "hbp": 0, "k": 0, "gs": 0, "k_gs": 0}
     for sp in _full_gamelog(pitcher_id, "pitching", season):
         if as_of and sp.get("date", "") >= as_of:
             continue
         st = sp.get("stat", {})
-        ip += _ip_to_innings(st.get("inningsPitched", "0"))
+        inn = _ip_to_innings(st.get("inningsPitched", "0"))
+        k = int(st.get("strikeOuts", 0) or 0)
+        started = int(st.get("gamesStarted", 0) or 0)
+        ip += inn
         tot["hr"] += int(st.get("homeRuns", 0) or 0)
         tot["bb"] += int(st.get("baseOnBalls", 0) or 0)
         tot["hbp"] += int(st.get("hitByPitch", 0) or 0)
-        tot["k"] += int(st.get("strikeOuts", 0) or 0)
-        tot["gs"] += int(st.get("gamesStarted", 0) or 0)
+        tot["k"] += k
+        tot["gs"] += started
+        if started:
+            ip_gs += inn
+            tot["k_gs"] += k
     tot["ip"] = round(ip, 2)
+    tot["ip_gs"] = round(ip_gs, 2)
     return tot
 
 
