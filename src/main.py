@@ -286,7 +286,7 @@ def run(date: str) -> dict:
                     opp_pitcher_id=getattr(osp, "player_id", None))
                 if not rk:
                     continue
-                side_fits = _fits_for(r, rk, bat_t.team_id, date)
+                side_fits = _fits_for(r, rk, bat_t.team_id, date, bat_t.name)
                 plat = _platoon_for(rk, getattr(osp, "hand", None), season_)
                 for b in rk:
                     pid_ = b.get("player_id")
@@ -1781,12 +1781,17 @@ def _prop_score(b: dict, fit: int = 0) -> float:
     return base + edge + platoon + (fit / PROP_FIT_SCALE)
 
 
-def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:
+def _fits_for(game: dict, bats: list, team_id: int, date: str,
+              bat_team: str | None = None) -> dict:
     """{player_id: fit score} from each hitter's batted-ball profile against
     tonight's conditions. Fails soft to {} - a missing profile costs the
-    conditions term, and must never cost the board."""
+    conditions term, and must never cost the board.
+
+    `bat_team` picks the starter these hitters actually face; see
+    `_conditions_against`.
+    """
     out: dict = {}
-    cold_or_in = _conditions_against(game)
+    cold_or_in = _conditions_against(game, bat_team)
     if not cold_or_in:
         return out                       # nothing to adjust for
     try:
@@ -2009,7 +2014,8 @@ def _prop_withheld(prop: dict, game: dict) -> dict | None:
     problem; paying through it is.
     """
     score = prop.get("prop_score")
-    if not isinstance(score, (int, float)) or not _conditions_against(game):
+    if not isinstance(score, (int, float)) or \
+            not _conditions_against(game, prop.get("team")):
         return None
     odds = prop.get("odds", prop_grade.PROP_PRICE)
     try:
@@ -2066,10 +2072,24 @@ def _platoon_for(bats: list, opp_hand: str | None, season: int) -> dict:
     return out
 
 
-def _conditions_against(g: dict) -> bool:
-    """True when tonight actually suppresses batted balls - cold, wind blowing in,
-    or a high-strikeout starter. Without one of those the profile term would be
-    noise dressed as information, so it is simply not applied."""
+def _conditions_against(g: dict, bat_team: str | None = None) -> bool:
+    """True when tonight actually suppresses batted balls for THIS hitter - cold,
+    wind blowing in, or the starter HE FACES striking people out. Without one of
+    those the profile term would be noise dressed as information, so it is
+    simply not applied.
+
+    `bat_team` is the side the hitter bats for, and the strikeout test uses only
+    the OPPOSING starter. Without it the test asked whether EITHER starter was
+    high-strikeout, which was a tolerable proxy while props came only from the
+    picked team and is simply wrong now they come from both: on 2026-10-12 it
+    held Teoscar Hernández on Yamamoto's 10.04 K/9 - Hernández's OWN pitcher,
+    who never throws him one - while the man he actually faced sat at 9.1, under
+    the bar. Same for José Ramírez against Griffin. Temperature and wind stay
+    game-level, because they are.
+
+    Omitting `bat_team` keeps the old either-starter behaviour, which is what a
+    legacy prop with no `team` field has to fall back to.
+    """
     w = g.get("weather") or {}
     if isinstance(w.get("temp_f"), int) and w["temp_f"] <= TEMP_COLD:
         return True
@@ -2078,7 +2098,11 @@ def _conditions_against(g: dict) -> bool:
     if wind and wind[0] == "in":
         return True
     sa = g.get("statistical_advantage") or {}
-    for side in ("home", "away"):
+    if bat_team:
+        sides = ("away",) if bat_team == home else ("home",)
+    else:
+        sides = ("home", "away")
+    for side in sides:
         k9 = (sa.get(side) or {}).get("starter_k9")
         if isinstance(k9, (int, float)) and k9 >= K9_POWER:
             return True

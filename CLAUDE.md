@@ -516,6 +516,19 @@ unit-testable with mock `Game`/`Team` objects.
   prop spent it there and left both hits legs empty. The hits legs are the
   measured product with their own recorded singles; total bases is the
   speculative one.
+  **The price bar checks the starter the HITTER FACES, not either starter**
+  (`_conditions_against(g, bat_team)`). The gate fires only when the night
+  suppresses contact — cold, wind in, or a high-K starter — AND the read is
+  under the break-even the price demands; the bar IS the price, not a chosen
+  threshold. The strikeout half used to ask whether EITHER starter was high-K,
+  which was a tolerable proxy while props came only from the picked team and
+  became wrong the moment they came from both. On 2026-10-12 it held Teoscar
+  Hernández on **Yamamoto's 10.04 K/9 — his own team's pitcher**, who never
+  throws him one, while the man he actually faced sat at 9.1 under the 9.5 bar;
+  same for José Ramírez, held on Griffin while facing Rasmussen at 8.9. Two of
+  five holds that night were on the wrong pitcher. Temperature and wind stay
+  game-level because they are. Omitting `bat_team` keeps the old either-starter
+  behaviour, which is what a legacy prop with no `team` field falls back to.
   **No fallback to WITHHELD props.** A prop held by `_prop_withheld` is below
   its own break-even, and a leg's EV multiplies into a parlay exactly as it
   does into a single, so a held leg is bad in both. A ticket that cannot find
