@@ -335,3 +335,52 @@ unit-testable with mock `Game`/`Team` objects.
   everything that renders them — F5/full runs, starter strikeouts, projected
   hits, the HR block, the watch tags — lives past that return. A night where
   nothing clears the pick bar is exactly the night they are wanted.
+- **The two run totals do NOT share a multiplier, and the umpire is NOT in the
+  strikeout projection** (`projections.py`, measured in `totals_model.py` over
+  1286 finished board games — five times the 251 `totals_signal` had).
+  **SHIPPED, each with a day-block bootstrap behind it:**
+  *First five is starter FIP alone; the full game weights starter and bullpen
+  FIP by INNINGS* (`STARTER_IP_DEFAULT`/9 from the starters, the rest from the
+  pen). Mechanism — the starters pitch the first five — and the data agrees
+  twice: bullpen FIP correlates +0.139 with full-game runs against +0.030 with
+  the first five, exactly that asymmetry, and head-to-head the split cuts
+  full-game MAE 3.60→3.53, r +0.075→+0.097, ΔMAE **[−0.105, −0.038]**, entirely
+  below zero. The first-five row is identical by construction.
+  *League constants re-measured on 1286 games*: 8.66→**8.92** full, 4.71→**4.96**
+  through five (55.6% of the game, not the 54% assumed). Not tuning — the
+  constant is DEFINED as the league mean of the thing projected. It cut the
+  cold bias from −0.45 to −0.19 runs.
+  *`pitcher_season_line` now also returns `ip_gs`/`k_gs`, STARTS ONLY, and
+  `projections.strikeouts` uses them.* Dividing all-appearance innings by games
+  STARTED overstates how long anyone who also relieved goes. That one line was
+  the single biggest error in the file: bias **+0.71→+0.06** K, MAE
+  **2.26→1.89**, r **+0.149→+0.404** over 2353 starts, ΔMAE [−0.435, −0.301].
+  **MEASURED AND REJECTED — the UMPIRE on strikeouts, which was asked for
+  directly.** It fails three independent ways and twice with the WRONG SIGN:
+  (1) raw `k_extra` vs the game's actual strikeouts is r=−0.044 over 1038 games
+  all out of sample for the table, with the high-`k_extra` third of umpires
+  seeing **16.36** K/game against **17.14** in the low third; (2) as a
+  multiplier, ΔMAE [−0.008, +0.018], and against what the K projection misses
+  r=+0.012; (3) residualised so the pitcher is removed by construction and
+  split chronologically (first half builds the tendency, second half tests it),
+  out-of-sample r=**−0.067** with a tercile gap of −0.38 K/start. **The
+  decisive number is the noise floor**: the spread of umpires' residual
+  tendencies is SD 0.57 K/start against a sampling floor of 0.64 — **0.90× the
+  floor**, i.e. no wider than if every umpire were identical. Umpires that
+  genuinely differed would spread WIDER. So this is not a stale table (it is
+  stale — built `through 2026-07-02`) and not a build bug; the quantity is not
+  there. Split-half reliability of raw K/game is +0.172 → Spearman-Brown
+  **+0.293**, and that residue is mostly which PITCHERS he drew. Do not add an
+  umpire strikeout term without a measurement that clears the noise floor.
+  The umpire tilt in `analysis.statistical_favorite` is a separate claim about
+  WIN rates and is untouched by this.
+  **ON THE SHELF, not shipped:** temperature and wind-out read as ONE carry
+  index (same mechanism — how far a struck ball carries) reaches r=+0.084 vs
+  full-game runs on 803 games, a +0.95-run tercile gap and r +0.100→+0.121, but
+  ΔMAE **[−0.041, +0.002]** spans zero, so it does not ship. Right sign, right
+  mechanism, too small to lower the error. Re-test it when more games
+  accumulate; do NOT re-fit the slope. Separately: signed wind needs the
+  compass string (`wind_dir`, on all 1167 weather boards) because `wind_deg` is
+  on only 24 — and `totals_signal` tested wind SPEED, where a gale blowing in
+  and one blowing out are the same number and cancel, which is why it read
+  −0.041. Bullpen arms down (−0.044) and bullpen innings (−0.001) are null.
