@@ -12,6 +12,16 @@ Windows: last 5 games against the 10 before them, both ending before the game pr
 | air rate only | 3.287% (1453/44211) | 3.109% (1415/45509) | +0.177% | 0.1594 |
 | ISO only | 3.376% (1237/36639) | 3.073% (1631/53081) | +0.304% | 0.0060 |
 
+## Does the batted-ball trend predict a HIT?
+
+_The five-game HIT-RATE form is a coin flip (AUC 0.5053) and was cut from the prop score. This is the other measurement - air rate and ISO, five games against the prior ten - the one that works for home runs. Whether it carries to hits is a separate question._
+
+- rising: **62.3%** got a hit (8970 games)
+- falling: **60.3%** got a hit (13546 games)
+- gap **+2.0%**, permutation **p = 0.0025**
+- **Real.** A trend requirement on props is justified.
+
+
 ## How to read this
 
 - the primary test is the combined ratio; the other two are reported so a split-specific result is visible, not so the best one can be chosen after the fact
