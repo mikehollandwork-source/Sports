@@ -61,8 +61,18 @@ def _norm(s: str) -> str:
 
 
 def _scores(date: str, cache: dict) -> dict:
-    """{gamePk: {total, f5}} - full-game runs and runs through five innings."""
-    if date in cache:
+    """{gamePk: {total, f5}} - full-game runs and runs through five innings.
+
+    A date is CACHED ONLY ONCE EVERY GAME ON IT IS DONE. Caching a date whose
+    games were still in progress stored an empty result that `date in cache`
+    then made permanent: 2026-10-11 and 2026-10-12 both sat at {} with a live
+    game on them, so the most recent games - the ones a tracker needs most -
+    could never settle. An empty cached entry is also re-checked rather than
+    trusted, which costs one cheap schedule call and heals the dates already
+    poisoned. A genuinely empty date (an off-day, the All-Star break) simply
+    re-caches as empty.
+    """
+    if date in cache and cache[date]:
         return cache[date]
     try:
         data = mlb_api._get("schedule", sportId=1, date=date,
@@ -70,10 +80,17 @@ def _scores(date: str, cache: dict) -> dict:
     except Exception as exc:
         log.warning("linescore %s failed (%s)", date, exc)
         return {}
-    out = {}
+    out, pending = {}, 0
     for day in data.get("dates", []):
         for g in day.get("games", []):
-            if (g.get("status") or {}).get("abstractGameState") != "Final":
+            status = g.get("status") or {}
+            if status.get("abstractGameState") != "Final":
+                # postponed, cancelled and suspended games never reach Final,
+                # so they must not hold the whole date out of the cache
+                det = (status.get("detailedState") or "")
+                if not det.startswith(("Postponed", "Cancelled", "Canceled",
+                                       "Suspended")):
+                    pending += 1
                 continue
             ls = g.get("linescore") or {}
             innings = ls.get("innings") or []
@@ -90,7 +107,11 @@ def _scores(date: str, cache: dict) -> dict:
                     f5 += int(v) if isinstance(v, int) else 0
             out[str(g["gamePk"])] = {"total": h + a,
                                      "f5": f5 if ok else None}
-    cache[date] = out
+    if pending:
+        log.info("scores %s: %d game(s) not final yet - not caching", date,
+                 pending)
+    else:
+        cache[date] = out
     return out
 
 
