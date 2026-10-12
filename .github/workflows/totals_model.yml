@@ -1,6 +1,10 @@
 name: Totals model
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write   # the report and the boxscore cache are committed back
+
 jobs:
   measure:
     runs-on: ubuntu-latest
