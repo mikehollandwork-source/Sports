@@ -1,6 +1,6 @@
 {
   "date": "2026-10-12",
-  "generated_at": "2026-10-12T23:04:19.377206+00:00",
+  "generated_at": "2026-10-12T23:07:34.069049+00:00",
   "games": [
     {
       "game_pk": 849812,
@@ -994,12 +994,12 @@
         "majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 77.0,
-          "moneyline": "-182"
+          "moneyline": "-166"
         },
         "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 23.0,
-          "moneyline": "+150"
+          "moneyline": "+148"
         }
       },
       "consistency": {
@@ -1273,37 +1273,6 @@
         },
         "hit_bats": [
           {
-            "player": "Chase DeLauter",
-            "player_id": 800050,
-            "hit_rate": 68,
-            "all_rate": 66,
-            "gap": 3,
-            "form": 14,
-            "super_hot": false,
-            "bvp": {
-              "pa": 6,
-              "ops": 1.167
-            },
-            "wins_played": 73,
-            "games_played": 138,
-            "avg_pa": 4.2,
-            "short_night_rate": 0.063,
-            "mean_pa_per_start": 4.34,
-            "short_nights": "7/131 starts of 3 PA or fewer",
-            "team": "Cleveland Guardians",
-            "opp_sp": "Drew Rasmussen",
-            "fit": 2,
-            "platoon": {
-              "hand": "R",
-              "avg": 0.269,
-              "pa": 380,
-              "delta": -0.017,
-              "shrunk": -0.0097
-            },
-            "trend_factor": 0.96,
-            "trend": "falling: last 5 vs prior 10 \u2014 air 33% vs 39%, ISO 0.000 vs 0.211 -> x0.96"
-          },
-          {
             "player": "Steven Kwan",
             "player_id": 680757,
             "hit_rate": 73,
@@ -1333,6 +1302,37 @@
             },
             "trend_factor": 0.96,
             "trend": "falling: last 5 vs prior 10 \u2014 air 38% vs 55%, ISO 0.000 vs 0.056 -> x0.96"
+          },
+          {
+            "player": "Chase DeLauter",
+            "player_id": 800050,
+            "hit_rate": 68,
+            "all_rate": 66,
+            "gap": 3,
+            "form": 14,
+            "super_hot": false,
+            "bvp": {
+              "pa": 6,
+              "ops": 1.167
+            },
+            "wins_played": 73,
+            "games_played": 138,
+            "avg_pa": 4.2,
+            "short_night_rate": 0.063,
+            "mean_pa_per_start": 4.34,
+            "short_nights": "7/131 starts of 3 PA or fewer",
+            "team": "Cleveland Guardians",
+            "opp_sp": "Drew Rasmussen",
+            "fit": 0,
+            "platoon": {
+              "hand": "R",
+              "avg": 0.269,
+              "pa": 380,
+              "delta": -0.017,
+              "shrunk": -0.0097
+            },
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 33% vs 39%, ISO 0.000 vs 0.211 -> x0.96"
           },
           {
             "player": "Junior Caminero",
@@ -1382,25 +1382,85 @@
             "odds": -179,
             "real_line": true,
             "reason": "conditions against the bat and the read (61%) is under the 64% that -179 needs"
-          },
+          }
+        ],
+        "props": [
           {
             "player": "Jos\u00e9 Ram\u00edrez",
-            "score": 0.43,
-            "need": 0.6667,
-            "odds": -200,
-            "real_line": false,
-            "reason": "conditions against the bat and the read (43%) is under the 67% that -200 needs"
+            "player_id": 608070,
+            "hit_rate": 74,
+            "all_rate": 62,
+            "gap": 12,
+            "form": -2,
+            "super_hot": false,
+            "bvp": {
+              "pa": 11,
+              "ops": 0.182
+            },
+            "wins_played": 70,
+            "games_played": 129,
+            "avg_pa": 4.5,
+            "short_night_rate": 0.035,
+            "mean_pa_per_start": 4.41,
+            "short_nights": "5/126 starts of 3 PA or fewer",
+            "team": "Cleveland Guardians",
+            "opp_sp": "Drew Rasmussen",
+            "fit": 0,
+            "platoon": {
+              "hand": "R",
+              "avg": 0.212,
+              "pa": 380,
+              "delta": -0.023,
+              "shrunk": -0.0126
+            },
+            "trend_factor": 1.05,
+            "trend": "rising: last 5 vs prior 10 \u2014 air 89% vs 57%, ISO 0.500 vs 0.143 -> x1.05",
+            "prop_score": 0.42,
+            "selector": "all_rate+bvp+fit+platoon+rising"
           }
-        ]
+        ],
+        "prop": {
+          "player": "Jos\u00e9 Ram\u00edrez",
+          "player_id": 608070,
+          "hit_rate": 74,
+          "all_rate": 62,
+          "gap": 12,
+          "form": -2,
+          "super_hot": false,
+          "bvp": {
+            "pa": 11,
+            "ops": 0.182
+          },
+          "wins_played": 70,
+          "games_played": 129,
+          "avg_pa": 4.5,
+          "short_night_rate": 0.035,
+          "mean_pa_per_start": 4.41,
+          "short_nights": "5/126 starts of 3 PA or fewer",
+          "team": "Cleveland Guardians",
+          "opp_sp": "Drew Rasmussen",
+          "fit": 0,
+          "platoon": {
+            "hand": "R",
+            "avg": 0.212,
+            "pa": 380,
+            "delta": -0.023,
+            "shrunk": -0.0126
+          },
+          "trend_factor": 1.05,
+          "trend": "rising: last 5 vs prior 10 \u2014 air 89% vs 57%, ISO 0.500 vs 0.143 -> x1.05",
+          "prop_score": 0.42,
+          "selector": "all_rate+bvp+fit+platoon+rising"
+        }
       },
       "flagged": false,
       "pick": null,
       "game_datetime": "2026-10-13T00:00:00Z",
       "weather": {
-        "temp_f": 76,
-        "wind_mph": 12,
-        "wind_dir": "NNW",
-        "wind_deg": 336,
+        "temp_f": 73,
+        "wind_mph": 6,
+        "wind_dir": "NW",
+        "wind_deg": 318,
         "precip_pct": 0,
         "roof": "dome"
       },
