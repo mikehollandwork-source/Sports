@@ -237,19 +237,23 @@ def run(date: str) -> dict:
     for r in results:
         if r.get("state") == "final":
             continue
-        pc0 = r.get("pick_criteria") or {}
-        gd = pc0.get("good_dog") or {}
-        # the read is computed for PLAYS and for watch-listed good dogs, since
-        # "who gets a hit when they win" is asked of both. For a watch entry the
-        # team is the good dog itself, not a bet side.
-        adv = (_bet_side(pc0)[0] if _play(r) == "pick" else None) or gd.get("team")
-        if not adv:
-            continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
             continue
-        is_home = adv == gm.home.name
-        team = gm.home if is_home else gm.away
+        pc0 = r.get("pick_criteria") or {}
+        gd = pc0.get("good_dog") or {}
+        # EVERY upcoming game gets props, including a no-action one. A 1+ hit
+        # prop is its own bet and does not need the moneyline rule to have
+        # landed anywhere - on a night where nothing clears the pick bar the
+        # board would otherwise carry no prop at all, which is what happened on
+        # 2026-10-12 (two games, both no-action, zero props).
+        #
+        # `adv` is only the side the HR PICK and the `opp_starter` label hang
+        # off, and it is None when the game is neither a play nor a good-dog
+        # watch. Both of those are skipped then; the hit props are not.
+        adv = (_bet_side(pc0)[0] if _play(r) == "pick" else None) or gd.get("team")
+        is_home = (adv == gm.home.name) if adv else None
+        team = (gm.home if is_home else gm.away) if adv else None
         try:
             # BOTH lineups. A hitter's chance of a hit has nothing to do with
             # which side the moneyline rule landed on, so restricting the pool
@@ -279,9 +283,10 @@ def run(date: str) -> dict:
                     if pid_ in plat:
                         b["platoon"] = plat[pid_]
                 ranked += rk
-            bet_sp = (gm.away if is_home else gm.home).probable_pitcher
-            if bet_sp:
-                r["pick_criteria"]["opp_starter"] = bet_sp.name
+            if adv:
+                bet_sp = (gm.away if is_home else gm.home).probable_pitcher
+                if bet_sp:
+                    r["pick_criteria"]["opp_starter"] = bet_sp.name
             scored = sorted(ranked,
                             key=lambda b: _prop_score(b, b.get("fit", 0)),
                             reverse=True)
@@ -298,7 +303,7 @@ def run(date: str) -> dict:
             # lineups now, so scoring every candidate would be ~18 fetches a
             # game and ~160 a slate to use three of them. It cannot reorder
             # anything - the score is already fixed - it only filters.
-            need = PROPS_POSTED if _play(r) == "pick" else 1
+            need = PROPS_POSTED
             rising = []
             for b in scored:
                 if len(rising) >= need:
@@ -322,11 +327,14 @@ def run(date: str) -> dict:
                 upcoming = r.get("state") == "upcoming"
                 is_play = _play(r) == "pick"
                 posted, withheld = [], []
-                # Up to PROPS_POSTED of them, from both lineups. They cost no
-                # extra odds credits - `prop_odds.hit_line` caches the game's
-                # whole batter_hits board per day, so the second and third are
-                # already paid for. `need` above still holds a good-dog watch
-                # entry to one: that block is context, not a bet.
+                # Up to PROPS_POSTED of them, from both lineups. The second and
+                # third cost no extra odds credits - `prop_odds.hit_line`
+                # caches the game's whole batter_hits board per day - but a
+                # game that is NOT a play is a new game to price, so it spends
+                # under the lower `prop_extra` tier: if the budget tightens,
+                # the game we have a model play on keeps its real line and the
+                # extras fall back to the assumed price.
+                tier = "bet" if is_play else "prop_extra"
                 for cand in rising:
                     fit = cand.get("fit", 0)
                     cand["prop_score"] = round(_prop_score(cand, fit), 4)
@@ -337,16 +345,18 @@ def run(date: str) -> dict:
                     if upcoming:
                         try:
                             ln = prop_odds.hit_line(date, cand["player"],
-                                                    gm.away.name, gm.home.name)
+                                                    gm.away.name, gm.home.name,
+                                                    tier=tier)
                             if ln is not None:
                                 cand["odds"] = ln
                         except Exception as exc:
                             log.warning("hit line failed for %s: %s",
                                         cand.get("player"), exc)
-                    # The gate applies to a POSTED prop, i.e. a play. A good-dog
-                    # watch entry's hit block is context, not a bet, so it is
-                    # left alone - it is already labelled NOT A BET.
-                    held = _prop_withheld(cand, r) if is_play else None
+                    # The price bar applies to every POSTED prop. It used to
+                    # run only on plays, because a non-play's prop was context
+                    # rather than a bet; now that all three post and all three
+                    # grade, all three have to clear it.
+                    held = _prop_withheld(cand, r)
                     if held:
                         withheld.append({**held, "player": cand.get("player")})
                         log.info("prop withheld on %s: %s %s",
@@ -1451,7 +1461,12 @@ def _game_lines(g: dict) -> list[str]:
     no-action games collapse to a one-liner."""
     pc = g["pick_criteria"]
     if _play(g) == "stay_away":
-        return [_stay_line(g)]
+        # The one-liner, PLUS the props and projections. Those were being
+        # computed and stored on no-action games and then never printed,
+        # because everything that renders them lives in `_hit_lines` and a
+        # no-action game returned before reaching it. A night where nothing
+        # clears the pick bar is exactly the night they are wanted.
+        return [_stay_line(g)] + _hit_lines(g)
     c = pc["components"]
     adv = pc["advantage_team"]
     e = c["stat_edge"]
@@ -2042,15 +2057,17 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     # `prop_withheld` is one entry or a list of them since three props post.
     held = pc.get("prop_withheld")
     held = [held] if isinstance(held, dict) else (held or [])
-    posted = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
-    if not posted:
-        if held:
-            # the conditions line is the justification, so it stays
-            out = [f"     NO PROP — {held[0]['reason']}"]
-            cond = _contact_conditions(g, winner or _bet_side(pc)[0])
-            if cond:
-                out.append(f"       {cond}")
-        return out
+    # What is actually BOOKED, matching `prop_grade` exactly so the board shows
+    # as a bet precisely what the ledger settles. New boards carry `props` only
+    # when a prop was posted, on any game. On a LEGACY board the single `prop`
+    # was also computed for good-dog watch entries as context, and the ledger
+    # required a pick there - so the same test applies here, or replaying an
+    # old no-action game would relabel its context prop as a posted bet.
+    posted = pc.get("props") or (
+        [pc["prop"]] if pc.get("prop") and _play(g) == "pick" else [])
+    if not posted and held:
+        # the conditions line below is the justification, so it stays
+        out.append(f"     NO PROP — {held[0]['reason']}")
     # POSTED PROPS. Drawn from BOTH lineups and required to be trending up, so
     # neither "if they win" nor one shared starter describes the list any more -
     # each line carries its own team and its own pitcher.
@@ -2058,9 +2075,10 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     # older board through this renderer would otherwise label a single
     # picked-team prop "both lineups, rising bats only".
     both = any(b.get("selector") == PROP_SELECTOR for b in posted)
-    out.append(f"     🎯 1+ HIT PROP{'S' if len(posted) > 1 else ''}"
-               + (f" ({len(posted)}, both lineups, rising bats only)"
-                  if both else ""))
+    if posted:
+        out.append(f"     🎯 1+ HIT PROP{'S' if len(posted) > 1 else ''}"
+                   + (f" ({len(posted)}, both lineups, rising bats only)"
+                      if both else ""))
     for b in posted:
         # legacy props carry no `team` - there, the bat was the pick's own
         side = b.get("team") or pc.get("advantage_team")
@@ -2083,7 +2101,7 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
-    for h in held:
+    for h in (held if posted else held[1:]):
         out.append(f"       ✖ {h.get('player') or '?'} held — {h['reason']}")
     hw = pc.get("hr_withheld")
     if hw:
@@ -2123,9 +2141,10 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         if hh:
             out.append("          hits  " + "  ·  ".join(
                 f"{t} {v['proj']}" for t, v in hh.items()))
-    cond = _contact_conditions(g, winner or _bet_side(pc)[0])
-    if cond:
-        out.append(f"       {cond}")
+    if out:
+        cond = _contact_conditions(g, winner or _bet_side(pc)[0])
+        if cond:
+            out.append(f"       {cond}")
     return out
 
 

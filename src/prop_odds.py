@@ -58,7 +58,11 @@ RESERVE = int(os.environ.get("ODDS_RESERVE", "40"))
 # Lower spends first. An UNREGISTERED tier falls to 0 below and is treated as a
 # bet, so anything new that spends credits must be added here or it will outrank
 # the posted bets and drain the budget they depend on.
-PRIORITY = {"bet": 0, "shadow": 1, "log": 2}
+# prop_extra: a hit line for a game that is NOT a model play. Those props are
+# real bets and are graded, so they rank above the shadow experiment, but they
+# are new games to price rather than second players on an already-paid-for
+# board, so they yield before a play's own line does.
+PRIORITY = {"bet": 0, "prop_extra": 1, "shadow": 2, "log": 3}
 
 
 def _state() -> dict:
@@ -209,14 +213,22 @@ def _as_row(v) -> dict:
     return {}
 
 
-def hit_line(date: str, player: str, away_name: str, home_name: str) -> int | None:
+def hit_line(date: str, player: str, away_name: str, home_name: str,
+             tier: str = "bet") -> int | None:
     """The real 1+ hit (Over 0.5) American price for a player, or None. Fetches a
-    game's whole batter_hits board once per day and caches it (credit-thrifty)."""
+    game's whole batter_hits board once per day and caches it (credit-thrifty).
+
+    `tier` is only consulted when the game is not already cached, since a cached
+    board costs nothing - so the second and third prop on one game never yield,
+    only the first prop of a new game.
+    """
     if not _key():
         return None
     cache = _load_cache(date)
     game_key = f"{away_name}@{home_name}"
     if game_key not in cache:
+        if not may_spend(tier):
+            return None
         eid = _event_id(date, away_name, home_name)
         cache[game_key] = _fetch_game_lines(eid) if eid else {}
         _save_cache(date, cache)

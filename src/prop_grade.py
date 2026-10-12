@@ -96,7 +96,7 @@ def grade_date(date: str) -> tuple[list, list, list]:
     """
     picks_path = OUTPUT_DIR / f"picks_{date}.json"
     if not picks_path.exists():
-        return [], []
+        return [], [], []          # three books; `update` unpacks all three
     payload = json.loads(picks_path.read_text())
     results = mlb_api.results_for(date)
     singles, parlays, homers = [], [], []
@@ -123,23 +123,29 @@ def grade_date(date: str) -> tuple[list, list, list]:
                     "profit": round(grade.american_profit(price) if won
                                     else -STAKE, 2)})
         # THREE props a game since 2026-10-12, drawn from both lineups.
-        # `props` is the list; `prop` stays the top one so anything still
-        # reading the old field keeps working.
+        # `props` is the list of POSTED props; `prop` stays the top one so
+        # anything still reading the old field keeps working.
+        new_fmt = bool(pc.get("props"))
         plist = pc.get("props") or ([pc["prop"]] if pc.get("prop") else [])
         adv = pc.get("advantage_team")
         res = results.get(g.get("game_pk"))
-        if not plist or not adv or not res or not res.get("final"):
+        if not plist or not res or not res.get("final"):
             continue
-        # Book only a game that was actually a PLAY. A prop is also computed for
-        # watch-listed good dogs so their hit block can be shown, and without
-        # this those were booked as bets: 4 of the first 142 singles came from
-        # non-pick games, three of them good-dog watch entries on 2026-09-30.
-        # Same invariant CLAUDE.md sets for the moneyline ledger - a watch tag
-        # must never reach the record. Entries already settled are left as they
-        # are; this stops it happening again.
-        if pc.get("play") != "pick":
+        # LEGACY BOARDS: book only a game that was actually a PLAY. There a
+        # prop was also computed for watch-listed good dogs so their hit block
+        # could be shown, and without this those were booked as bets: 4 of the
+        # first 142 singles came from non-pick games, three of them good-dog
+        # watch entries on 2026-09-30. Same invariant CLAUDE.md sets for the
+        # moneyline ledger - a watch tag must never reach the record.
+        #
+        # NEW BOARDS carry `props` only when a prop was actually POSTED, on any
+        # game, play or not - a 1+ hit prop is its own bet and does not need
+        # the moneyline rule to have landed anywhere. So presence in `props` IS
+        # the gate, and the pick test would wrongly drop every prop on a
+        # no-action night. Settled entries are left exactly as they are.
+        if not new_fmt and pc.get("play") != "pick":
             continue
-        team_won = res.get("winner") == adv
+        team_won = adv is not None and res.get("winner") == adv
         score = f"{res['away']} {res['away_score']} @ {res['home']} {res['home_score']}"
         ml = pc.get("advantage_moneyline")
         for prop in plist:
@@ -150,9 +156,14 @@ def grade_date(date: str) -> tuple[list, list, list]:
             if hits is None:
                 continue                   # can't confirm it -> retry later
             got_hit = hits >= 1
-            # Keyed per PLAYER. On the game key alone, three props would
-            # collide and grade._add would keep only the first.
-            key = f"{date}#{g['game_pk']}#{pid}"
+            # Keyed per PLAYER on a new-format board: on the game key alone
+            # the three would collide and grade._add would keep only the first.
+            # A LEGACY board keeps the bare `date#game_pk` it was settled
+            # under - re-grading an old date has to reproduce the same key, or
+            # _add would see a new one and append a duplicate next to an entry
+            # already in the record.
+            key = (f"{date}#{g['game_pk']}#{pid}" if new_fmt
+                   else f"{date}#{g['game_pk']}")
             # real captured 1+ hit line if we have one, else the assumed fallback
             prop_price = int(prop.get("odds", PROP_PRICE))
             singles.append({
@@ -163,7 +174,7 @@ def grade_date(date: str) -> tuple[list, list, list]:
                 "profit": round(grade.american_profit(prop_price) if got_hit
                                 else -STAKE, 2)})
             # parlay: team ML + prop; needs a real team price
-            if ml is not None and not PARLAYS_RETIRED:
+            if ml is not None and adv and not PARLAYS_RETIRED:
                 won = team_won and got_hit
                 po = parlay_odds(int(ml), prop_price)
                 parlays.append({

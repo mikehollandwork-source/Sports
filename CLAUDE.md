@@ -313,6 +313,25 @@ unit-testable with mock `Game`/`Team` objects.
   `pick_criteria["props"]` is the list and `["prop"]` stays the top one for
   older readers; `["hit_bats"]` is now ARCHIVAL only — it is the top of the pool
   BEFORE the rising filter, which is what a later backtest of that filter needs.
-  Extra props cost no odds credits (`prop_odds.hit_line` caches the game's whole
-  batter_hits board per day), but a good-dog watch entry still gets one, because
-  that block is context and not a bet.
+  **Props post on EVERY upcoming game, no-action ones included.** A 1+ hit prop
+  is its own bet and does not need the moneyline rule to have landed anywhere;
+  on 2026-10-12 a two-game slate of no-action games carried zero props. So
+  PRESENCE IN `props` IS THE LEDGER GATE now, not `play == "pick"` — but only
+  for new-format boards. On a LEGACY board the single `prop` was also computed
+  for good-dog watch entries as CONTEXT, so there the pick test still applies,
+  in `prop_grade` and in `main._hit_lines` alike (the board shows as a bet
+  exactly what the ledger settles). Legacy entries also keep the bare
+  `date#game_pk` key they were settled under: re-grading an old date must
+  reproduce the same key or `grade._add` would append a duplicate beside a
+  settled entry. Rendering all 2026 boards before and after this change is
+  byte-identical.
+  The second and third prop on one game cost no extra odds credits
+  (`prop_odds.hit_line` caches the game's whole batter_hits board per day), but
+  a game that is not a play is a new board to price, so it spends under the
+  registered `prop_extra` tier and yields before a play's own line does.
+- **Projections print on no-action games** (`projections.attach`, rendered in
+  `main._hit_lines`). They were being computed and stored and then never shown,
+  because a no-action game returns from `_game_lines` at `_stay_line` and
+  everything that renders them — F5/full runs, starter strikeouts, projected
+  hits, the HR block, the watch tags — lives past that return. A night where
+  nothing clears the pick bar is exactly the night they are wanted.
