@@ -154,6 +154,7 @@ def collect() -> tuple[dict, dict]:
         box = {}
     rows: dict = {}
     legacy = 0
+    unmatched: list = []
     for f in sorted(glob.glob(str(OUTPUT_DIR / "market_log_*.json"))):
         date = Path(f).stem.split("market_log_")[1]
         try:
@@ -216,6 +217,13 @@ def collect() -> tuple[dict, dict]:
                 pt = ((line.get("over") or {}).get("point")
                       if isinstance(line.get("over"), dict) else None)
                 k = actual_k.get(_norm(name))
+                if isinstance(pt, (int, float)) and k is None:
+                    # The book priced someone the boxscore does not list as a
+                    # starter. Usually a late scratch, but it is ALSO what a
+                    # name-matching failure looks like - a suffix or an accent
+                    # the normaliser misses - so it is counted and named rather
+                    # than dropped silently.
+                    unmatched.append(f"{date} {name}")
                 if not isinstance(pt, (int, float)) or k is None:
                     continue
                 rows[f"{date}#{pk}#k#{_norm(name)}"] = {
@@ -228,7 +236,7 @@ def collect() -> tuple[dict, dict]:
     if legacy:
         log.info("market_track: refused %d pair-keyed reading(s) from logs "
                  "written before the per-game key", legacy)
-    return rows, {"legacy_refused": legacy}
+    return rows, {"legacy_refused": legacy, "unmatched_pitchers": unmatched}
 
 
 def _our_side(row: dict) -> str | None:
@@ -310,6 +318,14 @@ def build(rows: dict, meta: dict) -> str:
           " min). The poller runs three times a day, so an afternoon game is "
           "already in progress by the later polls and its line has seen the "
           "score._", ""]
+    um = meta.get("unmatched_pitchers") or []
+    if um:
+        md += [f"- **{len(um)} priced pitcher(s) not found as a starter** in "
+               "the boxscore: " + ", ".join(um[:8])
+               + ("…" if len(um) > 8 else "")
+               + ". Usually a late scratch, but this is also what a "
+                 "name-matching failure looks like, so it is named rather "
+                 "than dropped silently.", ""]
     if meta.get("legacy_refused"):
         md += [f"- **{meta['legacy_refused']} reading(s) refused** as "
                "pair-keyed: they come from logs written before the per-game "
