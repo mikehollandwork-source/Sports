@@ -323,9 +323,17 @@ def run(date: str) -> dict:
             # instead of guessed at. `form_trend` measured 40% of hitter-games
             # rising, so an empty `rising` on a full pool should be rare - and
             # if it is not, this is the evidence. Reporting only.
+            by_side: dict = {}
+            for b in scored:
+                by_side[b.get("team") or "?"] = by_side.get(b.get("team")
+                                                            or "?", 0) + 1
             r["pick_criteria"]["prop_pool"] = {
                 "candidates": len(scored), "probed": probed,
-                "rising": len(rising), "window_too_thin": thin}
+                "rising": len(rising), "window_too_thin": thin,
+                # per side, because "props from both lineups" is the point and
+                # a side contributing nothing would otherwise look like a small
+                # pool rather than a missing half
+                "by_side": by_side}
             # ARCHIVAL, and written whether or not anything posts: it is the
             # top of the candidate pool BEFORE the rising filter, which is what
             # a later backtest of that filter needs. It used to sit inside the
@@ -2158,8 +2166,13 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
                    f"{fw['odds']:+d} — {fw['reason']}")
     pool = pc.get("prop_pool") or {}
     if pool and not posted:
-        out.append(f"          pool: {pool.get('candidates')} candidates, "
-                   f"{pool.get('probed')} probed, {pool.get('rising')} rising, "
+        sides = pool.get("by_side") or {}
+        out.append(f"          pool: {pool.get('candidates')} candidates"
+                   + (" (" + ", ".join(f"{_abbr_of(g, t) or t} {n}"
+                                       for t, n in sides.items()) + ")"
+                      if sides else "")
+                   + f", {pool.get('probed')} probed, "
+                   f"{pool.get('rising')} rising, "
                    f"{pool.get('window_too_thin')} unreadable window")
     pj = pc.get("projections") or {}
     if pj:
