@@ -422,3 +422,40 @@ unit-testable with mock `Game`/`Team` objects.
   every game on it is done (postponed/cancelled/suspended excluded, since they
   never reach Final), and an empty cached entry is re-checked rather than
   trusted, which heals the dates already poisoned.
+- **No parlay structure this data supports is positive, and the reason is
+  arithmetic** (`parlay_structure.py`, `output/parlay_structure.md`). Asked how
+  a professional would structure one to raise the hit rate or make it pay big.
+  Those are opposite ends of one priced dial, and both ends were computed.
+  **A parlay's edge is the leg's edge raised to the number of legs**, so it
+  cannot rescue a losing leg, only lose faster: posted hit props at 62.6%
+  against a 66.7% break-even are −6.1% as singles and −27.0% at five legs,
+  −43.2% at nine. Hold compounds the same way — 4.5% a leg is 20.6% at five
+  legs, 33.9% at nine. **$5 → $200 is decimal 40**, which these legs reach only
+  at NINE of them, where they hit 1.48% against the 2.60% the price demands; in
+  five legs each would have to pay +109, i.e. underdogs, not our props. The
+  already-retired `prop_grade` parlay book is the live confirmation: 20-47,
+  −28.2%, CI [−47.4%, −6.7%], the only interval in the system that excludes
+  zero.
+  **Correlation is the ONLY legitimate parlay edge** — a book prices legs as
+  independent, so positively correlated legs are underpriced. Measured on 4517
+  hitter-games: same-team pairs **×1.035**, same-team triples **×1.135**,
+  while the OPPOSITE-team control sits at **×0.996** and ×1.052. That control
+  landing on 1.000 is the validity check — two hitters facing different
+  pitchers should not co-move. But p≈0.10, and crediting the lift in full a
+  3-leg same-team parlay still returns **−6.5%** (−17.2% if the lift is zero).
+  Correlation has the right sign and is too small to cover the compounding hold
+  plus the 5.5-point deficit the legs start with.
+  **TWO ESTIMATOR TRAPS, both hit here first and both worth remembering.**
+  (1) Selecting hitters on a rate and then using that same rate as the
+  expectation reported a ×0.807 lift — a 19% ANTI-correlation no mechanism
+  explains — because filtering at 60% on an ~18-game rate (SE 0.115) selects
+  upward noise, so the expectation overstates true skill. Holding the measured
+  games out of the rate does NOT fix this; the bias is in the estimate, not the
+  overlap. (2) The fix is to read the lift **relative to the permutation null**,
+  which carries the identical selection bias and differs only in which game
+  each outcome came from. The null sits at ×0.72–0.80, not ×1.000, and that gap
+  IS the bias. Any future version of this must report the null, not just the
+  raw ratio.
+  **This cuts against how props are posted, deliberately:** three props from
+  BOTH lineups is right for three SINGLES and wrong for a parlay, which wants
+  correlated same-team legs. Different products; the board posts singles.
