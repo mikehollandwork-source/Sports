@@ -234,6 +234,22 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("pinch-risk refresh failed, props fall back to ungated: %s",
                     exc)
+    # PRICE CAPTURE, for every upcoming game rather than only the plays.
+    # `leg_markets.md` found the H+R+RBI question turns entirely on the price
+    # sample - the rate side is solid over 1571 held-out games, the price side
+    # was 42 quotes from four October dates - and total bases had no captured
+    # price at all despite a 36.4% rate. Both are per-day cached, so the first
+    # run of the day pays and later refreshes do not; `WARM_MAX_GAMES` caps it.
+    warmed = 0
+    for r in results:
+        if r.get("state") != "upcoming" or warmed >= prop_odds.WARM_MAX_GAMES:
+            continue
+        gm0 = gbypk.get(r.get("game_pk"))
+        if gm0 is None:
+            continue
+        prop_odds.warm(date, gm0.away.name, gm0.home.name)
+        warmed += 1
+
     for r in results:
         if r.get("state") == "final":
             continue

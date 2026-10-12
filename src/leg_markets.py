@@ -171,7 +171,7 @@ def captured_prices() -> dict:
     Only two of the three markets were ever cached. 2+ total bases has none,
     which is why it gets a fair price and no edge column.
     """
-    out: dict = {"hit": [], "hrr2": []}
+    out: dict = {"hit": [], "hrr2": [], "tb2": []}
     for f in glob.glob(str(OUTPUT_DIR / "prop_odds_2026-*.json")):
         try:
             d = json.loads(Path(f).read_text())
@@ -184,18 +184,20 @@ def captured_prices() -> dict:
                 o = v.get("over") if isinstance(v, dict) else v
                 if isinstance(o, int):
                     out["hit"].append(o)
-    for f in glob.glob(str(OUTPUT_DIR / "prop_odds_hrr_2026-*.json")):
-        try:
-            d = json.loads(Path(f).read_text())
-        except (OSError, ValueError):
-            continue
-        for game in d.values():
-            if not isinstance(game, dict):
+    for market, pat in (("hrr2", "prop_odds_hrr_2026-*.json"),
+                        ("tb2", "prop_odds_tb_2026-*.json")):
+        for f in glob.glob(str(OUTPUT_DIR / pat)):
+            try:
+                d = json.loads(Path(f).read_text())
+            except (OSError, ValueError):
                 continue
-            for v in game.values():
-                o = v.get("over") if isinstance(v, dict) else None
-                if isinstance(o, int):
-                    out["hrr2"].append(o)
+            for game in d.values():
+                if not isinstance(game, dict):
+                    continue
+                for v in game.values():
+                    o = v.get("over") if isinstance(v, dict) else None
+                    if isinstance(o, int):
+                        out[market].append(o)
     return out
 
 

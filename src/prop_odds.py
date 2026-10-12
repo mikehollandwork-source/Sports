@@ -243,19 +243,23 @@ def _hrr_cache_path(date: str) -> Path:
     return OUTPUT_DIR / f"prop_odds_hrr_{date}.json"
 
 
-def _fetch_hrr_lines(event_id: str) -> dict:
-    """{player lower: {"over": american, "under": american}} for the
-    hits+runs+RBIs OVER/UNDER 1.5 line, median across books."""
-    data = _get(f"/events/{event_id}/odds", regions="us", markets=HRR_MARKET,
+def _fetch_player_ou(event_id: str, market: str, point: float) -> dict:
+    """{player lower: {"over": american, "under": american}} for one player
+    OVER/UNDER market at one point, median across books.
+
+    Shared by the hits+runs+RBIs and total-bases fetchers, which differ only in
+    the market key and the number.
+    """
+    data = _get(f"/events/{event_id}/odds", regions="us", markets=market,
                 oddsFormat="american")
     sides: dict = {}
     for bk in (data or {}).get("bookmakers", []) or []:
         for mk in bk.get("markets", []) or []:
-            if mk.get("key") != HRR_MARKET:
+            if mk.get("key") != market:
                 continue
             for o in mk.get("outcomes", []) or []:
                 side = str(o.get("name")).lower()
-                if side not in ("over", "under") or o.get("point") != HRR_POINT:
+                if side not in ("over", "under") or o.get("point") != point:
                     continue
                 who = str(o.get("description") or "").strip().lower()
                 if who and isinstance(o.get("price"), (int, float)):
@@ -269,14 +273,24 @@ def _fetch_hrr_lines(event_id: str) -> dict:
     return out
 
 
+def _fetch_hrr_lines(event_id: str) -> dict:
+    return _fetch_player_ou(event_id, HRR_MARKET, HRR_POINT)
+
+
 def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
     """{"over", "under"} for a player's hits+runs+RBIs 1.5 line, or {}.
 
     SEPARATE MARKET, SEPARATE CREDIT. The Odds API bills per market, so this is
-    one extra credit per game per day on top of batter_hits. It is therefore
-    called for PLAYS ONLY - roughly 2-3 a day, about 80 credits a month against
-    the ~150-240 free tier, where batter_hits already spends a similar amount.
-    Calling it for every board game would bust the tier.
+    one extra credit per game per day on top of batter_hits, and the per-day
+    cache means repeat board runs cost nothing.
+
+    IT IS NOW CAPTURED FOR EVERY GAME, not plays only, bounded by
+    `WARM_MAX_GAMES`. That changed because `leg_markets.md` found the whole
+    H+R+RBI question turns on the PRICE sample: the rate side is solid over
+    1571 held-out games, while the price side was 42 quotes from four October
+    dates, which is why a +4.1-point pooled edge could not be established.
+    Collecting prices is the binding constraint, and the cap keeps a full
+    regular-season slate from busting the tier.
 
     Why this market: 1+ hit is a ~63% event priced near -200, where break-even is
     66.7% and the hold eats any edge the hitter read could produce. H+R+RBI over
@@ -299,6 +313,58 @@ def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
         OUTPUT_DIR.mkdir(exist_ok=True)
         _hrr_cache_path(date).write_text(json.dumps(cache, indent=1))
     return _as_row(cache[game_key].get(player.strip().lower()))
+
+
+TB_MARKET = "batter_total_bases"
+TB_POINT = 1.5            # "2+ total bases" is the OVER 1.5 outcome
+
+# How many games a day get their H+R+RBI and total-bases boards captured.
+# Postseason slates are 1-4 games, so this covers them in full; it exists so a
+# fifteen-game regular-season slate cannot quietly spend 30 credits a day.
+WARM_MAX_GAMES = int(os.environ.get("PROP_WARM_MAX", "4"))
+
+
+def _tb_cache_path(date: str) -> Path:
+    return OUTPUT_DIR / f"prop_odds_tb_{date}.json"
+
+
+def tb_line(date: str, player: str, away_name: str, home_name: str) -> dict:
+    """{"over", "under"} for a player's 2+ total bases, or {}.
+
+    NO PRICE FOR THIS MARKET EXISTED ANYWHERE in the repo before this, which
+    `leg_markets.md` called the single highest-value thing left to collect: the
+    board's posted hitters reach 2+ total bases 36.4% of the time (fair about
+    +175) and whether it is sold near fair was simply unknown.
+    """
+    if not _key() or not may_spend("log"):
+        return {}
+    try:
+        cache = json.loads(_tb_cache_path(date).read_text())
+    except (OSError, ValueError):
+        cache = {}
+    game_key = f"{away_name}@{home_name}"
+    if game_key not in cache:
+        eid = _event_id(date, away_name, home_name)
+        cache[game_key] = (_fetch_player_ou(eid, TB_MARKET, TB_POINT)
+                           if eid else {})
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        _tb_cache_path(date).write_text(json.dumps(cache, indent=1))
+    return _as_row(cache[game_key].get(player.strip().lower()))
+
+
+def warm(date: str, away_name: str, home_name: str) -> None:
+    """Capture this game's H+R+RBI and total-bases boards for the day.
+
+    Both are per-day cached, so the first board run of the day pays two credits
+    for the game and every later run pays nothing. Returns nothing: the point
+    is the cached board, which is what a later backtest reads.
+    """
+    for fn in (hrr_line, tb_line):
+        try:
+            fn(date, "", away_name, home_name)
+        except Exception as exc:
+            log.warning("price warm failed for %s@%s: %s",
+                        away_name, home_name, exc)
 
 
 HR_MARKET = "batter_home_runs"
