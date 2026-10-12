@@ -18,7 +18,22 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin claude/claude-md-docs-jx2xtz || true
           git add output/totals_model.md output/totals_model_cache.json output/totals_scores.json
-          git diff --staged --quiet || git commit -m "Totals model measurement"
-          for i in 1 2 3 4; do git push origin HEAD:claude/claude-md-docs-jx2xtz && break || sleep $((2**i)); done
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Totals model measurement"
+            # Same pattern as daily.yml: the pm_books logger pushes to this
+            # branch every few minutes, so the rebase has to be INSIDE the loop
+            # or every retry races the same stale base and loses. The final
+            # `exit 1` matters too - a loop ending on `sleep` returns 0, which
+            # is how the first run of this reported success and pushed nothing.
+            pushed=0
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" \
+                && { pushed=1; break; }
+              echo "push retry $i"; sleep $((2 ** i))
+            done
+            [ "$pushed" = 1 ] || { echo "push failed after 4 attempts"; exit 1; }
+          fi
