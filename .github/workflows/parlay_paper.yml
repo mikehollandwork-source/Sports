@@ -26,6 +26,10 @@ jobs:
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: |
+          # alt_k no longer feeds a leg - the strikeout banker was dropped on
+          # its own measurement. It is refreshed anyway because that report is
+          # the standing justification for a four-leg ticket, and a stale
+          # number backing a live decision is worse than a refreshed one.
           python -m src.alt_k
           python -m src.parlay_paper
       - name: Commit

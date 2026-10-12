@@ -459,11 +459,10 @@ unit-testable with mock `Game`/`Team` objects.
   **This cuts against how props are posted, deliberately:** three props from
   BOTH lineups is right for three SINGLES and wrong for a parlay, which wants
   correlated same-team legs. Different products; the board posts singles.
-- **The five-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
+- **The FOUR-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
   `output/parlay_paper.json`, built by its own workflow after the board).
-  Requested structure: alternate strikeouts on a starter, the board's moneyline
-  pick, 2+ total bases for the power model's hitter, and two DIFFERENT players
-  for 1+ hit. Nothing is staked. It touches no ledger — the hit props keep
+  Structure: the board's moneyline pick, two DIFFERENT players for 1+ hit, and
+  2+ total bases for the power model's hitter. Nothing is staked. It touches no ledger — the hit props keep
   being recorded as singles exactly as before, and
   `record_audit.paper_parlay_guard` asserts both halves of that from the files:
   every hits leg must ALSO exist as its own single, and no paper date may
@@ -473,16 +472,20 @@ unit-testable with mock `Game`/`Team` objects.
   plus correlated legs lands nearer that than the −28.2% the retired parlays
   did. It is built SAME-GAME on purpose: that is where the measured ×1.035 /
   ×1.135 correlation lift lives.
-  **"A number the pitcher has never missed" is NOT a floor** (`alt_k.py`,
-  `output/alt_k.md`). Measured out of sample in date order over 891 starts from
-  142 starters: his exact prior minimum clears **92.0%**, one under it
-  **97.0%**, two under **98.1%**. It gets WORSE with more starts — 93.3% at
-  8–11 prior starts, 92.9% at 12–15, **89.4% at 16+** — because a minimum is
-  the smallest value in a sample and drifts down as the sample grows. So
-  `BANKER_OFFSET = 1`: one under the prior minimum, which is the stated intent
-  ("a high hit rate") rather than the literal wording. At the exact minimum
-  that leg alone removes 8% of a five-leg ticket while adding almost nothing to
-  the payout, which makes it the leg most worth dropping entirely.
+  **The alternate-strikeout "banker" leg was DROPPED on the measurement that
+  was meant to justify it** (`alt_k.py`, `output/alt_k.md`). "A number the
+  pitcher has never missed" is NOT a floor — it is the smallest value in a
+  sample, and it drifts down as the sample grows. Measured out of sample in
+  date order over 891 starts from 142 starters: his exact prior minimum clears
+  **92.0%**, one under it **97.0%**, two under **98.1%**, and it gets WORSE
+  with more starts — 93.3% at 8–11 prior starts, 92.9% at 12–15, **89.4% at
+  16+**. A leg priced near certainty adds almost nothing to the payout while
+  removing 8% of the ticket, so four legs pay slightly less and win
+  meaningfully more often. `alt_k` is KEPT and still refreshed: it is the
+  standing justification for a structural decision, and a stale number backing
+  a live decision is worse than a refreshed one. `_grade_leg` also keeps its
+  `alt_strikeouts` branch, because a ticket file written before the drop still
+  has one on disk and settlement must not mis-grade it.
   Settlement reads the boxscore directly (`mlb_api.pitcher_strikeouts`,
   `player_total_bases`, `player_hits`) and is **all-or-nothing per ticket** — an
   unconfirmable leg leaves the whole ticket unbooked for a later retry, so a
@@ -496,6 +499,6 @@ unit-testable with mock `Game`/`Team` objects.
   **No fallback to WITHHELD props.** A prop held by `_prop_withheld` is below
   its own break-even, and a leg's EV multiplies into a parlay exactly as it
   does into a single, so a held leg is bad in both. A ticket that cannot find
-  five legs records what is `missing` and is not booked — on 2026-10-12 the
+  four legs records what is `missing` and is not booked — on 2026-10-12 the
   slate had no play and one prop total, so no ticket existed at all, which is
   the correct outcome rather than a thin one.

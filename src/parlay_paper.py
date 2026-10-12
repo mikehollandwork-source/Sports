@@ -5,11 +5,18 @@ WHAT THIS IS
 A requested structure, logged at real market prices and settled honestly so it
 accumulates a record of its own:
 
-  1. alternate strikeouts on a starter, at a number he has essentially always
-     cleared
-  2. the moneyline pick already on the board
-  3. total bases 2+ for the hitter our power model likes most
-  4. and 5. two different players to get one hit
+  1. the moneyline pick already on the board
+  2. and 3. two different players to get one hit
+  4. total bases 2+ for the hitter our power model likes most
+
+FOUR LEGS, NOT FIVE. The alternate-strikeout "banker" was dropped on the
+measurement that was supposed to justify it. `alt_k.md` scored it out of sample
+over 891 starts: a starter clears his exact prior minimum only 92.0% of the
+time, and it gets WORSE with more starts (89.4% at 16+ prior starts) because a
+minimum is the smallest value in a sample and drifts down. A leg like that is
+priced near certainty, so it added almost nothing to the payout while removing
+8% of the ticket. Four legs at the same other four pay slightly less and win
+meaningfully more often, which is the whole trade.
 
 SEPARATE FROM EVERYTHING, BY DESIGN
 It writes to `output/parlay_paper.json` and touches NOTHING else. Not the
@@ -37,13 +44,6 @@ book ran −28.2% over 67 bets with a CI that excludes zero. The point of paper
 trading is that it costs nothing to find out whether THIS structure, with a
 near-certain banker and correlated legs, lands closer to the first number than
 the second.
-
-THE BANKER LEG IS DELIBERATELY ONE UNDER HIS PRIOR MINIMUM, not at it.
-`alt_k.md` measured both out of sample: the exact prior minimum clears 92.0% and
-one under it clears 97.0%. "A number he has never missed" is a minimum over a
-sample, and it gets WORSE with more starts (93.3% at 8-11 prior starts, 89.4% at
-16+) because the minimum drifts down. Flip `BANKER_OFFSET` to 0 for the literal
-version.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ import logging
 import zoneinfo
 from pathlib import Path
 
-from . import alt_k, market_log, mlb_api, prop_odds
+from . import market_log, mlb_api, prop_odds
 
 log = logging.getLogger("parlay_paper")
 
@@ -63,12 +63,10 @@ BOOK = OUTPUT_DIR / "parlay_paper.json"
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
 
 STAKE = 5.0                # notional only; nothing is placed
-BANKER_OFFSET = 1          # one under his prior minimum - see the docstring
 TB_POINT = 1.5             # "2+ total bases" is the OVER 1.5 outcome
 HITS_POINT = 0.5           # "1+ hit" is the OVER 0.5 outcome
 TIER = "log"               # yields to the posted bets in prop_odds.may_spend
 
-ALT_K_MARKET = "pitcher_strikeouts_alternate"
 TB_MARKET = "batter_total_bases"
 
 
@@ -99,21 +97,6 @@ def _pick_over(outs: list, who: str, point: float) -> int | None:
         if (o.get("description") or "").strip().lower() != who.strip().lower():
             continue
         if abs(float(o.get("point", -999)) - point) < 1e-6:
-            return o.get("price")
-    return None
-
-
-def _alt_k_over(outs: list, who: str, line: int) -> int | None:
-    """Alternate strikeout markets quote one outcome per number, so the "line"
-    is the point and clearing it means Over that many. Books differ on whether
-    `N+` is listed at point N or N-0.5; both are accepted."""
-    for o in outs:
-        if (o.get("description") or "").strip().lower() != who.strip().lower():
-            continue
-        pt = o.get("point")
-        if not isinstance(pt, (int, float)):
-            continue
-        if abs(pt - line) < 1e-6 or abs(pt - (line - 0.5)) < 1e-6:
             return o.get("price")
     return None
 
@@ -154,36 +137,7 @@ def build_ticket(date: str) -> dict | None:
     legs = []
     missing = []
 
-    # 1. the banker: alternate strikeouts on a starter
-    hist = alt_k.starts_by_pitcher()
-    best = None
-    for side in ("home", "away"):
-        sp = ((g.get("statistical_advantage") or {}).get(side) or {}).get(
-            "probable_pitcher")
-        if not sp:
-            continue
-        for pid, items in hist.items():
-            if items and items[-1][1] == sp:
-                prior = [x for x in items if x[0] < date]
-                sl = alt_k.safe_line(prior, BANKER_OFFSET)
-                if sl and (best is None or sl["line"] > best[1]["line"]):
-                    best = (sp, sl, pid)
-                break
-    if best:
-        who, sl, pid = best
-        price = _alt_k_over(_outcomes(eid, ALT_K_MARKET), who,
-                            sl["line"]) if eid else None
-        legs.append({"leg": "alt_strikeouts", "player": who, "player_id": pid,
-                     "line": sl["line"], "prior_min": sl["prior_min"],
-                     "prior_starts": sl["prior_starts"], "odds": price,
-                     "measured_rate": 0.970 if BANKER_OFFSET else 0.920,
-                     "note": f"{sl['line']}+ K; his prior minimum was "
-                             f"{sl['prior_min']} over {sl['prior_starts']} "
-                             "starts"})
-    else:
-        missing.append("alt_strikeouts (no starter with enough prior starts)")
-
-    # 2. the board's moneyline pick
+    # 1. the board's moneyline pick
     ml = pc.get("bet_moneyline")
     team = pc.get("bet_team")
     if ml is None:
@@ -194,7 +148,7 @@ def build_ticket(date: str) -> dict | None:
     else:
         missing.append("moneyline (no play on this game)")
 
-    # 4 and 5 FIRST: two different players for one hit.
+    # 2 and 3 FIRST: two different players for one hit.
     #
     # Deliberately before the total-bases leg. On a thin slate the board may
     # post only one prop, and taking it for total bases consumed the only
@@ -219,7 +173,7 @@ def build_ticket(date: str) -> dict | None:
                        "board posted "
                        f"{len(pc.get('props') or [])} prop(s) on this game)")
 
-    # 3. total bases 2+ for the power model's hitter, from the HR pick if there
+    # 4. total bases 2+ for the power model's hitter, from the HR pick if there
     # is one, otherwise the best posted bat NOT already carrying a hits leg.
     hp = pc.get("hr_prop") or {}
     tb_who, tb_id = hp.get("player"), hp.get("player_id")
@@ -245,8 +199,7 @@ def build_ticket(date: str) -> dict | None:
               "matchup": g.get("matchup"), "event_id": eid,
               "built_at": dt.datetime.now(dt.timezone.utc).isoformat(),
               "stake": STAKE, "paper": True,
-              "legs": legs, "missing": missing,
-              "banker_offset": BANKER_OFFSET}
+              "legs": legs, "missing": missing}
     if len(priced) == len(legs) and legs:
         dec = 1.0
         for x in legs:
@@ -280,6 +233,9 @@ def _grade_leg(leg: dict, pk: int, results: dict) -> bool | None:
         tb = mlb_api.player_total_bases(pk, leg["player_id"])
         return None if tb is None else tb >= leg["line"] + 0.5
     if kind == "alt_strikeouts":
+        # The leg is no longer built, but a ticket file written before it was
+        # dropped still has one on disk, and settlement must not silently
+        # mis-grade it. Kept for that, not because anything generates it.
         k = mlb_api.pitcher_strikeouts(pk, leg["player_id"])
         return None if k is None else k >= leg["line"]
     return None
