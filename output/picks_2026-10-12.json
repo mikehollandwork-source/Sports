@@ -1,6 +1,6 @@
 {
   "date": "2026-10-12",
-  "generated_at": "2026-10-12T01:36:23.171434+00:00",
+  "generated_at": "2026-10-12T01:41:35.018279+00:00",
   "games": [
     {
       "game_pk": 849812,
@@ -116,12 +116,12 @@
           "forum": {
             "pick": "Milwaukee Brewers",
             "home": 10,
-            "away": 2
+            "away": 3
           },
           "agree": false,
-          "forum_lean": 0.667,
+          "forum_lean": 0.538,
           "consensus_lean": -0.08,
-          "blended_lean": 0.235,
+          "blended_lean": 0.137,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -131,9 +131,9 @@
           "wiki_lean": -0.024,
           "books": {
             "polymarket_bets": {
-              "away": 50,
-              "home": 50,
-              "lean": 0.0
+              "away": 55,
+              "home": 46,
+              "lean": -0.09
             },
             "scoresodds_bets": {
               "away": 53,
@@ -340,7 +340,7 @@
               "opponent": "",
               "scored": 1,
               "allowed": 1,
-              "hits": 2,
+              "hits": 3,
               "hits_allowed": 5,
               "adj_scored": 1.14,
               "adj_allowed": 0.9,
@@ -413,7 +413,7 @@
               "scored": 1,
               "allowed": 1,
               "hits": 5,
-              "hits_allowed": 2,
+              "hits_allowed": 3,
               "adj_scored": 1.15,
               "adj_allowed": 0.91,
               "opp_win_pct": 0.636
@@ -428,7 +428,7 @@
         "public_edge": true,
         "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.241,
+        "confidence": 0.233,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -437,8 +437,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.235,
-            "strength": 0.047,
+            "blended_lean": 0.137,
+            "strength": 0.027,
             "weight": 0.45
           },
           "consistency": {
@@ -493,7 +493,7 @@
         "sp_dog_edge": 0.117,
         "pitching_dog": false,
         "signals_hit": 2,
-        "public_pct_against": 54,
+        "public_pct_against": 52,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -505,17 +505,17 @@
           "bet": "Los Angeles Dodgers",
           "odds": -103,
           "basis": "ticket %",
-          "hold_home": -375907,
-          "hold_away": 718168
+          "hold_home": -93954,
+          "hold_away": 430926
         },
         "play": "stay_away",
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
-          "pm_pct": 50,
-          "pm_american": -100,
-          "edge_pts": 0.7,
-          "vs_book": "same"
+          "pm_pct": 55,
+          "pm_american": -122,
+          "edge_pts": -4.3,
+          "vs_book": "worse"
         },
         "projected": {
           "win_prob": 54.8,
@@ -526,7 +526,107 @@
         "bet_moneyline": null,
         "starred": [],
         "good_dog": null,
-        "line_money": null
+        "line_money": null,
+        "hit_bats": [
+          {
+            "player": "Brice Turang",
+            "player_id": 668930,
+            "hit_rate": 71,
+            "all_rate": 66,
+            "gap": 4,
+            "form": -6,
+            "super_hot": false,
+            "bvp": {
+              "pa": 4,
+              "ops": 0.833
+            },
+            "wins_played": 99,
+            "games_played": 155,
+            "avg_pa": 4.6,
+            "short_night_rate": 0.003,
+            "mean_pa_per_start": 4.55,
+            "short_nights": "2/152 starts of 3 PA or fewer",
+            "team": "Milwaukee Brewers",
+            "opp_sp": "Yoshinobu Yamamoto",
+            "fit": 2,
+            "platoon": {
+              "hand": "R",
+              "avg": 0.291,
+              "pa": 478,
+              "delta": 0.022,
+              "shrunk": 0.0137
+            },
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 50% vs 36%, ISO 0.167 vs 0.237 -> x0.96"
+          },
+          {
+            "player": "Jake Bauers",
+            "player_id": 641343,
+            "hit_rate": 63,
+            "all_rate": 61,
+            "gap": 2,
+            "form": -1,
+            "super_hot": false,
+            "bvp": {
+              "pa": 6,
+              "ops": 1.167
+            },
+            "wins_played": 91,
+            "games_played": 149,
+            "avg_pa": 4.2,
+            "short_night_rate": 0.055,
+            "mean_pa_per_start": 4.25,
+            "short_nights": "16/133 starts of 3 PA or fewer",
+            "team": "Milwaukee Brewers",
+            "opp_sp": "Yoshinobu Yamamoto",
+            "fit": -3,
+            "platoon": {
+              "hand": "R",
+              "avg": 0.266,
+              "pa": 418,
+              "delta": -0.0,
+              "shrunk": -0.0002
+            },
+            "trend_factor": 1.0,
+            "trend": "trend window too thin"
+          },
+          {
+            "player": "Jackson Chourio",
+            "player_id": 694192,
+            "hit_rate": 77,
+            "all_rate": 73,
+            "gap": 3,
+            "form": -13,
+            "super_hot": false,
+            "bvp": {
+              "pa": 7,
+              "ops": 0.286
+            },
+            "wins_played": 86,
+            "games_played": 132,
+            "avg_pa": 4.6,
+            "short_night_rate": 0.002,
+            "mean_pa_per_start": 4.65,
+            "short_nights": "1/122 starts of 3 PA or fewer",
+            "team": "Milwaukee Brewers",
+            "opp_sp": "Yoshinobu Yamamoto",
+            "fit": 0,
+            "platoon": {
+              "hand": "R",
+              "avg": 0.274,
+              "pa": 402,
+              "delta": -0.018,
+              "shrunk": -0.0101
+            },
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 57% vs 58%, ISO 0.167 vs 0.182 -> x0.96"
+          }
+        ],
+        "prop_withheld": [
+          {
+            "reason": "no bat in either lineup is trending up"
+          }
+        ]
       },
       "flagged": false,
       "pick": null,
@@ -794,7 +894,7 @@
         "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 27.0,
-          "moneyline": "+135"
+          "moneyline": "+140"
         }
       },
       "consistency": {
@@ -1051,32 +1151,6 @@
         "bet_moneyline": null,
         "good_dog": null,
         "line_money": null,
-        "prop_withheld": [
-          {
-            "player": "Jonathan Aranda",
-            "score": 0.6368,
-            "need": 0.6865,
-            "odds": -219,
-            "real_line": true,
-            "reason": "conditions against the bat and the read (64%) is under the 69% that -219 needs"
-          },
-          {
-            "player": "Jonny DeLuca",
-            "score": 0.6094,
-            "need": 0.6416,
-            "odds": -179,
-            "real_line": true,
-            "reason": "conditions against the bat and the read (61%) is under the 64% that -179 needs"
-          },
-          {
-            "player": "Jos\u00e9 Ram\u00edrez",
-            "score": 0.43,
-            "need": 0.6667,
-            "odds": -200,
-            "real_line": false,
-            "reason": "conditions against the bat and the read (43%) is under the 67% that -200 needs"
-          }
-        ],
         "hit_bats": [
           {
             "player": "Chase DeLauter",
@@ -1170,6 +1244,32 @@
             },
             "trend_factor": 1.0,
             "trend": "trend window too thin"
+          }
+        ],
+        "prop_withheld": [
+          {
+            "player": "Jonathan Aranda",
+            "score": 0.6368,
+            "need": 0.6865,
+            "odds": -219,
+            "real_line": true,
+            "reason": "conditions against the bat and the read (64%) is under the 69% that -219 needs"
+          },
+          {
+            "player": "Jonny DeLuca",
+            "score": 0.6094,
+            "need": 0.6416,
+            "odds": -179,
+            "real_line": true,
+            "reason": "conditions against the bat and the read (61%) is under the 64% that -179 needs"
+          },
+          {
+            "player": "Jos\u00e9 Ram\u00edrez",
+            "score": 0.43,
+            "need": 0.6667,
+            "odds": -200,
+            "real_line": false,
+            "reason": "conditions against the bat and the read (43%) is under the 67% that -200 needs"
           }
         ]
       },
