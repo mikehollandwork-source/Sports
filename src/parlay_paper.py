@@ -194,40 +194,51 @@ def build_ticket(date: str) -> dict | None:
     else:
         missing.append("moneyline (no play on this game)")
 
-    # 3. total bases 2+ for the power model's hitter
+    # 4 and 5 FIRST: two different players for one hit.
+    #
+    # Deliberately before the total-bases leg. On a thin slate the board may
+    # post only one prop, and taking it for total bases consumed the only
+    # hitter and left the two hits legs empty - which is backwards, because the
+    # hits legs are the measured product with their own recorded singles and
+    # the total-bases leg is the speculative one.
+    used: set = set()
+    for b in pc.get("props") or []:
+        if len(used) >= 2:
+            break
+        pid_ = b.get("player_id")
+        if pid_ in used:
+            continue              # never two legs on the same player
+        used.add(pid_)
+        legs.append({"leg": "hits", "player": b.get("player"),
+                     "player_id": pid_, "line": HITS_POINT,
+                     "odds": b.get("odds"),
+                     "note": "1+ hit; also recorded as its own single"})
+    short = 2 - len(used)
+    if short > 0:
+        missing.append(f"hits ({short} short of two distinct players; the "
+                       "board posted "
+                       f"{len(pc.get('props') or [])} prop(s) on this game)")
+
+    # 3. total bases 2+ for the power model's hitter, from the HR pick if there
+    # is one, otherwise the best posted bat NOT already carrying a hits leg.
     hp = pc.get("hr_prop") or {}
     tb_who, tb_id = hp.get("player"), hp.get("player_id")
     if not tb_who:
-        # no HR pick tonight: fall back to the posted prop with the best score
-        props = pc.get("props") or []
-        if props:
-            tb_who, tb_id = props[0].get("player"), props[0].get("player_id")
+        spare = [b for b in (pc.get("props") or [])
+                 if b.get("player_id") not in used]
+        if spare:
+            tb_who, tb_id = spare[0].get("player"), spare[0].get("player_id")
     if tb_who:
         price = _pick_over(_outcomes(eid, TB_MARKET), tb_who,
                            TB_POINT) if eid else None
         legs.append({"leg": "total_bases", "player": tb_who,
                      "player_id": tb_id, "line": TB_POINT, "odds": price,
                      "note": "2+ total bases; the bat the power model likes"
-                             + ("" if hp.get("player") else " (no HR pick "
-                                "tonight, so the top posted prop)")})
+                             + ("" if hp.get("player") else
+                                " (no HR pick tonight, so the best posted bat "
+                                "not already on a hits leg)")})
     else:
-        missing.append("total_bases (no hitter to use)")
-
-    # 4 and 5. two different players for one hit
-    used = {tb_id}
-    for b in pc.get("props") or []:
-        if len([x for x in legs if x["leg"] == "hits"]) >= 2:
-            break
-        if b.get("player_id") in used:
-            continue          # never two legs on the same player
-        used.add(b.get("player_id"))
-        legs.append({"leg": "hits", "player": b.get("player"),
-                     "player_id": b.get("player_id"), "line": HITS_POINT,
-                     "odds": b.get("odds"),
-                     "note": "1+ hit; also recorded as its own single"})
-    short = 2 - len([x for x in legs if x["leg"] == "hits"])
-    if short > 0:
-        missing.append(f"hits ({short} short of two distinct players)")
+        missing.append("total_bases (no hitter left to use)")
 
     priced = [x for x in legs if isinstance(x.get("odds"), int)]
     ticket = {"date": date, "game_pk": g.get("game_pk"),

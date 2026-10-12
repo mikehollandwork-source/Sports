@@ -487,3 +487,15 @@ unit-testable with mock `Game`/`Team` objects.
   `player_total_bases`, `player_hits`) and is **all-or-nothing per ticket** — an
   unconfirmable leg leaves the whole ticket unbooked for a later retry, so a
   feed gap can never book a partial ticket. Idempotent per date.
+  **The HITS legs are filled BEFORE the total-bases leg**, and that order
+  matters on a thin slate: the first version took the top prop for total bases,
+  so a night with only one posted prop spent it there and left both hits legs
+  empty. The hits legs are the measured product with their own recorded
+  singles; total bases is the speculative one, and it only ever uses the HR
+  pick or a bat not already carrying a hits leg.
+  **No fallback to WITHHELD props.** A prop held by `_prop_withheld` is below
+  its own break-even, and a leg's EV multiplies into a parlay exactly as it
+  does into a single, so a held leg is bad in both. A ticket that cannot find
+  five legs records what is `missing` and is not booked — on 2026-10-12 the
+  slate had no play and one prop total, so no ticket existed at all, which is
+  the correct outcome rather than a thin one.
