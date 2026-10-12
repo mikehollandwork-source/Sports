@@ -511,3 +511,28 @@ unit-testable with mock `Game`/`Team` objects.
   four legs records what is `missing` and is not booked — on 2026-10-12 the
   slate had no play and one prop total, so no ticket existed at all, which is
   the correct outcome rather than a thin one.
+- **The four-leg ticket CANNOT be back-tested on this history, and the ML+prop
+  pairing gets NO correlation subsidy** (`parlay_backtest.py`,
+  `output/parlay_backtest.md`). Of 248 past plays, **241 stored no `hit_bats`
+  pool at all** and most of the rest carry exactly ONE hitter — boards posted a
+  single prop until 2026-10-12, so three distinct hitters never existed in the
+  record and a four-leg reconstruction would invent two of its legs. The
+  four-leg record has to be built FORWARD; that is what `parlay_paper` is for.
+  **What the 142 gradeable two-leg rows say:** moneyline pick **54.2%**, its
+  posted prop **63.4%**, both together **33.8%** against 34.4% independent —
+  a same-game lift of **×0.984**, i.e. NONE. One hit barely moves a game's
+  outcome and a game's outcome barely moves one hitter's chance of a hit, so
+  pairing the pick with a prop is just paying two holds: **−12.8%** at real
+  prices. That is a different result from the same-TEAM hit-prop pair at
+  ×1.035, and it means the ML leg contributes no correlation to the ticket.
+  **The total-bases leg now has a measured fair price.** The board's own posted
+  hitters reach 2+ total bases **38.7%** of the time → fair about **+158**
+  before hold. The `+140` previously assumed is already a LOSING leg (demands
+  41.7%, delivers 38.7%). ML + 2+ TB honestly priced returns −28.2% / −13.9% /
+  +0.5% at +100 / +140 / +180.
+  **BEWARE the nested-leg artifact, which this backtest produced at +29%.**
+  Putting 2+ total bases on the SAME hitter as a 1+ hit leg wins on TWO legs of
+  risk while being PAID for three, because 2+ TB cannot happen without a hit.
+  The redundant leg multiplies the payout for free and that free multiplier IS
+  the entire positive number. No book prices it that way. Any future report
+  showing a positive parlay ROI should be checked for exactly this first.
