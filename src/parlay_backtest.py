@@ -159,14 +159,23 @@ def collect() -> list[dict]:
     return rows
 
 
-def _pair_roi(rows: list, tb_price: int | None) -> tuple:
-    """(wins, n, roi, mean decimal) for ML + prop, optionally + total bases."""
+def _pair_roi(rows: list, tb_price: int | None,
+              drop_hit: bool = False) -> tuple:
+    """(wins, n, roi, mean decimal) for ML + prop, optionally + total bases.
+
+    `drop_hit` removes the 1+ hit leg, which is what makes the total-bases
+    version BETTABLE: 2+ total bases on the same hitter already implies the
+    hit, so keeping both pays for a leg that carries no risk.
+    """
     wins = n = 0
     profit = 0.0
     decs = []
     for r in rows:
-        dec = _dec(r["ml"]) * _dec(r["prop_odds"])
-        ok = r["ml_won"] and r["hit_won"]
+        dec = _dec(r["ml"])
+        ok = r["ml_won"]
+        if not drop_hit:
+            dec *= _dec(r["prop_odds"])
+            ok = ok and r["hit_won"]
         if tb_price is not None:
             dec *= _dec(tb_price)
             ok = ok and r["tb_won"]
@@ -218,10 +227,14 @@ def build() -> str:
     md += [f"- **both together: {both}/{n} = {both / n:.1%}**, against "
            f"{ind:.1%} if they were independent → same-game lift "
            f"**×{(both / n) / ind:.3f}**",
-           "  _Positive is expected and is the only thing that makes a parlay "
-           "better than its legs: a team winning and its hitter getting a hit "
-           "are the same night going one way. Note the prop may be on EITHER "
-           "team since 2026-10-12, which weakens exactly this._", ""]
+           "  _Positive was expected - a team winning and its hitter getting "
+           "a hit are the same night going one way - and it is NOT THERE. "
+           "These two legs are independent to within noise, so the ML + prop "
+           "pair gets none of the correlation subsidy that made a same-team "
+           "hit-prop pair worth ×1.035. One hit barely moves a game's "
+           "outcome, and a game's outcome barely moves one hitter's chance of "
+           "a hit. Pairing the pick with a prop is therefore just paying two "
+           "holds._", ""]
     md += ["## Does the pair beat its price?", "",
            "| structure | wins | mean price | ROI |", "|---|---|---|---|"]
     w, nn, roi, mp = _pair_roi(rows, None)
@@ -231,18 +244,34 @@ def build() -> str:
         w, nn, roi, mp = _pair_roi(rows, tbp)
         md.append(f"| + 2 total bases at {tbp:+d} (3 legs) | {w}/{nn} "
                   f"({w / nn:.1%}) | {_american(mp):+d} | **{roi:+.1%}** |")
-    md += ["", "_The three-leg rows add total bases on the SAME hitter as the "
-           "hit leg, which is a NESTED leg the live builder now forbids — 2+ "
-           "total bases cannot happen without a hit. They are shown because "
-           "the history has no second hitter to use, and they therefore "
-           "FLATTER the structure: the real four-leg version needs a third "
-           "hitter to also come through._", "",
-           "## What this says about the total-bases leg", "",
+    md += ["", "### Those three-leg rows are NOT an edge — read this before "
+           "the numbers above", "",
+           "_They put 2+ total bases on the SAME hitter as the hit leg, which "
+           "the live builder forbids. **2+ total bases cannot happen without "
+           "a hit**, so such a ticket wins exactly when the moneyline and the "
+           "total bases land — two legs of risk — while being PAID for three. "
+           "The redundant hit leg multiplies the payout for free, and that "
+           "free multiplier is the entire positive number. It is the classic "
+           "nested-leg artifact and no book will price it that way; it is "
+           "shown only because the history has no second hitter to put there._",
+           "",
+           "_Here is the same risk priced honestly, with the redundant leg "
+           "removed:_", "",
+           "| structure | wins | mean price | ROI |", "|---|---|---|---|"]
+    for tbp in TB_PRICES:
+        w, nn, roi, mp = _pair_roi(rows, tbp, drop_hit=True)
+        md.append(f"| ML + 2 total bases at {tbp:+d} (2 real legs) | {w}/{nn} "
+                  f"({w / nn:.1%}) | {_american(mp):+d} | **{roi:+.1%}** |")
+    fair = _american(1 / (tbw / n))
+    md += ["", "## What this says about the total-bases leg", "",
            f"- the board's own posted hitters reach 2+ total bases "
-           f"**{tbw / n:.1%}** of the time, so a fair price is about "
-           f"**{_american(1 / (tbw / n)):+d}** before any hold",
-           "- that is the first measured number for that leg; it was a guess "
-           "before", ""]
+           f"**{tbw / n:.1%}** of the time, so a FAIR price is about "
+           f"**{fair:+d}** before any hold — the first measured number for "
+           "that leg, where it used to be a guess",
+           f"- so {TB_MAIN:+d} is already WORSE than fair: it demands "
+           f"{1 / _dec(TB_MAIN):.1%} and the leg delivers {tbw / n:.1%}. Any "
+           f"price under about {fair:+d} is a losing leg before the parlay "
+           "even multiplies it.", ""]
     md += ["## Caveats", "",
            f"1. {sum(1 for r in rows if not r['real_price'])} of {n} prop legs "
            f"use the assumed {ASSUMED_PROP:+d} rather than a captured price.",
