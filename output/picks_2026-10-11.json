@@ -1,6 +1,6 @@
 {
   "date": "2026-10-11",
-  "generated_at": "2026-10-12T02:01:59.103541+00:00",
+  "generated_at": "2026-10-12T03:01:56.223462+00:00",
   "games": [
     {
       "game_pk": 849809,
@@ -498,8 +498,8 @@
         "prop_pool": {
           "candidates": 14,
           "probed": 14,
-          "rising": 1,
-          "window_too_thin": 8,
+          "rising": 2,
+          "window_too_thin": 6,
           "by_side": {
             "Los Angeles Dodgers": 8,
             "Milwaukee Brewers": 6
@@ -534,8 +534,8 @@
               "delta": 0.001,
               "shrunk": 0.0004
             },
-            "trend_factor": 1.0,
-            "trend": "trend window too thin"
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 88% vs 47%, ISO 0.000 vs 0.026 -> x0.96"
           },
           {
             "player": "Jackson Chourio",
@@ -566,7 +566,7 @@
               "shrunk": 0.015
             },
             "trend_factor": 0.96,
-            "trend": "falling: last 5 vs prior 10 \u2014 air 57% vs 58%, ISO 0.158 vs 0.182 -> x0.96"
+            "trend": "falling: last 5 vs prior 10 \u2014 air 57% vs 58%, ISO 0.150 vs 0.182 -> x0.96"
           },
           {
             "player": "Jake Bauers",
@@ -630,7 +630,7 @@
               "shrunk": 0.0005
             },
             "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 67% vs 57%, ISO 0.333 vs 0.132 -> x1.05",
+            "trend": "rising: last 5 vs prior 10 \u2014 air 70% vs 57%, ISO 0.316 vs 0.132 -> x1.05",
             "prop_score": 0.7331,
             "selector": "all_rate+bvp+fit+platoon+rising"
           }
@@ -664,9 +664,17 @@
             "shrunk": 0.0005
           },
           "trend_factor": 1.05,
-          "trend": "rising: last 5 vs prior 10 \u2014 air 67% vs 57%, ISO 0.333 vs 0.132 -> x1.05",
+          "trend": "rising: last 5 vs prior 10 \u2014 air 70% vs 57%, ISO 0.316 vs 0.132 -> x1.05",
           "prop_score": 0.7331,
           "selector": "all_rate+bvp+fit+platoon+rising"
+        },
+        "prop_withheld": {
+          "player": "Teoscar Hern\u00e1ndez",
+          "score": 0.618,
+          "need": 0.6667,
+          "odds": -200,
+          "real_line": false,
+          "reason": "conditions against the bat and the read (62%) is under the 67% that -200 needs"
         }
       },
       "flagged": false,
