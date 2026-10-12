@@ -60,8 +60,20 @@ def _best(outcomes: list, name: str) -> dict | None:
     return None
 
 
+def event_key(away: str | None, home: str | None, commence: str | None) -> str:
+    """The log key for one GAME, not one team pair.
+
+    A pair plays on consecutive days and `/events` lists several days at once,
+    so a bare `away@home` key silently keeps whichever event happened to come
+    last - the same error that put the wrong Kalshi market on 97 logged
+    entries. The commence time disambiguates and lets the settler match the
+    right game.
+    """
+    return f"{away}@{home}|{commence or '?'}"
+
+
 def totals_slate() -> dict:
-    """{matchup: {over, under, point}} for every game, on ONE credit."""
+    """{game key: {over, under, point, commence}} for every game, ONE credit."""
     out = {}
     try:
         data = prop_odds._get("/odds", regions="us", markets="totals",
@@ -70,7 +82,8 @@ def totals_slate() -> dict:
         log.warning("bulk totals failed: %s", exc)
         return out
     for g in data or []:
-        key = f"{g.get('away_team')}@{g.get('home_team')}"
+        key = event_key(g.get("away_team"), g.get("home_team"),
+                        g.get("commence_time"))
         for b in g.get("bookmakers") or []:
             for m in b.get("markets") or []:
                 if m.get("key") != "totals":
@@ -78,7 +91,8 @@ def totals_slate() -> dict:
                 o, u = _best(m.get("outcomes"), "over"), _best(m.get("outcomes"), "under")
                 if o and u:
                     out[key] = {"over": o["price"], "under": u["price"],
-                                "point": o["point"], "book": b.get("key")}
+                                "point": o["point"], "book": b.get("key"),
+                                "commence": g.get("commence_time")}
                 break
             if key in out:
                 break
@@ -121,6 +135,18 @@ def per_event(event_id: str) -> dict:
     return out
 
 
+def _et_date(commence: str | None) -> str | None:
+    """The EASTERN calendar date an event starts on, which is the date the log
+    is filed under. A 00:00Z first pitch is the previous evening in ET."""
+    if not isinstance(commence, str):
+        return None
+    try:
+        at = dt.datetime.fromisoformat(commence.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return at.astimezone(EASTERN).date().isoformat()
+
+
 def run(date: str | None = None) -> dict:
     date = date or dt.datetime.now(EASTERN).date().isoformat()
     path = OUTPUT_DIR / f"market_log_{date}.json"
@@ -141,10 +167,16 @@ def run(date: str | None = None) -> dict:
     except Exception as exc:
         log.warning("events listing failed: %s", exc)
         evs = []
-    done = 0
+    done = skipped = 0
     for e in evs:
         if done >= MAX_EVENTS:
             break
+        # TODAY'S GAMES ONLY. `/events` lists several days at once, so without
+        # this MAX_EVENTS could spend its whole budget on tomorrow's slate and
+        # log nothing for the games being played tonight.
+        if _et_date(e.get("commence_time")) != date:
+            skipped += 1
+            continue
         if not prop_odds.may_spend("log"):
             log.info("market_log: stopping per-event, credits near reserve")
             break
@@ -153,8 +185,13 @@ def run(date: str | None = None) -> dict:
             continue
         got = per_event(eid)
         if got:
-            poll["events"][f"{e.get('away_team')}@{e.get('home_team')}"] = got
+            got["commence"] = e.get("commence_time")
+            poll["events"][event_key(e.get("away_team"), e.get("home_team"),
+                                     e.get("commence_time"))] = got
             done += 1
+    if skipped:
+        log.info("market_log: skipped %d event(s) not starting %s ET",
+                 skipped, date)
 
     rec["polls"].append(poll)
     OUTPUT_DIR.mkdir(exist_ok=True)

@@ -86,6 +86,48 @@ def _last_poll_before(polls: list, cutoff: dt.datetime | None) -> dict | None:
     return best[1] if best else None
 
 
+MATCH_TOLERANCE = dt.timedelta(minutes=90)
+
+
+def _parse(v) -> dt.datetime | None:
+    if not isinstance(v, str):
+        return None
+    try:
+        return dt.datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _find(logged: dict, away: str, home: str,
+          fp: dt.datetime | None) -> tuple:
+    """(entry, legacy_skipped) - the logged line for THIS GAME.
+
+    Keys are `away@home|commence` since 2026-10-12. A bare pair key cannot be
+    tied to a game: the same pair plays on consecutive days and `/events` lists
+    several at once, so the earlier logs may hold either day's line. Those are
+    REFUSED rather than guessed at, exactly as CLAUDE.md requires of the 97
+    mis-keyed Kalshi entries - a reading that might belong to another game is
+    not a reading.
+    """
+    pair = f"{away}@{home}"
+    best, legacy = None, 0
+    for k, v in (logged or {}).items():
+        if "|" not in k:
+            if k == pair:
+                legacy += 1
+            continue
+        p, _, c = k.partition("|")
+        if p != pair:
+            continue
+        at = _parse((v or {}).get("commence") or c)
+        if at is None or fp is None:
+            continue
+        gap = abs(at - fp)
+        if gap <= MATCH_TOLERANCE and (best is None or gap < best[0]):
+            best = (gap, v)
+    return (best[1] if best else None), legacy
+
+
 def _side(point, actual) -> str | None:
     if not isinstance(point, (int, float)) or actual is None:
         return None
@@ -96,8 +138,12 @@ def _side(point, actual) -> str | None:
     return "push"
 
 
-def collect() -> dict:
-    """{key: row} for every logged market that has a settled outcome."""
+def collect() -> tuple[dict, dict]:
+    """({key: row} for every settled logged market, {counts}).
+
+    The counts stay OUT of the row dict - a meta entry living among the rows
+    would be iterated as one and read for a `market` it does not have.
+    """
     try:
         scores = json.loads(totals_model.totals_signal.SCORES.read_text())
     except (OSError, ValueError):
@@ -107,6 +153,7 @@ def collect() -> dict:
     except (OSError, ValueError):
         box = {}
     rows: dict = {}
+    legacy = 0
     for f in sorted(glob.glob(str(OUTPUT_DIR / "market_log_*.json"))):
         date = Path(f).stem.split("market_log_")[1]
         try:
@@ -133,13 +180,13 @@ def collect() -> dict:
             if not poll:
                 continue                     # no pre-game reading
             away, home = (g.get("matchup") or " @ ").split(" @ ")
-            gkey = f"{away}@{home}"
             pj = (g.get("pick_criteria") or {}).get("projections") or {}
             base = {"date": date, "game_pk": pk, "matchup": g.get("matchup"),
                     "poll_at": poll.get("at")}
 
             # full-game total (bulk endpoint, so it is on every game)
-            t = (poll.get("totals") or {}).get(gkey)
+            t, lg = _find(poll.get("totals") or {}, away, home, fp)
+            legacy += lg
             if t and isinstance(t.get("point"), (int, float)):
                 rows[f"{date}#{pk}#total"] = {
                     **base, "market": "total", "point": t["point"],
@@ -148,7 +195,9 @@ def collect() -> dict:
                     "result": _side(t["point"], got["total"]),
                     "proj": (pj.get("runs") or {}).get("full")}
 
-            ev = (poll.get("events") or {}).get(gkey) or {}
+            ev, lg = _find(poll.get("events") or {}, away, home, fp)
+            legacy += lg
+            ev = ev or {}
             f5 = ev.get("f5_total")
             if f5 and isinstance(f5.get("point"), (int, float)):
                 rows[f"{date}#{pk}#f5_total"] = {
@@ -176,7 +225,10 @@ def collect() -> dict:
                     "under": (line.get("under") or {}).get("price"),
                     "actual": k, "result": _side(pt, k),
                     "proj": proj_k.get(_norm(name))}
-    return rows
+    if legacy:
+        log.info("market_track: refused %d pair-keyed reading(s) from logs "
+                 "written before the per-game key", legacy)
+    return rows, {"legacy_refused": legacy}
 
 
 def _our_side(row: dict) -> str | None:
@@ -246,7 +298,7 @@ def _market_block(name: str, rows: list) -> list[str]:
     return out
 
 
-def build(rows: dict) -> str:
+def build(rows: dict, meta: dict) -> str:
     md = ["# Tracking the totals, first five and strikeout lines", "",
           "_LOGGING AND SETTLEMENT ONLY. Nothing is staked, no price is "
           "compared to a payout, and no pick changes. A hit rate is not an "
@@ -258,6 +310,12 @@ def build(rows: dict) -> str:
           " min). The poller runs three times a day, so an afternoon game is "
           "already in progress by the later polls and its line has seen the "
           "score._", ""]
+    if meta.get("legacy_refused"):
+        md += [f"- **{meta['legacy_refused']} reading(s) refused** as "
+               "pair-keyed: they come from logs written before the per-game "
+               "key and could belong to either day of a back-to-back, so "
+               "they are not used. The record starts at the per-game key.",
+               ""]
     if not rows:
         return "\n".join(md + ["- nothing settled yet.", ""])
     dates = sorted({r["date"] for r in rows.values()})
@@ -287,10 +345,11 @@ def build(rows: dict) -> str:
 def main() -> None:
     logging.basicConfig(level=logging.INFO,
                         format="%(levelname)s %(name)s: %(message)s")
-    rows = collect()
+    rows, meta = collect()
     OUTPUT_DIR.mkdir(exist_ok=True)
-    RECORD.write_text(json.dumps(rows, indent=1, sort_keys=True))
-    text = build(rows)
+    RECORD.write_text(json.dumps({"meta": meta, "rows": rows}, indent=1,
+                                 sort_keys=True))
+    text = build(rows, meta)
     REPORT.write_text(text)
     print(text)
 

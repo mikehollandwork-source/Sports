@@ -384,3 +384,35 @@ unit-testable with mock `Game`/`Team` objects.
   on only 24 — and `totals_signal` tested wind SPEED, where a gale blowing in
   and one blowing out are the same number and cancel, which is why it read
   −0.041. Bullpen arms down (−0.044) and bullpen innings (−0.001) are null.
+- **The totals, first-five and strikeout markets are TRACKED, not bet**
+  (`market_log` logs, `market_track` settles, `projections` supplies our side).
+  Nothing is staked, no price is compared to a payout, no pick changes, and
+  there is no ROI figure anywhere in it. The record answers two narrow things:
+  how often the OVER hit, which is the market's own calibration and the
+  baseline to beat, and — where we had a projection — which side it took and
+  whether that side was right. **A hit rate is not an edge**: a 55% side at
+  −115 is break-even and the vig on a two-sided total is ~4.5%, so nothing
+  becomes bettable until a side clears its price by more than its own interval.
+  **Readings are cut at first pitch minus `consensus.LOCK_LEAD`**, the same rule
+  CLAUDE.md sets for `pm_books`: the poller runs three times a day, so an
+  afternoon game is in progress by the later polls and its line has seen the
+  score.
+  **The log is keyed per GAME, not per team pair** (`market_log.event_key` =
+  `away@home|commence`). A pair plays on consecutive days and `/events` lists
+  several days at once, so a bare `away@home` key kept whichever event came
+  last — the identical error that put the wrong Kalshi market on 97 entries.
+  `market_track._find` matches the board game by commence time within
+  `MATCH_TOLERANCE` and **REFUSES bare pair keys** rather than guessing; the
+  count of refusals is printed. The 2026-10-11 log predates the key, so its
+  readings are deliberately unusable and the record starts at the per-game key
+  — same treatment as the 97, and for the same reason. `market_log` also now
+  polls only events whose EASTERN start date matches the log date: `/events`
+  spans days, so `MAX_EVENTS` could otherwise spend its whole budget on
+  tomorrow's slate and log nothing for tonight.
+  **`totals_signal._scores` must not cache a date whose games are unfinished.**
+  It did, and `date in cache` made that permanent: 2026-10-11 and 2026-10-12
+  both sat at `{}` with a live game on them, so the most recent games — the
+  ones a tracker needs most — could never settle. A date is cached only once
+  every game on it is done (postponed/cancelled/suspended excluded, since they
+  never reach Final), and an empty cached entry is re-checked rather than
+  trusted, which heals the dates already poisoned.
