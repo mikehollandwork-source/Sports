@@ -41,6 +41,7 @@ from __future__ import annotations
 import glob
 import json
 import logging
+import math
 import random
 import statistics as st
 from itertools import combinations
@@ -377,7 +378,7 @@ def parlays(measure: list, rates: dict, prices: dict) -> list[str]:
     return md + [""]
 
 
-def price_matched(rows: list, rates: dict) -> list[str]:
+def price_matched(rows: list, measure: list, rates: dict) -> list[str]:
     """The decisive check on H+R+RBI: each CAPTURED price against the rate of
     the hitter it was actually quoted for.
 
@@ -415,6 +416,12 @@ def price_matched(rows: list, rates: dict) -> list[str]:
                     if nm:
                         name_to_pid[totals_signal._norm(nm)] = \
                             pid.replace("ID", "")
+    # HELD-OUT games only, for the pooled statistic. Using every game would
+    # include the half the rate was built from, which is the overlap the
+    # even/odd split exists to prevent.
+    by_pid: dict = {}
+    for r in measure:
+        by_pid.setdefault(r["pid"], []).append(r)
     matched, unmatched = [], 0
     for date in dates:
         try:
@@ -434,38 +441,49 @@ def price_matched(rows: list, rates: dict) -> list[str]:
                 if rate is None:
                     unmatched += 1
                     continue
-                matched.append({"name": nm, "price": o, "rate": rate,
-                                "need": _be(o)})
+                matched.append({"name": nm, "pid": pid, "price": o,
+                                "rate": rate, "need": _be(o)})
     if len(matched) < 10:
         return md + [f"- only {len(matched)} prices resolved to a measured "
                      f"hitter ({unmatched} unresolved); not decidable.", ""]
-    edges = [m["rate"] - m["need"] for m in matched]
-    beat = sum(1 for e in edges if e > 0)
+    # POOLED, not a mean of per-hitter edges. MIN_HALF is six games, so one
+    # hitter's held-out rate can read 65% off 4-of-6, and ranking 42 quotes by
+    # that estimate puts the noisiest ones on top - the winner's curse this
+    # file already warns about twice. Pooling the outcomes removes it.
+    succ = tot = 0
+    for m in matched:
+        for r in by_pid.get(m["pid"], ()):
+            tot += 1
+            succ += 1 if MARKETS["hrr2"][1](r["rec"]) else 0
+    pooled = succ / tot if tot else 0.0
+    need = st.mean(m["need"] for m in matched)
+    beat = sum(1 for m in matched if m["rate"] > m["need"])
+    se_beat = math.sqrt(0.25 / len(matched))
     md += [f"- captured prices resolved to a measured hitter: "
            f"**{len(matched)}** ({unmatched} unresolved)",
-           f"- median price **{int(st.median(m['price'] for m in matched)):+d}**, "
-           f"median rate **{st.median(m['rate'] for m in matched):.1%}**",
-           f"- **mean edge: {st.mean(edges):+.1f} points** "
-           f"(median {st.median(edges):+.1f})",
-           f"- prices the hitter's own rate beat: **{beat}/{len(matched)}**",
-           ""]
-    md += ["| hitter | price | needs | his rate | edge |",
-           "|---|---|---|---|---|"]
-    for m in sorted(matched, key=lambda x: -(x["rate"] - x["need"]))[:12]:
-        md.append(f"| {m['name'].title()} | {m['price']:+d} | "
-                  f"{m['need']:.1%} | {m['rate']:.1%} | "
-                  f"**{m['rate'] - m['need']:+.1f} pts** |")
-    md.append("")
-    md.append("- " + ("**the edge survives price-matching**, so the market "
-                      "table above is not a population artifact"
-                      if st.mean(edges) > 0.02 else
-                      "**the edge does NOT survive price-matching** — the "
-                      "apparent H+R+RBI edge was the mismatch between a "
-                      "quality-filtered rate and an all-hitters median price"
-                      if st.mean(edges) < 0 else
-                      "**inconclusive at this sample** — the mean edge is "
-                      "inside noise, and 42 captured prices from four October "
-                      "dates cannot settle it"))
+           f"- median price **{int(st.median(m['price'] for m in matched)):+d}**"
+           f", so the average quote needs **{need:.1%}**",
+           f"- POOLED rate of those hitters over "
+           f"**{tot}** held-out games: **{pooled:.1%}**",
+           f"- **pooled edge: {(pooled - need) * 100:+.1f} points**",
+           f"- quotes the hitter's own (noisy) rate beat: **{beat}/"
+           f"{len(matched)}** = {beat / len(matched):.0%}, against 50% by "
+           f"chance (±{1.96 * se_beat * 100:.0f}%)", ""]
+    md.append("- " + ("**the edge survives price-matching** on the pooled "
+                      "rate, which is the statistic that does not inherit "
+                      "per-hitter noise"
+                      if pooled - need > 0.02 and
+                      beat / len(matched) - 0.5 > 1.96 * se_beat else
+                      "**NOT ESTABLISHED.** "
+                      + (f"The pooled edge is {(pooled - need) * 100:+.1f} "
+                         "points, but " if pooled - need > 0 else
+                         f"The pooled edge is {(pooled - need) * 100:+.1f} "
+                         "points and ")
+                      + f"{beat} of {len(matched)} quotes beaten is inside "
+                      "chance at this sample. 42 prices from four October "
+                      "dates cannot settle it, and the per-hitter edges are "
+                      "far too noisy to rank — six games is the minimum half, "
+                      "so a rate can read 65% off four of six."))
     return md + [""]
 
 
@@ -487,7 +505,7 @@ def build() -> str:
     md += single_legs(measure, rates, prices)
     md += correlation(measure, rates)
     md += parlays(measure, rates, prices)
-    md += price_matched(rows, rates)
+    md += price_matched(rows, measure, rates)
     md += ["## Caveats", "",
            "1. Prices are the MEDIAN of what was captured, not what was "
            "available on each individual night, so a single leg's real edge "
