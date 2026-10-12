@@ -1492,11 +1492,10 @@ def _game_lines(g: dict) -> list[str]:
     no-action games collapse to a one-liner."""
     pc = g["pick_criteria"]
     if _play(g) == "stay_away":
-        # The one-liner, PLUS the props and projections. Those were being
-        # computed and stored on no-action games and then never printed,
-        # because everything that renders them lives in `_hit_lines` and a
-        # no-action game returned before reaching it. A night where nothing
-        # clears the pick bar is exactly the night they are wanted.
+        # The one-liner, PLUS the props. A no-action game used to return here
+        # before reaching anything in `_hit_lines`, so its props never printed.
+        # Projections are no longer printed anywhere - they are tracked instead
+        # - but the props on a no-action game still are.
         return [_stay_line(g)] + _hit_lines(g)
     c = pc["components"]
     adv = pc["advantage_team"]
@@ -2174,20 +2173,13 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
                    + f", {pool.get('probed')} probed, "
                    f"{pool.get('rising')} rising, "
                    f"{pool.get('window_too_thin')} unreadable window")
-    pj = pc.get("projections") or {}
-    if pj:
-        out.append("       ◻ our projections (not bets, untested):")
-        rr = pj.get("runs")
-        if rr:
-            out.append(f"          runs {rr['full']} full · {rr['f5']} first-5"
-                       f"   [{rr['basis']}]")
-        for k in pj.get("strikeouts") or []:
-            out.append(f"          K  {k['pitcher']}: {k['proj']}"
-                       f"   [{k['basis']}]")
-        hh = pj.get("hits") or {}
-        if hh:
-            out.append("          hits  " + "  ·  ".join(
-                f"{t} {v['proj']}" for t, v in hh.items()))
+    # PROJECTIONS ARE OFF THE BOARD, backend only. They are still attached to
+    # every game by `projections.attach` and MUST stay attached: `market_track`
+    # reads `pick_criteria["projections"]` to score which side of the book's
+    # line our number took. Tracking them and printing them are separate
+    # decisions, and only the printing was dropped - an untested number on the
+    # board reads like a call. Re-print by restoring this block; the data is
+    # already there.
     if out:
         cond = _contact_conditions(g, winner or _bet_side(pc)[0])
         if cond:

@@ -329,12 +329,18 @@ unit-testable with mock `Game`/`Team` objects.
   (`prop_odds.hit_line` caches the game's whole batter_hits board per day), but
   a game that is not a play is a new board to price, so it spends under the
   registered `prop_extra` tier and yields before a play's own line does.
-- **Projections print on no-action games** (`projections.attach`, rendered in
-  `main._hit_lines`). They were being computed and stored and then never shown,
-  because a no-action game returns from `_game_lines` at `_stay_line` and
-  everything that renders them — F5/full runs, starter strikeouts, projected
-  hits, the HR block, the watch tags — lives past that return. A night where
-  nothing clears the pick bar is exactly the night they are wanted.
+- **Projections are OFF THE BOARD and must stay ATTACHED** (`projections.attach`
+  at `main.py:106`; the render block in `main._hit_lines` is deliberately gone).
+  Tracking a number and printing it are separate decisions and only the
+  printing was dropped — an untested projection on the board reads like a call.
+  **Do not remove the attach to "clean up" the unprinted field:**
+  `market_track` reads `pick_criteria["projections"]` to score which side of
+  the book's line our number took, so dropping it silently empties the tracking
+  record. Re-printing is just restoring that block; the data is already on
+  every game.
+  Note the related fix that stays: a no-action game returns from `_game_lines`
+  at `_stay_line`, which used to skip everything in `_hit_lines`, so its PROPS
+  never printed either. Props on a no-action game still print.
 - **The two run totals do NOT share a multiplier, and the umpire is NOT in the
   strikeout projection** (`projections.py`, measured in `totals_model.py` over
   1286 finished board games — five times the 251 `totals_signal` had).
