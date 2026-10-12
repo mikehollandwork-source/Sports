@@ -315,6 +315,24 @@ def run(date: str) -> dict:
                 # is not rising.
                 if tf > 1.0:
                     rising.append(b)
+            # ARCHIVAL, and written whether or not anything posts: it is the
+            # top of the candidate pool BEFORE the rising filter, which is what
+            # a later backtest of that filter needs. It used to sit inside the
+            # `if prop` below, so a game where nothing rose recorded nothing at
+            # all and read exactly like a crash.
+            if scored:
+                for b in scored:
+                    b["fit"] = fits.get(b.get("player_id"), 0)
+                r["pick_criteria"]["hit_bats"] = scored[:3]
+            # Say WHY there is no prop rather than printing nothing. An empty
+            # pool and a pool where no bat is trending up are different facts
+            # and the board should distinguish them.
+            if not scored:
+                r["pick_criteria"]["prop_withheld"] = [
+                    {"reason": "no lineup or hit data for either side yet"}]
+            elif not rising:
+                r["pick_criteria"]["prop_withheld"] = [
+                    {"reason": "no bat in either lineup is trending up"}]
             prop = rising[0] if rising else None
             if prop:
                 # Only buy a price for a game that has NOT started. An in-game
@@ -394,12 +412,6 @@ def run(date: str) -> dict:
                     except Exception as exc:
                         log.warning("hrr shadow line failed on %s: %s",
                                     r.get("game_pk"), exc)
-                for b in scored:
-                    b["fit"] = fits.get(b.get("player_id"), 0)
-                # ARCHIVAL ONLY since the board reads `props`. Kept because it
-                # is the top of the candidate pool BEFORE the rising filter,
-                # which is exactly what a later backtest of that filter needs.
-                r["pick_criteria"]["hit_bats"] = scored[:3]
                 # HOME RUN PICK, from the WHOLE lineup - see _attach_hr_prop
                 # for why the three posted bats are the wrong pool for it.
                 if _play(r) == "pick" and upcoming:
@@ -2066,8 +2078,14 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     posted = pc.get("props") or (
         [pc["prop"]] if pc.get("prop") and _play(g) == "pick" else [])
     if not posted and held:
-        # the conditions line below is the justification, so it stays
-        out.append(f"     NO PROP — {held[0]['reason']}")
+        # the conditions line below is the justification, so it stays.
+        # One held entry keeps the exact wording it has always had; several -
+        # only possible since three props post - get a count, so the per-player
+        # reasons below carry their own names instead of one of them being
+        # promoted into the header anonymously.
+        out.append(f"     NO PROP — {held[0]['reason']}" if len(held) == 1
+                   else f"     NO PROP — none of the {len(held)} rising bats "
+                        f"clears its price")
     # POSTED PROPS. Drawn from BOTH lineups and required to be trending up, so
     # neither "if they win" nor one shared starter describes the list any more -
     # each line carries its own team and its own pitcher.
@@ -2101,7 +2119,7 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         bits.append(f"hits in {hr}% of wins"
                     + (f", {ar}% of all games" if ar is not None else ""))
         out.append("       • " + "  ·  ".join(x for x in bits if x))
-    for h in (held if posted else held[1:]):
+    for h in (held if posted or len(held) > 1 else []):
         out.append(f"       ✖ {h.get('player') or '?'} held — {h['reason']}")
     hw = pc.get("hr_withheld")
     if hw:
