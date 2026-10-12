@@ -148,20 +148,30 @@ def build_ticket(date: str) -> dict | None:
     else:
         missing.append("moneyline (no play on this game)")
 
-    # 2 and 3 FIRST: two different players for one hit.
+    # THREE DISTINCT HITTERS. Not a style preference - 2+ TOTAL BASES CANNOT
+    # HAPPEN WITHOUT A HIT, so the same player on both legs is a NESTED leg:
+    # the ticket carries three legs of real risk while being priced as four.
+    # The first live four-leg ticket did exactly that, putting Max Muncy on
+    # both. (Relative to independent pricing a nested leg is actually
+    # favourable, which is precisely why books refuse or re-price it - so it is
+    # not a bet that would stand, and a paper record of a bet that would be
+    # rejected teaches nothing.)
     #
-    # Deliberately before the total-bases leg. On a thin slate the board may
-    # post only one prop, and taking it for total bases consumed the only
-    # hitter and left the two hits legs empty - which is backwards, because the
-    # hits legs are the measured product with their own recorded singles and
-    # the total-bases leg is the speculative one.
+    # The HR pick is RESERVED for total bases before the hits legs are filled,
+    # because he is chosen by the power model and is the point of that leg.
+    # Without one, the hits legs fill first and total bases takes a leftover -
+    # a thin slate must not spend its only prop on the speculative leg.
+    hp = pc.get("hr_prop") or {}
+    tb_who, tb_id = hp.get("player"), hp.get("player_id")
+    reserved = {tb_id} if tb_who else set()
+
     used: set = set()
     for b in pc.get("props") or []:
         if len(used) >= 2:
             break
         pid_ = b.get("player_id")
-        if pid_ in used:
-            continue              # never two legs on the same player
+        if pid_ in used or pid_ in reserved:
+            continue
         used.add(pid_)
         legs.append({"leg": "hits", "player": b.get("player"),
                      "player_id": pid_, "line": HITS_POINT,
@@ -170,13 +180,11 @@ def build_ticket(date: str) -> dict | None:
     short = 2 - len(used)
     if short > 0:
         missing.append(f"hits ({short} short of two distinct players; the "
-                       "board posted "
-                       f"{len(pc.get('props') or [])} prop(s) on this game)")
+                       f"board posted {len(pc.get('props') or [])} prop(s) on "
+                       "this game"
+                       + (", and the HR pick is reserved for total bases"
+                          if reserved else "") + ")")
 
-    # 4. total bases 2+ for the power model's hitter, from the HR pick if there
-    # is one, otherwise the best posted bat NOT already carrying a hits leg.
-    hp = pc.get("hr_prop") or {}
-    tb_who, tb_id = hp.get("player"), hp.get("player_id")
     if not tb_who:
         spare = [b for b in (pc.get("props") or [])
                  if b.get("player_id") not in used]
@@ -192,7 +200,8 @@ def build_ticket(date: str) -> dict | None:
                                 " (no HR pick tonight, so the best posted bat "
                                 "not already on a hits leg)")})
     else:
-        missing.append("total_bases (no hitter left to use)")
+        missing.append("total_bases (no hitter left who is not already on a "
+                       "hits leg)")
 
     priced = [x for x in legs if isinstance(x.get("odds"), int)]
     ticket = {"date": date, "game_pk": g.get("game_pk"),

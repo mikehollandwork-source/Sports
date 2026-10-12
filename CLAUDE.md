@@ -490,12 +490,21 @@ unit-testable with mock `Game`/`Team` objects.
   `player_total_bases`, `player_hits`) and is **all-or-nothing per ticket** — an
   unconfirmable leg leaves the whole ticket unbooked for a later retry, so a
   feed gap can never book a partial ticket. Idempotent per date.
-  **The HITS legs are filled BEFORE the total-bases leg**, and that order
-  matters on a thin slate: the first version took the top prop for total bases,
-  so a night with only one posted prop spent it there and left both hits legs
-  empty. The hits legs are the measured product with their own recorded
-  singles; total bases is the speculative one, and it only ever uses the HR
-  pick or a bat not already carrying a hits leg.
+  **THREE DISTINCT HITTERS, and that is structural, not cosmetic. 2+ TOTAL
+  BASES CANNOT HAPPEN WITHOUT A HIT**, so the same player on both the hits leg
+  and the total-bases leg is a NESTED leg: the ticket carries three legs of
+  real risk while being priced as four. The first live four-leg ticket did
+  exactly that, putting Max Muncy on both. Relative to independent pricing a
+  nested leg is actually FAVOURABLE, which is precisely why books refuse or
+  re-price it — so it is not a bet that would stand, and a paper record of a
+  bet that would be rejected teaches nothing.
+  Ordering: the HR pick is RESERVED for total bases before the hits legs fill,
+  since he is chosen by the power model and is the point of that leg. With no
+  HR pick the hits legs fill FIRST and total bases takes a leftover — an
+  earlier version took the top prop for total bases, so a night with one posted
+  prop spent it there and left both hits legs empty. The hits legs are the
+  measured product with their own recorded singles; total bases is the
+  speculative one.
   **No fallback to WITHHELD props.** A prop held by `_prop_withheld` is below
   its own break-even, and a leg's EV multiplies into a parlay exactly as it
   does into a single, so a held leg is bad in both. A ticket that cannot find
