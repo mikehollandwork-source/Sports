@@ -313,8 +313,9 @@ unit-testable with mock `Game`/`Team` objects.
   `pick_criteria["props"]` is the list and `["prop"]` stays the top one for
   older readers; `["hit_bats"]` is now ARCHIVAL only — it is the top of the pool
   BEFORE the rising filter, which is what a later backtest of that filter needs.
-  **Props post on EVERY upcoming game, no-action ones included.** A 1+ hit prop
-  is its own bet and does not need the moneyline rule to have landed anywhere;
+  **Props post AND PRINT on EVERY upcoming game, no-action ones included.** A
+  1+ hit prop is its own bet and does not need the moneyline rule to have
+  landed anywhere;
   on 2026-10-12 a two-game slate of no-action games carried zero props. So
   PRESENCE IN `props` IS THE LEDGER GATE now, not `play == "pick"` — but only
   for new-format boards. On a LEGACY board the single `prop` was also computed
@@ -325,6 +326,16 @@ unit-testable with mock `Game`/`Team` objects.
   reproduce the same key or `grade._add` would append a duplicate beside a
   settled entry. Rendering all 2026 boards before and after this change is
   byte-identical.
+  **`telegram_text` renders a `🎯 PROPS — games with no play` section**, and it
+  had to be added separately: the selector was already posting props on every
+  game and `prop_grade` settling them, but the Telegram board only ever
+  rendered PLAYS — its own comment said "No-plays stay recorded in the picks
+  JSON (backend); they're not shown." So on 2026-10-12 Max Muncy was posted at
+  −133, stored, and gradeable while the board read "No plays on the board."
+  Storing a prop and showing it are separate code paths; changing one does not
+  change the other. Plays carry their props inline via `_pick_line` →
+  `_hit_lines`, and the section skips `_play(g) == "pick"`, so nothing prints
+  twice.
   The second and third prop on one game cost no extra odds credits
   (`prop_odds.hit_line` caches the game's whole batter_hits board per day), but
   a game that is not a play is a new board to price, so it spends under the

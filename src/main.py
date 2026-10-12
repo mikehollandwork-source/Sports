@@ -2544,8 +2544,8 @@ def telegram_text(payload: dict) -> str:
     picks = _by_win([g for g in board if _play(g) == "pick"])
     sp_all = _splits_or_empty(board)   # computed once; the cache makes it cheap
 
-    # Minimal board: only the plays, one clean line each (ranked by win chance).
-    # No-plays stay recorded in the picks JSON (backend); they're not shown.
+    # The plays, one clean line each (ranked by win chance). Their props are
+    # carried inline by `_pick_line`.
     L = [f"⚾ MLB BOARD — {date}", ""]
     if picks:
         L.append(f"{len(picks)} play{'s' if len(picks) != 1 else ''} today:")
@@ -2556,6 +2556,29 @@ def telegram_text(payload: dict) -> str:
         L.pop()          # no trailing blank before the divider
     else:
         L.append("No plays on the board.")
+
+    # PROPS ON NON-PLAY GAMES. The selector already posts props on every
+    # upcoming game and `prop_grade` settles them whether the moneyline rule
+    # landed on that game or not - but this board only ever rendered PLAYS, so
+    # on a night with no play they sat in the JSON and were never shown.
+    # 2026-10-12 was exactly that: Max Muncy posted at -133 while the board
+    # read "No plays on the board." Plays carry their props inline above, so
+    # this covers only the rest and nothing prints twice.
+    others = []
+    for g in board:
+        if _play(g) == "pick":
+            continue
+        pc0 = g.get("pick_criteria") or {}
+        if pc0.get("props") or pc0.get("prop_withheld"):
+            others.append(g)
+    if others:
+        L += ["", "🎯 PROPS — games with no play", "",
+              "Posted and graded the same as any other prop. The moneyline",
+              "rule not landing here says nothing about a hitter."]
+        for g in others:
+            st_ = _start_time(g)
+            L += ["", f"{g['matchup']}" + (f" · {st_}" if st_ else "")]
+            L += _hit_lines(g)
 
     dogs = _good_dog_lines(board, picks)
     money = _line_money_lines(board, picks)
