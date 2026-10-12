@@ -564,6 +564,18 @@ unit-testable with mock `Game`/`Team` objects.
   chance (±15%). The binding limit is the PRICE sample: 42 quotes from four
   October dates. Widen `prop_odds.hrr_line` to log the whole board daily before
   trusting it.
+  **PRICE CAPTURE IS NOW WIRED** (`prop_odds.warm`, called from `main` for
+  every upcoming game, capped by `WARM_MAX_GAMES = 4`; both markets are per-day
+  cached so only the first board run of the day spends). First night live:
+  21 H+R+RBI quotes and the **first 2+ total-bases prices that have ever
+  existed in this repo**.
+  **And total bases looks BAD at the prices it is actually sold at.** Captured
+  overs ran +115 to +156, median **+133**, which demands **42.9%** against the
+  measured **36.4%** — a **−6.5-point** leg before any parlay multiplies it.
+  Fair is +175 and nobody is offering it. That is the opposite of what the
+  rate alone suggested, and it is a direct hit on the paper ticket's
+  total-bases leg: re-read `parlay_paper`'s expectation once a few more nights
+  land, and do not treat the 36.4% rate as if it were available at fair.
   **TWO BUGS WORTH REMEMBERING.** (1) `rate - need` is a FRACTION: formatting it
   `:+.1f` printed an 18-point edge as "+0.2 pts" and a 1.7-point gap as
   "-0.0 pts". It happened twice, one line apart. (2) The first price-match
