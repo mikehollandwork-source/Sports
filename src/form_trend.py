@@ -295,6 +295,7 @@ def build() -> str:
         tag = " ← primary" if i == 0 else ""
         md.append(f"| {label}{tag} | {rh/rp:.3%} ({rh:.0f}/{rp:.0f}) "
                   f"| {fh/fp:.3%} ({fh:.0f}/{fp:.0f}) | {gap:+.3%} | {p:.4f} |")
+    md += [""] + hits_test(cache)
     md += ["",
            "## How to read this", "",
            "- the primary test is the combined ratio; the other two are "
