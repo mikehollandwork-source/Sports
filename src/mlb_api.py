@@ -197,6 +197,64 @@ def player_hits(game_pk: int, player_id: int) -> int | None:
     return None
 
 
+def pitcher_strikeouts(game_pk: int, player_id: int) -> int | None:
+    """Strikeouts the pitcher recorded in a game, from the boxscore pitching
+    line. None if unavailable, exactly like `player_hits`.
+
+    Read straight off the boxscore rather than out of another module's cache:
+    settlement must not depend on some other job having refreshed first.
+    """
+    try:
+        with apitime.timed("mlb", f"box/{game_pk}"):
+            box = SESSION.get(
+                f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore",
+                timeout=TIMEOUT).json()
+        for side in ("home", "away"):
+            p = (box.get("teams", {}).get(side, {}).get("players") or {}).get(
+                f"ID{player_id}")
+            if p:
+                pit = (p.get("stats", {}).get("pitching", {}) or {})
+                if not pit:
+                    return None
+                return int(pit.get("strikeOuts", 0) or 0)
+    except Exception as exc:
+        log.warning("pitcher_strikeouts fetch failed (%s/%s): %s",
+                    game_pk, player_id, exc)
+    return None
+
+
+def player_total_bases(game_pk: int, player_id: int) -> int | None:
+    """Total bases the player recorded in a game, from the boxscore batting
+    line. None if unavailable, exactly like `player_hits`.
+
+    MLB does not serve totalBases on the batting line, so it is reconstructed:
+    singles are hits minus the extra-base hits, and TB = 1B + 2*2B + 3*3B +
+    4*HR.
+    """
+    try:
+        with apitime.timed("mlb", f"box/{game_pk}"):
+            box = SESSION.get(
+                f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore",
+                timeout=TIMEOUT).json()
+        for side in ("home", "away"):
+            p = (box.get("teams", {}).get(side, {}).get("players") or {}).get(
+                f"ID{player_id}")
+            if p:
+                bat = (p.get("stats", {}).get("batting", {}) or {})
+                if int(bat.get("plateAppearances", 0) or 0) < 1:
+                    return None
+                h = int(bat.get("hits", 0) or 0)
+                d = int(bat.get("doubles", 0) or 0)
+                t = int(bat.get("triples", 0) or 0)
+                hr = int(bat.get("homeRuns", 0) or 0)
+                singles = max(0, h - d - t - hr)
+                return singles + 2 * d + 3 * t + 4 * hr
+    except Exception as exc:
+        log.warning("player_total_bases fetch failed (%s/%s): %s",
+                    game_pk, player_id, exc)
+    return None
+
+
 def player_home_runs(game_pk: int, player_id: int) -> int | None:
     """Home runs the player hit in a game, from the boxscore batting line. None
     if unavailable (game not final / player absent / fetch fails).

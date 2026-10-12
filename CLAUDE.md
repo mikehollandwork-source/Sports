@@ -459,3 +459,31 @@ unit-testable with mock `Game`/`Team` objects.
   **This cuts against how props are posted, deliberately:** three props from
   BOTH lineups is right for three SINGLES and wrong for a parlay, which wants
   correlated same-team legs. Different products; the board posts singles.
+- **The five-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
+  `output/parlay_paper.json`, built by its own workflow after the board).
+  Requested structure: alternate strikeouts on a starter, the board's moneyline
+  pick, 2+ total bases for the power model's hitter, and two DIFFERENT players
+  for 1+ hit. Nothing is staked. It touches no ledger — the hit props keep
+  being recorded as singles exactly as before, and
+  `record_audit.paper_parlay_guard` asserts both halves of that from the files:
+  every hits leg must ALSO exist as its own single, and no paper date may
+  appear in the booked-parlay book.
+  **Expected to lose, slowly** — `parlay_structure.md` puts the best available
+  structure at −6.5%; paper trading is how we find out whether a banker leg
+  plus correlated legs lands nearer that than the −28.2% the retired parlays
+  did. It is built SAME-GAME on purpose: that is where the measured ×1.035 /
+  ×1.135 correlation lift lives.
+  **"A number the pitcher has never missed" is NOT a floor** (`alt_k.py`,
+  `output/alt_k.md`). Measured out of sample in date order over 891 starts from
+  142 starters: his exact prior minimum clears **92.0%**, one under it
+  **97.0%**, two under **98.1%**. It gets WORSE with more starts — 93.3% at
+  8–11 prior starts, 92.9% at 12–15, **89.4% at 16+** — because a minimum is
+  the smallest value in a sample and drifts down as the sample grows. So
+  `BANKER_OFFSET = 1`: one under the prior minimum, which is the stated intent
+  ("a high hit rate") rather than the literal wording. At the exact minimum
+  that leg alone removes 8% of a five-leg ticket while adding almost nothing to
+  the payout, which makes it the leg most worth dropping entirely.
+  Settlement reads the boxscore directly (`mlb_api.pitcher_strikeouts`,
+  `player_total_bases`, `player_hits`) and is **all-or-nothing per ticket** — an
+  unconfirmable leg leaves the whole ticket unbooked for a later retry, so a
+  feed gap can never book a partial ticket. Idempotent per date.

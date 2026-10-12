@@ -400,6 +400,59 @@ def pull_gate_guard() -> list[str]:
     return out + [""]
 
 
+def paper_parlay_guard() -> list[str]:
+    """Assert the PAPER parlay is separate from every real ledger.
+
+    Two things have to be true and neither is worth trusting a docstring for.
+    The paper book must not have leaked a parlay into the prop ledger, which is
+    how the retired `prop_grade` parlays got there in the first place. And every
+    hits leg must ALSO exist as its own single - the point of the paper book is
+    that it sits BESIDE the recorded props, not instead of them, so a leg that
+    replaced its single would be a silent loss of record.
+    """
+    out = ["## Guard: the paper parlay touches no real ledger", ""]
+    try:
+        book = json.loads((OUTPUT_DIR / "parlay_paper.json").read_text())
+    except (OSError, ValueError):
+        return out + ["- _no paper tickets settled yet._", ""]
+    try:
+        led = json.loads((OUTPUT_DIR / "prop_ledger.json").read_text())
+    except (OSError, ValueError):
+        return out + ["- prop ledger unreadable; cannot check.", ""]
+    singles = {e.get("key") for e in led.get("singles", {}).get("entries", [])}
+    par = {e.get("key") for e in led.get("parlays", {}).get("entries", [])}
+    leaked = missing = legs = 0
+    for e in book.get("entries", []):
+        for leg in e.get("legs") or []:
+            if leg.get("leg") != "hits":
+                continue
+            legs += 1
+            # the single that must exist beside it
+            key = None
+            for s in singles:
+                if s and s.startswith(f"{e['date']}#") and \
+                        s.endswith(f"#{leg.get('player_id')}"):
+                    key = s
+                    break
+            if key is None:
+                missing += 1
+    # a paper ticket must never appear as a booked parlay
+    for e in book.get("entries", []):
+        if any(k and k.startswith(f"{e['date']}#") for k in par):
+            leaked += 1
+    out += [f"- settled paper tickets: **{len(book.get('entries', []))}** "
+            f"(paper bankroll {book.get('bankroll', 0):+.2f}, nothing staked)",
+            f"- hits legs checked against the singles book: **{legs}**",
+            f"- legs with NO matching single: **{missing}**",
+            f"- paper dates that also booked a real parlay: **{leaked}**"]
+    out.append("- " + ("**PASS** — the paper book sits beside the recorded "
+                       "props and has leaked nothing into any ledger"
+                       if missing == 0 and leaked == 0 else
+                       f"**FAIL — {missing} leg(s) have no single and "
+                       f"{leaked} date(s) leaked into the parlay book.**"))
+    return out + [""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Record audit — what was posted vs what got graded", "",
@@ -614,6 +667,7 @@ def build() -> str:
     md += line_money_guard()
     md += pitch_mix_guard()
     md += pull_gate_guard()
+    md += paper_parlay_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "

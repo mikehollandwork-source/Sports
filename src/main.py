@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for, hr_factor
-from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pinch_risk, pitch_mix, projections, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, parlay_paper, pinch_risk, pitch_mix, projections, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -2470,6 +2470,55 @@ def _telegram_records_lines() -> list[str]:
     return out
 
 
+def _paper_parlay_lines(date: str) -> list[str]:
+    """Tonight's paper ticket, if `parlay_paper` has built one.
+
+    READ ONLY, and deliberately decoupled: the ticket is built by its own job
+    AFTER the board, so the board never waits on it, never spends its credits
+    and cannot be broken by it. A refresh later in the day picks it up.
+    """
+    try:
+        t = json.loads((OUTPUT_DIR / f"parlay_paper_{date}.json").read_text())
+    except (OSError, ValueError):
+        return []
+    legs = t.get("legs") or []
+    if not legs:
+        return []
+    out = ["", "📄 PAPER PARLAY — NOT A BET, NOT IN ANY LEDGER", "",
+           "Logged at real prices in its own book so the structure earns a",
+           "record of its own. Measured expectation is NEGATIVE: the best",
+           "parlay this data supports is about -6.5% (parlay_structure.md)."]
+    if t.get("parlay_odds"):
+        out.append("")
+        out.append(f"{t['matchup']} · {t['parlay_odds']:+d} · "
+                   f"${t.get('stake', 5):.0f} returns ${t['returns']:.2f}")
+    out.append("")
+    for leg in legs:
+        who = leg.get("player") or leg.get("team") or "?"
+        price = (f"{leg['odds']:+d}" if isinstance(leg.get("odds"), int)
+                 else "no line")
+        label = {"alt_strikeouts": f"{leg.get('line')}+ K",
+                 "moneyline": "ML",
+                 "total_bases": "2+ total bases",
+                 "hits": "1+ hit"}.get(leg["leg"], leg["leg"])
+        out.append(f"   • {who} {label}  {price}")
+        if leg["leg"] == "alt_strikeouts":
+            out.append(f"     prior minimum {leg.get('prior_min')} over "
+                       f"{leg.get('prior_starts')} starts — clears "
+                       f"{leg.get('measured_rate', 0):.1%} of the time,")
+            out.append("     not always: a prior minimum is not a floor")
+    if t.get("missing"):
+        out.append("")
+        out.append("   legs unavailable tonight: " + "; ".join(t["missing"]))
+    if t.get("unpriced"):
+        out.append("")
+        out.append("   NOT PRICED, so not booked: " + ", ".join(t["unpriced"]))
+    rec = parlay_paper.lines()
+    if len(rec) > 1:
+        out += [""] + ["   " + x.strip() for x in rec[1:]]
+    return out
+
+
 def telegram_text(payload: dict) -> str:
     """Readable phone layout for Telegram: the pick(s) up top, then leans, then
     the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
@@ -2515,6 +2564,7 @@ def telegram_text(payload: dict) -> str:
               f"   (our own record on it, {PICK_REC_MIN}+ picks. History, not a "
               "forecast — team-by-team", "   differences here are not "
               "distinguishable from luck.)"]
+    L += _paper_parlay_lines(date)
     L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
     # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
     return "\n".join(L)

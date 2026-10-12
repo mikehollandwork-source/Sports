@@ -1,0 +1,49 @@
+name: Paper parlay
+# Builds tonight's five-leg paper ticket and settles yesterday's. PAPER ONLY -
+# nothing staked, its own book, touches no ledger. Separate from the board so
+# it cannot break it and does not spend the board's credits.
+on:
+  workflow_dispatch:
+  schedule:
+    # 16:40 UTC ~= 12:40pm ET: after the board (15:00) and after market_log
+    # (16:25), so the props, the HR pick and the prices all exist.
+    - cron: "40 16 * * *"
+permissions:
+  contents: write
+concurrency:
+  group: parlay-paper
+  cancel-in-progress: false
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install -r requirements.txt
+      - name: Build and settle
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: |
+          python -m src.alt_k
+          python -m src.parlay_paper
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/parlay_paper*.json output/alt_k.md output/odds_credits.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Paper parlay ($(date -u +%Y-%m-%d))"
+            pushed=0
+            for i in 1 2 3 4; do
+              git pull --rebase origin "${{ github.ref_name }}" \
+                && git push origin "HEAD:${{ github.ref_name }}" \
+                && { pushed=1; break; }
+              echo "push retry $i"; sleep $((2 ** i))
+            done
+            [ "$pushed" = 1 ] || { echo "push failed"; exit 1; }
+          fi
