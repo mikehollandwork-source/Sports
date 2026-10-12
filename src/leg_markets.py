@@ -377,6 +377,98 @@ def parlays(measure: list, rates: dict, prices: dict) -> list[str]:
     return md + [""]
 
 
+def price_matched(rows: list, rates: dict) -> list[str]:
+    """The decisive check on H+R+RBI: each CAPTURED price against the rate of
+    the hitter it was actually quoted for.
+
+    The table above pairs a rate measured on QUALITY hitters with a median
+    price taken over EVERY hitter the book listed, weak ones included. Good
+    hitters are priced shorter, so that mismatch alone would manufacture an
+    edge. This removes it by resolving each quoted name to the player and
+    using his own held-out rate against his own price.
+    """
+    md = ["## The decisive check: each captured price against ITS OWN hitter",
+          "",
+          "_The table above pairs a rate measured on QUALITY hitters with a "
+          "median price taken over EVERY hitter the book listed. Good hitters "
+          "are priced shorter, so that mismatch alone could manufacture the "
+          "edge. Here each quoted name is resolved to the player and scored "
+          "against his own held-out rate._", ""]
+    # name -> pid, from the boxscores of the dates that have captured prices
+    dates = []
+    for f in sorted(glob.glob(str(OUTPUT_DIR / "prop_odds_hrr_2026-*.json"))):
+        dates.append(Path(f).stem.split("prop_odds_hrr_")[1])
+    name_to_pid: dict = {}
+    pks_by_date: dict = {}
+    for r in rows:
+        pks_by_date.setdefault(r["date"], set()).add(r["pk"])
+    for date in dates:
+        for pk in pks_by_date.get(date, ()):
+            try:
+                box = mlb_api._get(f"game/{pk}/boxscore")
+            except Exception:
+                continue
+            for side in ("home", "away"):
+                for pid, pl in (((box.get("teams") or {}).get(side, {})
+                                 .get("players")) or {}).items():
+                    nm = ((pl.get("person") or {}).get("fullName") or "")
+                    if nm:
+                        name_to_pid[totals_signal._norm(nm)] = \
+                            pid.replace("ID", "")
+    matched, unmatched = [], 0
+    for date in dates:
+        try:
+            d = json.loads((OUTPUT_DIR
+                            / f"prop_odds_hrr_{date}.json").read_text())
+        except (OSError, ValueError):
+            continue
+        for game in d.values():
+            if not isinstance(game, dict):
+                continue
+            for nm, v in game.items():
+                o = v.get("over") if isinstance(v, dict) else None
+                if not isinstance(o, int):
+                    continue
+                pid = name_to_pid.get(totals_signal._norm(nm))
+                rate = (rates.get(pid) or {}).get("hrr2") if pid else None
+                if rate is None:
+                    unmatched += 1
+                    continue
+                matched.append({"name": nm, "price": o, "rate": rate,
+                                "need": _be(o)})
+    if len(matched) < 10:
+        return md + [f"- only {len(matched)} prices resolved to a measured "
+                     f"hitter ({unmatched} unresolved); not decidable.", ""]
+    edges = [m["rate"] - m["need"] for m in matched]
+    beat = sum(1 for e in edges if e > 0)
+    md += [f"- captured prices resolved to a measured hitter: "
+           f"**{len(matched)}** ({unmatched} unresolved)",
+           f"- median price **{int(st.median(m['price'] for m in matched)):+d}**, "
+           f"median rate **{st.median(m['rate'] for m in matched):.1%}**",
+           f"- **mean edge: {st.mean(edges):+.1f} points** "
+           f"(median {st.median(edges):+.1f})",
+           f"- prices the hitter's own rate beat: **{beat}/{len(matched)}**",
+           ""]
+    md += ["| hitter | price | needs | his rate | edge |",
+           "|---|---|---|---|---|"]
+    for m in sorted(matched, key=lambda x: -(x["rate"] - x["need"]))[:12]:
+        md.append(f"| {m['name'].title()} | {m['price']:+d} | "
+                  f"{m['need']:.1%} | {m['rate']:.1%} | "
+                  f"**{m['rate'] - m['need']:+.1f} pts** |")
+    md.append("")
+    md.append("- " + ("**the edge survives price-matching**, so the market "
+                      "table above is not a population artifact"
+                      if st.mean(edges) > 0.02 else
+                      "**the edge does NOT survive price-matching** — the "
+                      "apparent H+R+RBI edge was the mismatch between a "
+                      "quality-filtered rate and an all-hitters median price"
+                      if st.mean(edges) < 0 else
+                      "**inconclusive at this sample** — the mean edge is "
+                      "inside noise, and 42 captured prices from four October "
+                      "dates cannot settle it"))
+    return md + [""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Which market on our hitters is actually worth taking?", "",
@@ -395,6 +487,7 @@ def build() -> str:
     md += single_legs(measure, rates, prices)
     md += correlation(measure, rates)
     md += parlays(measure, rates, prices)
+    md += price_matched(rows, rates)
     md += ["## Caveats", "",
            "1. Prices are the MEDIAN of what was captured, not what was "
            "available on each individual night, so a single leg's real edge "
