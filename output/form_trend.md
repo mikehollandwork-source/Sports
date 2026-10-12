@@ -4,13 +4,13 @@ _`hr_pick.form_factor` measures a level: a 15-game lump against the hitter's sea
 
 Windows: last 5 games against the 10 before them, both ending before the game predicted. Outcome: HR per PA in that next game. Permutation over hitters, 2000 draws.
 
-**22361 hitter-games** from 419 hitters.
+**22505 hitter-games** from 427 hitters.
 
 | split | rising HR/PA | falling HR/PA | gap | permutation p |
 |---|---|---|---|---|
-| combined (air × ISO)**0.5 ← primary | 3.369% (1213/36008) | 3.085% (1642/53224) | +0.284% | 0.0215 |
-| air rate only | 3.290% (1448/44009) | 3.111% (1407/45223) | +0.179% | 0.1489 |
-| ISO only | 3.384% (1234/36468) | 3.072% (1621/52764) | +0.312% | 0.0060 |
+| combined (air × ISO)**0.5 ← primary | 3.364% (1216/36151) | 3.084% (1652/53569) | +0.280% | 0.0225 |
+| air rate only | 3.287% (1453/44211) | 3.109% (1415/45509) | +0.177% | 0.1594 |
+| ISO only | 3.376% (1237/36639) | 3.073% (1631/53081) | +0.304% | 0.0060 |
 
 ## How to read this
 
