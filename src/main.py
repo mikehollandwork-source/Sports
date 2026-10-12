@@ -1620,28 +1620,37 @@ PROP_FIT_SCALE = 100.0
 # display, so it is left alone, but the two matchup terms are not on the same
 # scale and that is worth knowing.)
 PLATOON_PRIOR_PA = 300
-PROP_SELECTOR = "all_rate+form+bvp+fit+platoon"   # stamped so the ledger stays separable
+PROP_SELECTOR = "all_rate+bvp+fit+platoon"   # stamped so the ledger stays separable
 
 
 def _prop_score(b: dict, fit: int = 0) -> float:
     """Estimated hit likelihood for tonight, on a probability-ish scale.
 
-    FORM IS SHRUNK, for the same reason BvP is. `form` is computed over
-    props.RECENT_GAMES games, so a +39% reading is five games of evidence, and
-    taking it at face value would say a hitter is 39 points more likely to get a
-    hit tonight than his own season rate. It gets the same sample-size treatment
-    BvP gets, with the prior set EQUAL TO the window - so at exactly the window
-    length form carries half its face value. The prior is the window rather than
-    a number picked to produce an answer.
+    FORM IS DELIBERATELY ABSENT. It used to enter here shrunk by half, on the
+    reasoning that a five-game window deserves the same sample-size treatment
+    BvP gets. That reasoning was sound but assumed form carried SOME signal. It
+    does not:
+
+      * a 5-game hit rate has a sampling SD of 21.6 points on its own, so a
+        hitter whose ability never changed still reads +/-22; the form values we
+        actually stored have SD 18.5, entirely inside what noise alone produces
+      * against whether he gets a hit, form scores AUC 0.5053 over 32,564
+        starts - a coin flip (`short_night_form.py`)
+      * shrunk by half it still contributed SD ~0.092 to this score, against a
+        median spread of ~0.095 in all_rate between candidates in the same
+        game. A noise term the size of the signal decides the pick about as
+        often as the signal does
+
+    n/(n+n) is the right shrinkage for a MODERATELY reliable reading. For one
+    with no measured reliability the correct multiplier is zero, which is what
+    it now has. Do not reinstate it without a measurement that beats 0.5053.
     """
     base = (b.get("all_rate") or 0) / 100.0
-    n = props.RECENT_GAMES
-    form = ((b.get("form") or 0) / 100.0) * (n / (n + n))
     bvp = b.get("bvp") or {}
     pa, ops = bvp.get("pa") or 0, bvp.get("ops") or 0.0
     edge = ((ops - LEAGUE_OPS) * (pa / (pa + BVP_PRIOR))) if pa > 0 else 0.0
     platoon = (b.get("platoon") or {}).get("shrunk") or 0.0
-    return base + form + edge + platoon + (fit / PROP_FIT_SCALE)
+    return base + edge + platoon + (fit / PROP_FIT_SCALE)
 
 
 def _fits_for(game: dict, bats: list, team_id: int, date: str) -> dict:

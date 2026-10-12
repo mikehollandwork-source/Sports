@@ -1,4 +1,24 @@
 """
+WATCH ONLY since 2026-10-12. Tags the other side; posts no pick.
+
+WHY IT WAS DEMOTED
+It never cleared a bar - the note below says so in its own words - and the
+forward record came in worse than the backtest allowed for:
+
+    backtest, as shipped ....... +15.0% on 96, CI -12.3% to +41.4%
+    live, 2026-09-22 to 10-10 ... 4-8, -3.08u, -25.7%
+
+-25.7% sits BELOW the backtest interval's floor. Twelve bets cannot prove a
+rule is broken, and this is not claimed as proof. But a rule that never reached
+significance, whose live return falls outside its own backtest CI, and which
+posts bets the model contradicts - 2026-10-10 took the White Sox at +118 with
+the model on 40.7% against a 45.9% implied - has no claim on a stake.
+
+So it now writes `fade_watch` and nothing else: no play, no status, no
+bet_team. Nothing downstream treats it as a bet, so it stays out of the ledger
+the way `good_dog` and `line_money` do, and the evidence keeps accumulating
+against a day it either earns the stake back or is deleted.
+
 Back the other side when the rule withdraws a pick. Added at the user's call.
 
 RE-BASELINED 2026-09-29, because the rule's INPUT changed
@@ -160,21 +180,19 @@ def apply(results: list[dict], date: str) -> int:
             if not side:
                 continue
             team, odds = side
-            pc.update({"play": "pick", "status": "PICK", "bet_team": team,
-                       "bet_moneyline": odds, "source": "fade",
-                       "reason": was.get("reason")
-                       or f"fade — standing bet on {team}"})
+            pc["fade_watch"] = {"team": team, "odds": odds,
+                                "reason": was.get("reason")
+                                or f"standing fade on {team}"}
             added += 1
             continue
         side = _other_side(r, was.get("bet"))
         if not side:
             continue
         other, odds = side
-        pc.update({"play": "pick", "status": "PICK", "bet_team": other,
-                   "bet_moneyline": odds, "source": "fade",
-                   "reason": f"fade — {was.get('bet')} {was.get('odds'):+d} "
-                             "was withdrawn"})
+        pc["fade_watch"] = {
+            "team": other, "odds": odds,
+            "reason": f"{was.get('bet')} {was.get('odds'):+d} was withdrawn"}
         added += 1
     if added:
-        log.info("applied %d fade pick(s) for %s", added, date)
+        log.info("tagged %d fade watch(es) for %s - no picks posted", added, date)
     return added
