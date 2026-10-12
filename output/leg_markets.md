@@ -11,9 +11,9 @@ _Hitters are filtered ONCE on the held-out HIT rate at 60%, the population the b
 
 | market | rate | fair price | real median price | it needs | edge |
 |---|---|---|---|---|---|
-| 1+ hit | **61.7%** | -161 | -173 _(n=4484)_ | 63.4% | **-0.0 pts** |
+| 1+ hit | **61.7%** | -161 | -173 _(n=4484)_ | 63.4% | **-1.7 pts** |
 | 2+ total bases | **36.4%** | +175 | _never captured_ | — | — |
-| 2+ hits+runs+RBIs | **47.4%** | +111 | +115 _(n=42)_ | 46.5% | **+0.0 pts** |
+| 2+ hits+runs+RBIs | **47.4%** | +111 | +115 _(n=42)_ | 46.5% | **+0.9 pts** |
 
 _`edge` is percentage POINTS of hit rate over the break-even the price demands. Multiply by roughly 1.5 to read it as ROI at a short price, or 2 at plus money._
 
