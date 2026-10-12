@@ -186,6 +186,16 @@ def _both(sa: dict, key: str):
     return st.mean(vals) if vals else None
 
 
+# 16-point compass -> degrees. `wind_deg` was only added to the board recently
+# and sits on 24 of 1299 games, while the compass string `wind_dir` is on all
+# 1167 that have weather at all - so without this the signed-wind test runs at
+# n=17 and says nothing.
+COMPASS = {"N": 0, "NNE": 22.5, "NE": 45, "ENE": 67.5, "E": 90,
+           "ESE": 112.5, "SE": 135, "SSE": 157.5, "S": 180, "SSW": 202.5,
+           "SW": 225, "WSW": 247.5, "W": 270, "WNW": 292.5, "NW": 315,
+           "NNW": 337.5}
+
+
 def _wind_signed(g: dict, home_name: str):
     """+mph when the wind blows OUT to centre, -mph when it blows in, None for
     a crosswind, a closed roof or an unknown park bearing.
@@ -197,6 +207,8 @@ def _wind_signed(g: dict, home_name: str):
     if (wx.get("roof") or "") == "closed":
         return None
     deg, mph = wx.get("wind_deg"), wx.get("wind_mph")
+    if not isinstance(deg, (int, float)):
+        deg = COMPASS.get((wx.get("wind_dir") or "").strip().upper())
     bearing = park_factors.bearing_for(home_name)
     if bearing is None or not isinstance(deg, (int, float)) \
             or not isinstance(mph, (int, float)):
@@ -590,7 +602,96 @@ def build() -> str:
     md += ["", f"_At n around a thousand the standard error on a correlation "
            f"is about {1 / math.sqrt(1000):.3f}, so anything inside roughly "
            "±0.06 is not distinguishable from nothing._", ""]
+
+    # --- 8. the umpire, measured the way it should have been -----------------
+    md += ump_residual_section(rows)
     return "\n".join(md)
+
+
+UMP_MIN_STARTS = 12
+
+
+def ump_residual_section(rows: list[dict]) -> list[str]:
+    """The umpire as K ABOVE WHAT THE PITCHERS IMPLY, split chronologically.
+
+    This is the real version of the question. `k_extra` is raw K/game, so over
+    a dozen games it mostly measures which PITCHERS an umpire happened to draw
+    - a confound that does not transfer, and the likeliest reason section 1
+    comes back wrong-signed. Averaging the projection's RESIDUAL instead
+    (actual minus what this pitcher, against this lineup, was projected for)
+    removes the pitcher from the measurement by construction.
+
+    Judged out of sample: each umpire's mean residual is built from the FIRST
+    half of the season by date and then asked to predict his residuals in the
+    second half. A tendency that only exists inside its own training games is
+    not a tendency.
+    """
+    starts = []
+    for r in rows:
+        if not r.get("ump"):
+            continue
+        for s in r["starters"]:
+            if s["ip"] < 1:
+                continue
+            proj = starter_k_proj(r, s, with_ump=False, starts_only=True)
+            if proj is not None:
+                starts.append((r["date"], r["ump"], s["k"] - proj))
+    out = ["## 8. The umpire, measured as strikeouts ABOVE the pitchers", "",
+           "_`k_extra` is raw K/game, so over a dozen games it largely "
+           "measures which PITCHERS the umpire drew - which is the likeliest "
+           "reason section 1 comes back wrong-signed. This averages the "
+           "projection's residual instead, which removes the pitcher by "
+           "construction, and then asks the first half of the season to "
+           "predict the second._", ""]
+    if len(starts) < 200:
+        return out + [f"- only {len(starts)} usable starts; not measurable.",
+                      ""]
+    starts.sort()
+    cut = starts[len(starts) // 2][0]
+    train: dict = {}
+    test: list = []
+    for date, ump, res in starts:
+        if date <= cut:
+            train.setdefault(ump, []).append(res)
+        else:
+            test.append((ump, res))
+    tend = {u: st.mean(v) for u, v in train.items()
+            if len(v) >= UMP_MIN_STARTS}
+    paired = [(tend[u], res) for u, res in test if u in tend]
+    out += [f"- usable starts: **{len(starts)}**, split at **{cut}**",
+            f"- umpires with {UMP_MIN_STARTS}+ starts in the first half: "
+            f"**{len(tend)}**",
+            f"- second-half starts under one of them: **{len(paired)}**"]
+    if tend:
+        vals = list(tend.values())
+        out.append(f"- spread of their residual tendencies: SD "
+                   f"**{st.pstdev(vals):.2f}** K/start, range "
+                   f"{min(vals):+.2f} to {max(vals):+.2f}")
+    if len(paired) < 100:
+        return out + ["- too few paired second-half starts to test.", ""]
+    r = _pearson([a for a, _ in paired], [b for _, b in paired])
+    out += ["",
+            f"- **OUT-OF-SAMPLE correlation, first-half tendency vs "
+            f"second-half residual: {_fmt_r(r)}** (n={len(paired)}, "
+            f"SE about {1 / math.sqrt(len(paired)):.3f})"]
+    # does sorting on it separate anything?
+    t = _tercile([{"t": a, "res": b} for a, b in paired], "t", "res")
+    if t:
+        lo, hi, nlo, nhi = t
+        out.append(f"- second-half residual by first-half tendency: low third "
+                   f"**{lo:+.2f}** K/start ({nlo}), high third **{hi:+.2f}** "
+                   f"({nhi}), gap **{hi - lo:+.2f}**")
+    good = isinstance(r, float) and r >= 2 / math.sqrt(len(paired))
+    out.append("- " + ("**this version carries signal** — worth building a "
+                       "residual-based umpire table and re-testing it as a "
+                       "multiplier before the idea is closed"
+                       if good else
+                       "**still nothing.** Removing the pitcher confound does "
+                       "not rescue it, so the umpire is not a usable "
+                       "strikeout term in this data - not because the table "
+                       "is stale or built wrong, but because the effect is "
+                       "too small to survive one start's variance."))
+    return out + [""]
 
 
 def _reliability(rows: list[dict]) -> list[str]:
@@ -613,24 +714,19 @@ def _reliability(rows: list[dict]) -> list[str]:
         if sb is not None:
             out.append(f"- Spearman-Brown, lifted to the full record: "
                        f"**{sb:+.3f}**")
-        out.append("- " + ("**there is a trait here** — a rebuilt, "
-                           "sample-shrunk table is worth trying before the "
-                           "umpire is written off"
-                           if isinstance(r, float) and r >= 0.2 else
-                           "**no trait to find** — his half-seasons barely "
-                           "agree with each other, so a bigger table cannot "
-                           "rescue a term the outcome already rejected"))
+        if sb is not None and sb >= 0.25:
+            out.append("- **a trait exists, but a weak one.** At this "
+                       "reliability the honest use of `k_extra` is to shrink "
+                       "it toward zero by roughly that fraction - which makes "
+                       "an already-null term smaller, not larger. And note "
+                       "what this number cannot separate: an umpire's K/game "
+                       "also reflects the PITCHERS he drew, and over ~12 "
+                       "games that is most of it. Section 8 strips that out.")
+        else:
+            out.append("- **no trait to find** — his half-seasons barely "
+                       "agree with each other, so a bigger table cannot "
+                       "rescue a term the outcome already rejected.")
     return out + [""]
-
-    """(row, base projection, starter) for every usable start - so the residual
-    test reuses exactly the projections table 4 scored."""
-    for r in rows:
-        for s in r["starters"]:
-            if s["ip"] < 1:
-                continue
-            b = starter_k_proj(r, s, with_ump=False)
-            if b is not None:
-                yield r, b, s
 
 
 def _residual_rows(rows: list[dict]):
