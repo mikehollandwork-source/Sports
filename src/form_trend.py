@@ -185,6 +185,66 @@ KEYS = {
 }
 
 
+def hits_test(cache: dict) -> list[str]:
+    """Does the BATTED-BALL trend predict a HIT, as it does a home run?
+
+    Asked to require that a prop hitter is genuinely trending up. Form measured
+    as a five-game HIT RATE is a coin flip - AUC 0.5053 over 32,564 starts -
+    which is why it was cut from the prop score. But the trend that works for
+    home runs is a different measurement: air rate and ISO over the last five
+    games against the prior ten. Whether THAT carries to hits has never been
+    tested, and assuming it transfers because it worked for home runs is
+    exactly the leap this repo keeps having to undo.
+
+    Same windows and the same combined ratio as the primary test, so the only
+    thing changing is the outcome.
+    """
+    rows = []
+    for pid in cache:
+        gl = cache.get(pid) or []        # already oldest -> newest from _rows
+        for i in range(RECENT_N + EARLIER_N, len(gl)):
+            r = ratios(gl, i)
+            if not r:
+                continue
+            nxt = gl[i]
+            pa = nxt.get("pa") if isinstance(nxt, dict) else None
+            if not pa or pa < 1:
+                continue
+            rows.append((math.sqrt(r[0] * r[1]),
+                         1 if (nxt.get("hits") or 0) >= 1 else 0))
+    if len(rows) < 500:
+        return ["_Not enough rows to test the trend against hits._", ""]
+    rise = [y for x, y in rows if x > 1.0]
+    fall = [y for x, y in rows if x <= 1.0]
+    pr, pf = sum(rise) / len(rise), sum(fall) / len(fall)
+    obs = pr - pf
+    rng = random.Random(SEED + 7)
+    hits_ = 0
+    ys = [y for _, y in rows]
+    for _ in range(PERMUTATIONS):
+        rng.shuffle(ys)
+        a = ys[:len(rise)]
+        b = ys[len(rise):]
+        if abs(sum(a) / len(a) - sum(b) / len(b)) >= abs(obs):
+            hits_ += 1
+    p = (hits_ + 1) / (PERMUTATIONS + 1)
+    return ["## Does the batted-ball trend predict a HIT?", "",
+            "_The five-game HIT-RATE form is a coin flip (AUC 0.5053) and was "
+            "cut from the prop score. This is the other measurement - air rate "
+            "and ISO, five games against the prior ten - the one that works "
+            "for home runs. Whether it carries to hits is a separate question._",
+            "",
+            f"- rising: **{pr:.1%}** got a hit ({len(rise)} games)",
+            f"- falling: **{pf:.1%}** got a hit ({len(fall)} games)",
+            f"- gap **{obs:+.1%}**, permutation **p = {p:.4f}**",
+            "- " + ("**Real.** A trend requirement on props is justified."
+                    if p < 0.05 else
+                    "**Not distinguishable from noise.** The batted-ball trend "
+                    "works for home runs but does not carry to hits, so a "
+                    "trend requirement would re-introduce what was just cut."),
+            ""]
+
+
 def build() -> str:
     cache = {}
     try:
