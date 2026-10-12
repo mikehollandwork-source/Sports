@@ -31,12 +31,12 @@ _`bias` is projected minus actual, so positive means the projection runs hot. `M
 
 | model | n | bias | MAE | r |
 |---|---|---|---|---|
-| full game — current (starter FIP only) | 1284 | -0.45 | 3.60 | +0.075 |
-| full game — CANDIDATE (starter + pen by innings) | 1284 | -0.44 | 3.53 | +0.097 |
-| first five — current | 1284 | -0.35 | 2.64 | +0.063 |
-| first five — CANDIDATE (unchanged by construction) | 1284 | -0.35 | 2.64 | +0.063 |
+| full game — current (starter FIP only) | 1284 | -0.20 | 3.62 | +0.075 |
+| full game — CANDIDATE (starter + pen by innings) | 1284 | -0.19 | 3.54 | +0.097 |
+| first five — current | 1284 | -0.11 | 2.66 | +0.063 |
+| first five — CANDIDATE (unchanged by construction) | 1284 | -0.11 | 2.66 | +0.063 |
 
-- full-game ΔMAE (candidate − current), day-block bootstrap: **[-0.105, -0.038]** → **the candidate is better** - the interval is entirely below zero
+- full-game ΔMAE (candidate − current), day-block bootstrap: **[-0.107, -0.038]** → **the candidate is better** - the interval is entirely below zero
 
 ## 4. Starter strikeouts, with and without the umpire
 
@@ -51,3 +51,31 @@ _Point-in-time: the pitcher's K/9 and expected innings come from starts strictly
 
 - correlation between `k_extra` and what the current K projection MISSES (actual − projected), n=1894: **+0.012**
   _This is the cleanest form of the question: a positive number means a big-zone umpire adds strikeouts the projection does not already account for._
+
+## 5. Is an umpire's strikeout rate a stable trait?
+
+_Section 1 says the table does not predict. Two things could cause that: the table is three months stale, or there is nothing there to measure. This separates them. Each umpire's games are split into alternate halves and his K/game in one half is correlated with the other, across umpires - then Spearman-Brown lifts that to the reliability of his full record. A near-zero split-half means more games will not help._
+
+## 6. Starter strikeouts: innings per START, not per appearance
+
+_The projection divided ALL-APPEARANCE innings by games STARTED, which overstates how long a pitcher goes whenever he also relieved. Both rates below are point-in-time. `k9/exp_ip from starts` also takes his K rate from starts only, which is the rate a start should be projected at._
+
+| model | n | bias | MAE | r |
+|---|---|---|---|---|
+| starter K — current (all appearances / starts) | 2353 | +0.71 | 2.26 | +0.149 |
+| starter K — CANDIDATE (starts only) | 2353 | +0.06 | 1.89 | +0.404 |
+
+- ΔMAE (starts-only − current): **[-0.435, -0.301]** → **better**
+
+## 7. Two signals the earlier sweep could not have found
+
+_`totals_signal` tested wind SPEED, where a gale blowing in and one blowing out are the same number and cancel; this is the signed component toward centre field. A depleted bullpen can only matter AFTER the starters leave, so it is read against the full game and the first five separately - if it is real, the full-game number is the larger of the two._
+
+| signal | n | r vs full game | r vs first five | low third runs | high third runs | gap |
+|---|---|---|---|---|---|---|
+| wind out (+) / in (−), mph | 17 | — | — | — | — | — |
+| bullpen arms down | 1071 | -0.044 | -0.043 | 8.88 | 8.66 | **-0.22** |
+| bullpen innings last 5 | 1286 | -0.001 | +0.010 | 8.92 | 8.98 | **+0.06** |
+| temperature °F | 1155 | +0.042 | +0.033 | 8.62 | 9.19 | **+0.57** |
+
+_At n around a thousand the standard error on a correlation is about 0.032, so anything inside roughly ±0.06 is not distinguishable from nothing._
