@@ -304,17 +304,28 @@ def run(date: str) -> dict:
             # game and ~160 a slate to use three of them. It cannot reorder
             # anything - the score is already fixed - it only filters.
             need = PROPS_POSTED
-            rising = []
+            rising, probed, thin = [], 0, 0
             for b in scored:
                 if len(rising) >= need:
                     break
                 tf, tnote = hr_pick.trend_factor(b.get("player_id"), season_)
                 b["trend_factor"], b["trend"] = round(tf, 2), tnote
+                probed += 1
+                if tf == 1.0:
+                    thin += 1
                 # An unreadable window returns exactly 1.0 and is excluded too:
                 # "genuinely trending upwards" is what was asked, and unknown
                 # is not rising.
                 if tf > 1.0:
                     rising.append(b)
+            # CENSUS of the filter, recorded so the question "is the rising
+            # requirement starving the board?" is answerable from the boards
+            # instead of guessed at. `form_trend` measured 40% of hitter-games
+            # rising, so an empty `rising` on a full pool should be rare - and
+            # if it is not, this is the evidence. Reporting only.
+            r["pick_criteria"]["prop_pool"] = {
+                "candidates": len(scored), "probed": probed,
+                "rising": len(rising), "window_too_thin": thin}
             # ARCHIVAL, and written whether or not anything posts: it is the
             # top of the candidate pool BEFORE the rising filter, which is what
             # a later backtest of that filter needs. It used to sit inside the
@@ -2145,6 +2156,11 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     if fw:
         out.append(f"       ◻ fade watch, NOT a bet: {fw['team']} "
                    f"{fw['odds']:+d} — {fw['reason']}")
+    pool = pc.get("prop_pool") or {}
+    if pool and not posted:
+        out.append(f"          pool: {pool.get('candidates')} candidates, "
+                   f"{pool.get('probed')} probed, {pool.get('rising')} rising, "
+                   f"{pool.get('window_too_thin')} unreadable window")
     pj = pc.get("projections") or {}
     if pj:
         out.append("       ◻ our projections (not bets, untested):")
