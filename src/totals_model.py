@@ -605,7 +605,94 @@ def build() -> str:
 
     # --- 8. the umpire, measured the way it should have been -----------------
     md += ump_residual_section(rows)
+    # --- 9. temperature and wind as one carry term ---------------------------
+    md += carry_section(rows)
     return "\n".join(md)
+
+
+def _z(vals: list[float]) -> list[float]:
+    m, sd = st.mean(vals), st.pstdev(vals)
+    return [(v - m) / sd for v in vals] if sd > 0 else [0.0] * len(vals)
+
+
+def carry_section(rows: list[dict]) -> list[str]:
+    """Temperature and wind-out as ONE term, because they are one mechanism.
+
+    Section 7 leaves both at about 1.5 standard errors with the right sign and
+    nearly identical tercile gaps - +0.54 runs for wind, +0.57 for temperature.
+    Separately neither clears a bar. Both are the same physical thing, how far
+    a struck ball carries, so the pre-specifiable move is to read them as one
+    standardized index rather than to keep testing them one at a time.
+
+    HONESTY ABOUT THE ORDER THIS HAPPENED IN: the combination was chosen AFTER
+    seeing that both halves came back right-signed, so it is not a blind
+    hypothesis and the correlation below is not a clean p-value. What makes it
+    decidable anyway is the last line - whether a multiplier built from it
+    lowers the shipped projection's error on a day-block bootstrap, which is
+    the same bar the bullpen split had to clear.
+    """
+    rs = [r for r in rows
+          if isinstance(r.get("temp"), (int, float))
+          and isinstance(r.get("wind_signed"), (int, float))]
+    out = ["## 9. Temperature and wind-out as ONE carry term", "",
+           "_Both are the same mechanism - how far a struck ball carries - and "
+           "section 7 leaves each at about 1.5 standard errors with the right "
+           "sign. Read as one standardized index instead. The combination was "
+           "chosen after seeing both halves, so the correlation is not a clean "
+           "p-value; the MAE line is what decides it._", ""]
+    if len(rs) < 200:
+        return out + [f"- only {len(rs)} games with both; not measurable.", ""]
+    zt = _z([r["temp"] for r in rs])
+    zw = _z([r["wind_signed"] for r in rs])
+    carry = [(a + b) / 2 for a, b in zip(zt, zw)]
+    tot = [r["total"] for r in rs]
+    f5 = [r["f5"] for r in rs]
+    rc_full, rc_f5 = _pearson(carry, tot), _pearson(carry, f5)
+    out += [f"- games with temperature and a readable wind: **{len(rs)}**",
+            f"- carry index vs full-game runs: **{_fmt_r(rc_full)}** "
+            f"(SE about {1 / math.sqrt(len(rs)):.3f})",
+            f"- carry index vs first-five runs: **{_fmt_r(rc_f5)}**"]
+    t = _tercile([{"c": c, "total": v} for c, v in zip(carry, tot)],
+                 "c", "total")
+    if t:
+        out.append(f"- full-game runs: low third **{t[0]:.2f}**, high third "
+                   f"**{t[1]:.2f}**, gap **{t[1] - t[0]:+.2f}**")
+    # the slope is DERIVED from this measurement, not searched over
+    mc, mt = st.mean(carry), st.mean(tot)
+    sxx = sum((c - mc) ** 2 for c in carry)
+    slope = (sum((c - mc) * (v - mt) for c, v in zip(carry, tot)) / sxx
+             if sxx else 0.0)
+    out.append(f"- derived slope: **{slope:+.3f} runs per unit of the index** "
+               f"(one unit is about {st.pstdev([r['temp'] for r in rs]):.0f}°F "
+               "and the same again in wind)")
+    # does a multiplier built from it lower the shipped projection's error?
+    base, cand = [], []
+    for r, c in zip(rs, carry):
+        cur = runs_split(r)
+        if cur is None:
+            continue
+        mult = 1.0 + slope * c / projections.LEAGUE_FULL_RUNS
+        base.append((cur[0], r["total"], r["date"]))
+        cand.append((cur[0] * mult, r["total"], r["date"]))
+    md_lines = ["", "| model | n | bias | MAE | r |", "|---|---|---|---|---|"]
+    md_lines += _pair_block("full game — shipped (starter + pen)", base)
+    md_lines += _pair_block("full game — + carry term", cand)
+    out += md_lines
+    lo, hi = _boot_delta_mae(cand, base)
+    if lo is not None:
+        verdict = ("**ship it** — the interval is entirely below zero, and the "
+                   "slope is derived from the measurement rather than searched "
+                   "over, so it must not be re-fitted later"
+                   if hi < 0 else
+                   "**do not ship.** The interval spans zero: the term is the "
+                   "right sign and the right mechanism and still does not "
+                   "lower the error, which is what a 1.5-sigma signal looks "
+                   "like when it is real but too small to matter"
+                   if lo < 0 <= hi else
+                   "**do not ship** — it makes the projection worse")
+        out += ["", f"- ΔMAE (with carry − without), day-block bootstrap: "
+                f"**[{lo:+.3f}, {hi:+.3f}]** → {verdict}"]
+    return out + [""]
 
 
 UMP_MIN_STARTS = 12
@@ -664,9 +751,35 @@ def ump_residual_section(rows: list[dict]) -> list[str]:
             f"- second-half starts under one of them: **{len(paired)}**"]
     if tend:
         vals = list(tend.values())
+        spread = st.pstdev(vals)
         out.append(f"- spread of their residual tendencies: SD "
-                   f"**{st.pstdev(vals):.2f}** K/start, range "
+                   f"**{spread:.2f}** K/start, range "
                    f"{min(vals):+.2f} to {max(vals):+.2f}")
+        # THE DECISIVE NUMBER. If umpires were identical, their measured means
+        # would still differ, purely from how few starts each one has. That
+        # floor is the per-start residual SD over the root of the starts per
+        # umpire - so a real umpire effect has to make the observed spread
+        # BIGGER than the floor. If it does not, there is no umpire-level
+        # variance left to find and no table can recover one.
+        per_start_sd = st.pstdev([r for _d, _u, r in starts])
+        n_per = st.mean(len(train[u]) for u in tend)
+        floor = per_start_sd / math.sqrt(n_per)
+        out.append(f"- noise floor for that spread: **{floor:.2f}** "
+                   f"(per-start residual SD {per_start_sd:.2f} over "
+                   f"√{n_per:.0f} starts each)")
+        out.append("- " + (f"**the spread is {spread / floor:.2f}× the "
+                           "floor** — there is umpire-level variance above "
+                           "sampling noise, so the out-of-sample column "
+                           "below is the thing that decides it"
+                           if spread > floor else
+                           f"**the spread is {spread / floor:.2f}× the "
+                           "floor, i.e. no larger than pure sampling noise.** "
+                           "Umpires that genuinely differed would spread "
+                           "WIDER than this. There is no umpire-level "
+                           "variance to find, which is a stronger result than "
+                           "the correlation below: it is not that the table "
+                           "is stale or built wrong, it is that the quantity "
+                           "it is trying to measure is not there."))
     if len(paired) < 100:
         return out + ["- too few paired second-half starts to test.", ""]
     r = _pearson([a for a, _ in paired], [b for _, b in paired])
