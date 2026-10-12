@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import consensus as consensus_rule
 from .park_factors import bearing_for, hr_factor
-from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pinch_risk, pitch_mix, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
+from . import batter_look, good_dog, hitter_type, hr_pick, hrr_shadow, line_money, pinch_risk, pitch_mix, projections, manual_picks, covers, prop_grade, early_lines, espn, fade_rule, grade, notify, pick_watch, prop_odds, props, public_sources, reddit, road_trip, tune, umpire, weather, wiki
 from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN,
                        LINE_CONFIRM_MIN, PDOG_FIP_MIN, PICK_MIN_SIGNALS, PUBLIC_HEAVY,
                        UMP_K_EXTRA, UMP_MIN_GAMES, _canon_abbr, _implied, evaluate_game,
@@ -101,6 +101,9 @@ def run(date: str) -> dict:
         r["weather"] = g.weather
         r["umpire_hp"] = g.umpire_hp
         r["ump_tend"] = g.ump_tend
+        # Every game, pick or not: our own F5/full runs, strikeout and hit
+        # numbers, logged beside the market lines market_log collects.
+        projections.attach(r, g, int(date[:4]))
         results.append(r)
 
     # Line source = ESPN (true open + current moneyline for every game). For any
@@ -2019,6 +2022,24 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     if sh and sh.get("over") is not None:
         out.append(f"       ◻ tracking only, NOT a bet: {sh['player']} "
                    f"H+R+RBI o1.5 {sh['over']:+d}")
+    fw = pc.get("fade_watch")
+    if fw:
+        out.append(f"       ◻ fade watch, NOT a bet: {fw['team']} "
+                   f"{fw['odds']:+d} — {fw['reason']}")
+    pj = pc.get("projections") or {}
+    if pj:
+        out.append("       ◻ our projections (not bets, untested):")
+        rr = pj.get("runs")
+        if rr:
+            out.append(f"          runs {rr['full']} full · {rr['f5']} first-5"
+                       f"   [{rr['basis']}]")
+        for k in pj.get("strikeouts") or []:
+            out.append(f"          K  {k['pitcher']}: {k['proj']}"
+                       f"   [{k['basis']}]")
+        hh = pj.get("hits") or {}
+        if hh:
+            out.append("          hits  " + "  ·  ".join(
+                f"{t} {v['proj']}" for t, v in hh.items()))
     cond = _contact_conditions(g, winner or _bet_side(pc)[0])
     if cond:
         out.append(f"       {cond}")
