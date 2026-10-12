@@ -244,7 +244,7 @@ def single_legs(measure: list, rates: dict, prices: dict) -> list[str]:
             need = _be(med)
             md.append(f"| {label} | **{rate:.1%}** | {fair:+d} | "
                       f"{med:+d} _(n={len(got)})_ | {need:.1%} | "
-                      f"**{rate - need:+.1f} pts** |")
+                      f"**{(rate - need) * 100:+.1f} pts** |")
         else:
             md.append(f"| {label} | **{rate:.1%}** | {fair:+d} | "
                       "_never captured_ | — | — |")
