@@ -536,3 +536,38 @@ unit-testable with mock `Game`/`Team` objects.
   The redundant leg multiplies the payout for free and that free multiplier IS
   the entire positive number. No book prices it that way. Any future report
   showing a positive parlay ROI should be checked for exactly this first.
+- **All three hitter markets ARE back-testable on outcomes; only prices are
+  partial** (`leg_markets.py`, `output/leg_markets.md`, 26,397 hitter-games over
+  1286 final board games). `hrr_shadow`'s claim that H+R+RBI "cannot be
+  back-tested" is true only of its PRICE — the outcome sat in the boxscores all
+  season, and the outcome is the half that decides whether the read transfers.
+  Hitters are filtered ONCE on their held-out HIT rate (what the selector
+  estimates), then measured in all three markets.
+  **Single legs, all near fair:** 1+ hit **61.7%** against the −173 median's
+  63.4% = **−1.7 pts**; 2+ H+R+RBI **47.4%** against the +115 median's 46.5% =
+  **+0.9 pts**; 2+ total bases **36.4%**, fair **+175**, and NO price was ever
+  captured — capturing it is the single highest-value thing left to collect.
+  **CORRECTION TO `parlay_structure`: the same-team HIT-prop lift was NOISE.**
+  On 5800 combos instead of 834 it is **×1.001** for pairs and **×1.011** for
+  triples, not ×1.035/×1.135. Hits are an individual event and do not co-move.
+  Do not cite the old numbers.
+  **H+R+RBI DOES co-move same-team** — ×1.098 for pairs, ×1.295 for triples —
+  and the mechanism is obvious: runs and RBIs are TEAM events, so a team
+  scoring lifts several hitters at once. But the OPPOSITE-team control sits at
+  ×1.104 for triples rather than ×1.000, so part of that is a game-level
+  scoring effect, not a same-team one; the same-team-specific part is nearer
+  ×1.17. Pairs are clean (control ×0.984).
+  **The apparent +14%/+37% H+R+RBI parlay ROI is NOT ESTABLISHED.** Price-matched
+  — each captured quote resolved to the player it was for — the pooled rate over
+  1571 held-out games is 50.8% against the 46.7% the average quote demands, a
+  **+4.1-point pooled edge**, but only **24 of 42** quotes were beaten, inside
+  chance (±15%). The binding limit is the PRICE sample: 42 quotes from four
+  October dates. Widen `prop_odds.hrr_line` to log the whole board daily before
+  trusting it.
+  **TWO BUGS WORTH REMEMBERING.** (1) `rate - need` is a FRACTION: formatting it
+  `:+.1f` printed an 18-point edge as "+0.2 pts" and a 1.7-point gap as
+  "-0.0 pts". It happened twice, one line apart. (2) The first price-match
+  ranked 42 quotes by each hitter's own held-out rate and showed the top twelve
+  — with `MIN_HALF = 6`, a rate reads 65% off four of six, so sorting by it puts
+  the noisiest quotes on top. Use the POOLED outcome, never a ranked list of
+  per-hitter estimates.
