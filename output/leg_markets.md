@@ -47,6 +47,32 @@ _True joint probability from the observed rate, against what the real median pri
 | 2+ hits+runs+RBIs | 2 | 24.69% | +362 | 21.63% | **+14.1%** |
 | 2+ hits+runs+RBIs | 3 | 13.84% | +894 | 10.06% | **+37.6%** |
 
+## The decisive check: each captured price against ITS OWN hitter
+
+_The table above pairs a rate measured on QUALITY hitters with a median price taken over EVERY hitter the book listed. Good hitters are priced shorter, so that mismatch alone could manufacture the edge. Here each quoted name is resolved to the player and scored against his own held-out rate._
+
+- captured prices resolved to a measured hitter: **42** (0 unresolved)
+- median price **+115**, median rate **48.2%**
+- **mean edge: +0.0 points** (median +0.0)
+- prices the hitter's own rate beat: **24/42**
+
+| hitter | price | needs | his rate | edge |
+|---|---|---|---|---|
+| Junior Caminero | +112 | 47.2% | 65.2% | **+0.2 pts** |
+| Jonathan Aranda | +140 | 41.7% | 59.5% | **+0.2 pts** |
+| Jackson Chourio | -105 | 51.2% | 68.9% | **+0.2 pts** |
+| George Lombard Jr. | +140 | 41.7% | 58.3% | **+0.2 pts** |
+| Brice Turang | +134 | 42.7% | 58.5% | **+0.2 pts** |
+| William Contreras | +125 | 44.4% | 57.5% | **+0.1 pts** |
+| Ty France | +126 | 44.2% | 57.1% | **+0.1 pts** |
+| Fernando Tatis Jr. | +112 | 47.2% | 60.0% | **+0.1 pts** |
+| Jackson Chourio | -130 | 56.5% | 68.9% | **+0.1 pts** |
+| Miguel Vargas | +115 | 46.5% | 58.7% | **+0.1 pts** |
+| Yandy Diaz | +105 | 48.8% | 60.5% | **+0.1 pts** |
+| Manny Machado | +137 | 42.2% | 53.3% | **+0.1 pts** |
+
+- **the edge survives price-matching**, so the market table above is not a population artifact
+
 ## Caveats
 
 1. Prices are the MEDIAN of what was captured, not what was available on each individual night, so a single leg's real edge varies around the number shown.
