@@ -30,7 +30,7 @@ from .analysis import (FORM_DIFF_FLOOR, LEAN_MIN_CONSISTENCY, LEAN_STRONG_MARGIN
                        find_slate_line, line_confirms,
                        projected_from_margin)
 from .mlb_api import (enrich_with_stats, hp_umpire, lineup as mlb_lineup,
-                      results_for, schedule_for,
+                      lineup_confirmed, results_for, schedule_for,
                       team_home_away_split)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -234,6 +234,14 @@ def run(date: str) -> dict:
     except Exception as exc:
         log.warning("pinch-risk refresh failed, props fall back to ungated: %s",
                     exc)
+    # The previously committed board, read once: the props selection is frozen
+    # against it from the first confirmed lineup onward.
+    try:
+        prev_snap = {g["game_pk"]: g for g in json.loads(
+            (OUTPUT_DIR / f"picks_{date}.json").read_text()).get("games", [])}
+    except (OSError, ValueError, KeyError):
+        prev_snap = {}
+
     # PRICE CAPTURE, for every upcoming game rather than only the plays.
     # `leg_markets.md` found the H+R+RBI question turns entirely on the price
     # sample - the rate side is solid over 1571 held-out games, the price side
@@ -263,6 +271,20 @@ def run(date: str) -> dict:
             continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
+            continue
+        # THE SELECTION FREEZES AT THE FIRST CONFIRMED LINEUP, which is the
+        # real reason props used to churn all day. `mlb_api.lineup` falls back
+        # to the whole active roster when no batting order is posted, so a
+        # morning board picks a hitter out of ~13 names, most of whom will not
+        # start - and then picks someone else entirely once the real nine
+        # appear. That is not noise, it is the pick being made on a guess.
+        # Once both orders are posted the chosen players never change again;
+        # only their PRICE is refreshed, so a line that posts later still
+        # attaches and the gate can still drop a prop whose price turns bad.
+        snap_pc = (prev_snap.get(r.get("game_pk")) or {}).get(
+            "pick_criteria") or {}
+        if snap_pc.get("props_locked"):
+            _refresh_locked_props(r, snap_pc, gm, date)
             continue
         pc0 = r.get("pick_criteria") or {}
         gd = pc0.get("good_dog") or {}
@@ -307,6 +329,12 @@ def run(date: str) -> dict:
                     if pid_ in plat:
                         b["platoon"] = plat[pid_]
                 ranked += rk
+            # Both batting orders posted? `props.hit_in_wins_ranked` has just
+            # fetched them, so this only reads what that call recorded.
+            confirmed = all(
+                lineup_confirmed(gm.game_pk, t.team_id, date, h)
+                for t, h in ((gm.home, True), (gm.away, False)))
+            r["pick_criteria"]["lineup_confirmed"] = confirmed
             if adv:
                 bet_sp = (gm.away if is_home else gm.home).probable_pitcher
                 if bet_sp:
@@ -433,6 +461,11 @@ def run(date: str) -> dict:
                     # `prop` stays the top one so the existing grading path and
                     # every reader of it keep working unchanged.
                     r["pick_criteria"]["prop"] = posted[0]
+                # FREEZE the selection from here on, but only once the lineups
+                # are real. A provisional pick off the roster fallback stays
+                # free to change, because it should.
+                if confirmed and (posted or withheld):
+                    r["pick_criteria"]["props_locked"] = True
                 # SHADOW ONLY, NEVER BET: the same hitter's hits+runs+RBIs over
                 # 1.5. 1+ hit is a ~63% event priced near -200 (66.7% break-even)
                 # so the hold eats the edge; H+R+RBI 1.5 was +105 on 2026-10-03,
@@ -2013,6 +2046,49 @@ def _break_even(odds: int) -> float:
     return abs(o) / (abs(o) + 100.0) if o < 0 else 100.0 / (o + 100.0)
 
 
+def _refresh_locked_props(r: dict, snap_pc: dict, gm, date: str) -> None:
+    """Carry a frozen props selection forward, re-pricing and re-gating it.
+
+    The PLAYERS are fixed - that is the point of the freeze - but a hit line
+    often posts after the lineup does, so an unpriced prop is looked up again.
+    The price bar runs on whatever price it now has, which is the one way a
+    frozen prop can still drop off: it can never be replaced by someone else.
+    """
+    pc = r.setdefault("pick_criteria", {})
+    is_play = _play(r) == "pick"
+    posted, held = [], []
+    for cand in snap_pc.get("props") or []:
+        c = dict(cand)
+        if not isinstance(c.get("odds"), int):
+            try:
+                ln = prop_odds.hit_line(date, c.get("player", ""),
+                                        gm.away.name, gm.home.name,
+                                        tier="bet" if is_play else "prop_extra")
+                if ln is not None:
+                    c["odds"] = ln
+            except Exception as exc:
+                log.warning("re-price failed for %s: %s", c.get("player"), exc)
+        why = _prop_withheld(c, r)
+        if why:
+            held.append({**why, "player": c.get("player")})
+        else:
+            posted.append(c)
+    pc["props_locked"] = True
+    pc["lineup_confirmed"] = True
+    for key, val in (("props", posted), ("prop", posted[0] if posted else None),
+                     ("prop_withheld", held or None),
+                     ("hit_bats", snap_pc.get("hit_bats")),
+                     ("prop_pool", snap_pc.get("prop_pool")),
+                     ("opp_starter", snap_pc.get("opp_starter")),
+                     ("hr_prop", snap_pc.get("hr_prop")),
+                     ("hr_withheld", snap_pc.get("hr_withheld")),
+                     ("shadow_hrr", snap_pc.get("shadow_hrr"))):
+        if val is None:
+            pc.pop(key, None)
+        else:
+            pc[key] = val
+
+
 def _prop_withheld(prop: dict, game: dict) -> dict | None:
     """Why this prop should NOT be posted, or None to post it.
 
@@ -2168,9 +2244,15 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     # picked-team prop "both lineups, rising bats only".
     both = any(b.get("selector") == PROP_SELECTOR for b in posted)
     if posted:
+        # Say whether this is final. A prop picked before the batting orders
+        # post comes out of the whole active roster and WILL change; one picked
+        # after is frozen for the rest of the day.
+        tag = ("" if not both else
+               " — LOCKED" if pc.get("props_locked") else
+               " — PROVISIONAL, lineup not posted")
         out.append(f"     🎯 1+ HIT PROP{'S' if len(posted) > 1 else ''}"
                    + (f" ({len(posted)}, both lineups, rising bats only)"
-                      if both else ""))
+                      if both else "") + tag)
     for b in posted:
         # legacy props carry no `team` - there, the bat was the pick's own
         side = b.get("team") or pc.get("advantage_team")

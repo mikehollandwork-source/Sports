@@ -653,10 +653,28 @@ def probable_hands(game: Game) -> None:
 _LINEUP_CACHE: dict[tuple, list] = {}
 
 
+# (game_pk, team_id, date, home) -> was the batting order actually POSTED?
+# The fallback in `lineup` quietly returns the whole active roster, which is a
+# different thing from a lineup, and the caller could not tell them apart.
+_LINEUP_CONFIRMED: dict[tuple, bool] = {}
+
+
+def lineup_confirmed(game_pk: int, team_id: int, date: str, home: bool) -> bool:
+    """Whether the last `lineup()` call for this side used a POSTED batting
+    order rather than the roster fallback. False until one has been fetched."""
+    return _LINEUP_CONFIRMED.get((game_pk, team_id, date, home), False)
+
+
 def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
     """Projected lineup: boxscore battingOrder if posted, else roster hitters.
     Cached per (game, team, date) for the process - a backtest re-rating the same
-    slate at several form windows would otherwise re-fetch each boxscore."""
+    slate at several form windows would otherwise re-fetch each boxscore.
+
+    Records in `_LINEUP_CONFIRMED` which of the two it was. Before lineups post
+    this returns ~13 non-pitchers, most of whom will not start, so anything
+    picking a HITTER off it is guessing - and will pick someone else once the
+    real nine appear.
+    """
     ck = (game_pk, team_id, date, home)
     if ck in _LINEUP_CACHE:
         return _LINEUP_CACHE[ck]
@@ -667,6 +685,7 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
         side = "home" if home else "away"
         order = box["teams"][side].get("battingOrder", [])
         if order:
+            _LINEUP_CONFIRMED[ck] = True
             people = _people(list(order))
             _LINEUP_CACHE[ck] = [
                 Player(pid, people.get(pid, {}).get("fullName", ""),
@@ -677,6 +696,7 @@ def lineup(game_pk: int, team_id: int, date: str, home: bool) -> list[Player]:
     except Exception as exc:
         log.warning("boxscore lineup unavailable for %s (%s); using roster", game_pk, exc)
 
+    _LINEUP_CONFIRMED[ck] = False
     data = _get(f"teams/{team_id}/roster", rosterType="active", date=date)
     ids = [
         e["person"]["id"]

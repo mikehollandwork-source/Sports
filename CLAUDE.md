@@ -326,6 +326,22 @@ unit-testable with mock `Game`/`Team` objects.
   reproduce the same key or `grade._add` would append a duplicate beside a
   settled entry. Rendering all 2026 boards before and after this change is
   byte-identical.
+  **THE PROP SELECTION FREEZES AT THE FIRST CONFIRMED LINEUP**
+  (`pick_criteria["props_locked"]`, `main._refresh_locked_props`). This is the
+  real reason props churned all day, and it is not noise:
+  **`mlb_api.lineup` silently falls back to the WHOLE ACTIVE ROSTER** when no
+  batting order is posted — ~13 non-pitchers, most of whom will not start — and
+  gave the caller no way to tell a real lineup from that guess. A morning board
+  therefore picked a hitter out of the roster and picked somebody else entirely
+  once the real nine appeared. `mlb_api.lineup_confirmed(game_pk, team_id,
+  date, home)` now reports which was used.
+  Once BOTH orders are posted the chosen players never change again. Only the
+  PRICE is refreshed, because a hit line often posts after the lineup does — so
+  a late line still attaches, and the price bar can still DROP a frozen prop
+  whose number turns bad. It can never swap in a different hitter.
+  Before confirmation the board labels props **PROVISIONAL, lineup not
+  posted**; after, **LOCKED**. A provisional prop is deliberately still free to
+  move, because a pick off the roster fallback should.
   **THE LOCK APPLIES TO PROPS, and until 2026-10-13 it did not.**
   `_lock_started_games` restores a frozen snapshot from `LOCK_LEAD` before
   first pitch onward — but it runs at `main.py:182` and the props loop ran
