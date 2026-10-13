@@ -1,6 +1,6 @@
 {
   "date": "2026-10-13",
-  "generated_at": "2026-10-13T10:02:12.932185+00:00",
+  "generated_at": "2026-10-13T11:02:14.147671+00:00",
   "games": [
     {
       "game_pk": 849813,
@@ -104,18 +104,24 @@
         }
       },
       "public_majority": {
-        "team": "Cleveland Guardians",
+        "team": "Tampa Bay Rays",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Tb",
+            "pcts": {
+              "Cle": 30.0,
+              "Tb": 70.0
+            }
+          },
           "forum": {
             "pick": "Cleveland Guardians",
-            "home": 5,
+            "home": 7,
             "away": 11
           },
-          "agree": null,
-          "forum_lean": -0.375,
-          "consensus_lean": null,
-          "blended_lean": -0.217,
+          "agree": false,
+          "forum_lean": -0.222,
+          "consensus_lean": 0.4,
+          "blended_lean": 0.011,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -135,22 +141,27 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "forum",
             "side": "away",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           }
         ],
-        "majority_side": "away",
-        "agree": 1,
+        "majority_side": "home",
+        "agree": 2,
         "dissent": 1,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (polymarket_bets differ)",
+        "trusted": true,
+        "verdict": "mostly agrees",
+        "note": "2/3 sources agree (forum differ)",
         "flags": [],
         "line": "flat",
         "money": "unknown",
@@ -230,7 +241,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Tampa Bay Rays",
+          "consensus_pct": 70.0,
+          "moneyline": "-137"
+        },
+        "non_majority": {
+          "team": "Cleveland Guardians",
+          "consensus_pct": 30.0,
+          "moneyline": "+117"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 6,
@@ -381,10 +403,10 @@
         "status": "stay_away",
         "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Cleveland Guardians",
-        "public_edge": false,
-        "public_trusted": false,
+        "public_edge": true,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.197,
+        "confidence": 0.2,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -393,8 +415,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.217,
-            "strength": 0.0,
+            "blended_lean": 0.011,
+            "strength": 0.007,
             "weight": 0.45
           },
           "consistency": {
@@ -444,7 +466,12 @@
           "current": 119,
           "implied_shift": -0.017,
           "status": "contradicts",
-          "reason": "line moved away from the pick (+111\u2192+119, -1.7%)"
+          "reason": "line moved away from the pick (+111\u2192+119, -1.7%)",
+          "morning": 119,
+          "early_shift": -0.017,
+          "late_shift": 0.0,
+          "timing": null,
+          "pinny_morning": 123
         },
         "form_edge": true,
         "form_gap": 0.058,
@@ -452,6 +479,7 @@
         "sp_dog_edge": 1.193,
         "pitching_dog": true,
         "signals_hit": 4,
+        "public_pct_against": 55,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -463,13 +491,12 @@
           "bet": "Tampa Bay Rays",
           "odds": -143,
           "basis": "ticket %",
-          "hold_home": 1810760,
-          "hold_away": -1642287
+          "hold_home": 462098,
+          "hold_away": 95822
         },
         "play": "stay_away",
-        "starred": [],
-        "win_prob": 75,
-        "win_driver": "bvp + consistency",
+        "stay_bet": null,
+        "stay_odds": null,
         "pm_quote": {
           "pm_pct": 44,
           "pm_american": 127,
@@ -480,9 +507,10 @@
           "win_prob": 54.3,
           "fair_american": -119
         },
-        "line_vs_money": "against",
+        "line_vs_money": "with",
         "bet_team": null,
         "bet_moneyline": null,
+        "starred": [],
         "good_dog": null,
         "line_money": null,
         "lineup_confirmed": false,
@@ -686,8 +714,8 @@
       "weather": {
         "temp_f": 75,
         "wind_mph": 5,
-        "wind_dir": "N",
-        "wind_deg": 353,
+        "wind_dir": "NNW",
+        "wind_deg": 344,
         "precip_pct": 0,
         "roof": "dome"
       },
