@@ -1,6 +1,6 @@
 {
   "date": "2026-10-13",
-  "generated_at": "2026-10-13T21:01:40.819806+00:00",
+  "generated_at": "2026-10-13T22:01:41.035517+00:00",
   "games": [
     {
       "game_pk": 849813,
@@ -115,13 +115,13 @@
           },
           "forum": {
             "pick": "Tampa Bay Rays",
-            "home": 30,
-            "away": 30
+            "home": 26,
+            "away": 25
           },
-          "agree": null,
-          "forum_lean": 0.0,
+          "agree": true,
+          "forum_lean": 0.02,
           "consensus_lean": 0.38,
-          "blended_lean": 0.325,
+          "blended_lean": 0.218,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -156,6 +156,11 @@
             "agrees": true
           },
           {
+            "name": "forum",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "scoresodds_bets",
             "side": "home",
             "agrees": true
@@ -172,16 +177,16 @@
           }
         ],
         "majority_side": "home",
-        "agree": 4,
+        "agree": 5,
         "dissent": 0,
         "trusted": true,
         "verdict": "corroborated",
-        "note": "all 4 sources agree on the public side",
+        "note": "all 5 sources agree on the public side",
         "flags": [],
         "line": "flat",
         "money": "with public",
         "money_side": "home",
-        "money_pct": 65
+        "money_pct": 68
       },
       "bvp": {
         "home_eff": 0.546,
@@ -257,12 +262,12 @@
         "majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 69.0,
-          "moneyline": "-130"
+          "moneyline": "-128"
         },
         "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 31.0,
-          "moneyline": "+110"
+          "moneyline": "+119"
         }
       },
       "consistency": {
@@ -418,7 +423,7 @@
         "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.393,
+        "confidence": 0.345,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -427,8 +432,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.325,
-            "strength": 0.325,
+            "blended_lean": 0.218,
+            "strength": 0.218,
             "weight": 0.45
           },
           "consistency": {
@@ -503,8 +508,8 @@
           "bet": "Cleveland Guardians",
           "odds": 113,
           "basis": "money %",
-          "hold_home": -895588,
-          "hold_away": 1781500
+          "hold_home": -1260000,
+          "hold_away": 2228800
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -527,74 +532,17 @@
         "line_money": null,
         "props_locked": true,
         "lineup_confirmed": true,
-        "props": [
+        "props": [],
+        "prop_withheld": [
           {
             "player": "Jos\u00e9 Ram\u00edrez",
-            "player_id": 608070,
-            "hit_rate": 75,
-            "all_rate": 62,
-            "gap": 12,
-            "form": 18,
-            "super_hot": true,
-            "bvp": {
-              "pa": 9,
-              "ops": 0.889
-            },
-            "wins_played": 71,
-            "games_played": 130,
-            "avg_pa": 4.5,
-            "short_night_rate": 0.035,
-            "mean_pa_per_start": 4.41,
-            "short_nights": "5/126 starts of 3 PA or fewer",
-            "team": "Cleveland Guardians",
-            "opp_sp": "Freddy Peralta",
-            "fit": 0,
-            "platoon": {
-              "hand": "R",
-              "avg": 0.212,
-              "pa": 380,
-              "delta": -0.023,
-              "shrunk": -0.0126
-            },
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 88% vs 58%, ISO 0.450 vs 0.146 -> x1.05",
-            "prop_score": 0.663,
-            "selector": "all_rate+bvp+fit+platoon+rising"
+            "score": 0.663,
+            "need": 0.6667,
+            "odds": -200,
+            "real_line": false,
+            "reason": "conditions against the bat and the read (66%) is under the 67% that -200 needs"
           }
         ],
-        "prop": {
-          "player": "Jos\u00e9 Ram\u00edrez",
-          "player_id": 608070,
-          "hit_rate": 75,
-          "all_rate": 62,
-          "gap": 12,
-          "form": 18,
-          "super_hot": true,
-          "bvp": {
-            "pa": 9,
-            "ops": 0.889
-          },
-          "wins_played": 71,
-          "games_played": 130,
-          "avg_pa": 4.5,
-          "short_night_rate": 0.035,
-          "mean_pa_per_start": 4.41,
-          "short_nights": "5/126 starts of 3 PA or fewer",
-          "team": "Cleveland Guardians",
-          "opp_sp": "Freddy Peralta",
-          "fit": 0,
-          "platoon": {
-            "hand": "R",
-            "avg": 0.212,
-            "pa": 380,
-            "delta": -0.023,
-            "shrunk": -0.0126
-          },
-          "trend_factor": 1.05,
-          "trend": "rising: last 5 vs prior 10 \u2014 air 88% vs 58%, ISO 0.450 vs 0.146 -> x1.05",
-          "prop_score": 0.663,
-          "selector": "all_rate+bvp+fit+platoon+rising"
-        },
         "hit_bats": [
           {
             "player": "Yandy D\u00edaz",
@@ -707,10 +655,10 @@
       "pick": null,
       "game_datetime": "2026-10-14T00:00:00Z",
       "weather": {
-        "temp_f": 76,
-        "wind_mph": 6,
-        "wind_dir": "N",
-        "wind_deg": 357,
+        "temp_f": 78,
+        "wind_mph": 10,
+        "wind_dir": "NNW",
+        "wind_deg": 347,
         "precip_pct": 0,
         "roof": "dome"
       },
