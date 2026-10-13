@@ -1,6 +1,6 @@
 {
   "date": "2026-10-13",
-  "generated_at": "2026-10-13T04:02:06.714191+00:00",
+  "generated_at": "2026-10-13T05:01:58.367115+00:00",
   "games": [
     {
       "game_pk": 849813,
@@ -106,16 +106,22 @@
       "public_majority": {
         "team": "Cleveland Guardians",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Tb",
+            "pcts": {
+              "Cle": 40.0,
+              "Tb": 60.0
+            }
+          },
           "forum": {
             "pick": "Cleveland Guardians",
             "home": 5,
-            "away": 7
+            "away": 9
           },
-          "agree": null,
-          "forum_lean": -0.167,
-          "consensus_lean": null,
-          "blended_lean": -0.075,
+          "agree": false,
+          "forum_lean": -0.286,
+          "consensus_lean": 0.2,
+          "blended_lean": -0.071,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -135,6 +141,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": false
+          },
+          {
             "name": "forum",
             "side": "away",
             "agrees": true
@@ -147,10 +158,10 @@
         ],
         "majority_side": "away",
         "agree": 1,
-        "dissent": 1,
+        "dissent": 2,
         "trusted": false,
         "verdict": "sources split",
-        "note": "sources disagree on the public side (polymarket_bets differ)",
+        "note": "sources disagree on the public side (covers, polymarket_bets differ)",
         "flags": [],
         "line": "flat",
         "money": "unknown",
@@ -230,7 +241,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Cleveland Guardians",
+          "consensus_pct": 40.0,
+          "moneyline": "+116"
+        },
+        "non_majority": {
+          "team": "Tampa Bay Rays",
+          "consensus_pct": 60.0,
+          "moneyline": "-139"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 6,
@@ -393,7 +415,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.075,
+            "blended_lean": -0.071,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -463,8 +485,8 @@
           "bet": "Tampa Bay Rays",
           "odds": -137,
           "basis": "ticket %",
-          "hold_home": 1086533,
-          "hold_away": -664767
+          "hold_home": 876058,
+          "hold_away": -404400
         },
         "play": "stay_away",
         "starred": [],
@@ -685,8 +707,8 @@
       "weather": {
         "temp_f": 75,
         "wind_mph": 5,
-        "wind_dir": "NNW",
-        "wind_deg": 343,
+        "wind_dir": "N",
+        "wind_deg": 353,
         "precip_pct": 0,
         "roof": "dome"
       },
