@@ -466,6 +466,18 @@ def run(date: str) -> dict:
                 # free to change, because it should.
                 if confirmed and (posted or withheld):
                     r["pick_criteria"]["props_locked"] = True
+                    # FREEZE THE WHOLE SELECTION, not just the posted half.
+                    # `prop_withheld` carries a SUMMARY of a held candidate
+                    # (player, score, need, odds, reason) and not the candidate
+                    # itself, so a refresh that walked only `props` lost every
+                    # held bat permanently - and once the last posted prop fell
+                    # under its price bar the next refresh had nothing left to
+                    # walk and the game went silently propless. Seen on
+                    # 2026-10-13: Ramirez held at 22:01, gone by 23:01.
+                    # The frozen roster is the players; which of them POST is
+                    # re-decided from the price at every refresh, in both
+                    # directions.
+                    r["pick_criteria"]["props_frozen"] = rising
                 # SHADOW ONLY, NEVER BET: the same hitter's hits+runs+RBIs over
                 # 1.5. 1+ hit is a ~63% event priced near -200 (66.7% break-even)
                 # so the hold eats the edge; H+R+RBI 1.5 was +105 on 2026-10-03,
@@ -2070,7 +2082,11 @@ def _refresh_locked_props(r: dict, snap_pc: dict, gm, date: str) -> None:
     pc = r.setdefault("pick_criteria", {})
     is_play = _play(r) == "pick"
     posted, held = [], []
-    for cand in snap_pc.get("props") or []:
+    # The frozen roster is `props_frozen` - every bat the lock chose, posted
+    # or held. Falling back to `props` keeps a snapshot written before that
+    # key existed rendering exactly as it did.
+    frozen = snap_pc.get("props_frozen") or snap_pc.get("props") or []
+    for cand in frozen:
         c = dict(cand)
         if not isinstance(c.get("odds"), int):
             try:
@@ -2088,7 +2104,8 @@ def _refresh_locked_props(r: dict, snap_pc: dict, gm, date: str) -> None:
             posted.append(c)
     pc["props_locked"] = True
     pc["lineup_confirmed"] = True
-    for key, val in (("props", posted), ("prop", posted[0] if posted else None),
+    for key, val in (("props_frozen", list(frozen) or None),
+                     ("props", posted), ("prop", posted[0] if posted else None),
                      ("prop_withheld", held or None),
                      ("hit_bats", snap_pc.get("hit_bats")),
                      ("prop_pool", snap_pc.get("prop_pool")),
