@@ -339,9 +339,16 @@ unit-testable with mock `Game`/`Team` objects.
   PRICE is refreshed, because a hit line often posts after the lineup does — so
   a late line still attaches, and the price bar can still DROP a frozen prop
   whose number turns bad. It can never swap in a different hitter.
-  Before confirmation the board labels props **PROVISIONAL, lineup not
-  posted**; after, **LOCKED**. A provisional prop is deliberately still free to
-  move, because a pick off the roster fallback should.
+  **PROVISIONAL PROPS ARE NOT SHOWN AT ALL.** Before confirmation the board
+  prints only `⏳ props pending — lineup not posted yet`, and the HR pick is
+  suppressed with them since it comes from the same pool. Printing a pick the
+  board itself does not stand behind invites betting it. After confirmation
+  they appear tagged **— LOCKED**, which is the only tag that can ever render.
+  The discriminator is `lineup_confirmed` being PRESENT: it is absent on every
+  board written before 2026-10-13, which is how legacy boards keep rendering
+  exactly as they always did (verified: zero removed lines across all 2026
+  boards). The selection is still free to move while provisional — it just is
+  not published while it is.
   **THE LOCK APPLIES TO PROPS, and until 2026-10-13 it did not.**
   `_lock_started_games` restores a frozen snapshot from `LOCK_LEAD` before
   first pitch onward — but it runs at `main.py:182` and the props loop ran

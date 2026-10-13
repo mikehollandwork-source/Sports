@@ -2227,6 +2227,19 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     # old no-action game would relabel its context prop as a posted bet.
     posted = pc.get("props") or (
         [pc["prop"]] if pc.get("prop") and _play(g) == "pick" else [])
+    # PROVISIONAL PROPS ARE NOT SHOWN. Before the batting orders post, the pick
+    # comes out of `mlb_api.lineup`'s roster fallback and WILL change, so
+    # printing it invites betting a selection the board itself does not stand
+    # behind. The same goes for the HR pick, which is drawn from the same pool.
+    # `lineup_confirmed` is absent on boards written before 2026-10-13, which
+    # is how a legacy board keeps rendering exactly as it always did.
+    provisional = (pc.get("lineup_confirmed") is not None
+                   and not pc.get("props_locked"))
+    if provisional:
+        pending = bool(posted or held)
+        posted, held = [], []
+        if pending:
+            out.append("     ⏳ props pending — lineup not posted yet")
     if not posted and held:
         # the conditions line below is the justification, so it stays.
         # One held entry keeps the exact wording it has always had; several -
@@ -2244,12 +2257,11 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
     # picked-team prop "both lineups, rising bats only".
     both = any(b.get("selector") == PROP_SELECTOR for b in posted)
     if posted:
-        # Say whether this is final. A prop picked before the batting orders
-        # post comes out of the whole active roster and WILL change; one picked
-        # after is frozen for the rest of the day.
-        tag = ("" if not both else
-               " — LOCKED" if pc.get("props_locked") else
-               " — PROVISIONAL, lineup not posted")
+        # Only LOCKED is ever shown. A provisional prop is suppressed above,
+        # so the alternative branch would be unreachable - and on a board
+        # written before `props_locked` existed it would have labelled a
+        # perfectly good historical prop as provisional.
+        tag = " — LOCKED" if pc.get("props_locked") else ""
         out.append(f"     🎯 1+ HIT PROP{'S' if len(posted) > 1 else ''}"
                    + (f" ({len(posted)}, both lineups, rising bats only)"
                       if both else "") + tag)
@@ -2277,10 +2289,10 @@ def _hit_lines(g: dict, winner: str | None = None) -> list[str]:
         out.append("       • " + "  ·  ".join(x for x in bits if x))
     for h in (held if posted or len(held) > 1 else []):
         out.append(f"       ✖ {h.get('player') or '?'} held — {h['reason']}")
-    hw = pc.get("hr_withheld")
+    hw = pc.get("hr_withheld") if not provisional else None
     if hw:
         out.append(f"       {hw['reason']}")
-    hp = pc.get("hr_prop")
+    hp = pc.get("hr_prop") if not provisional else None
     if hp:
         price = (f" {hp['odds']:+d}" if isinstance(hp.get("odds"), int)
                  else " (no line)")
