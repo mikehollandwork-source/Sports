@@ -369,16 +369,31 @@ unit-testable with mock `Game`/`Team` objects.
   are never altered). Prop singles settled before 2026-10-13 may include picks
   made after first pitch; treat that population the way CLAUDE.md treats the 97
   `k_ticker_stale` Kalshi entries — real results of a contaminated selection.
-  **`telegram_text` renders a `🎯 PROPS — games with no play` section**, and it
-  had to be added separately: the selector was already posting props on every
-  game and `prop_grade` settling them, but the Telegram board only ever
-  rendered PLAYS — its own comment said "No-plays stay recorded in the picks
-  JSON (backend); they're not shown." So on 2026-10-12 Max Muncy was posted at
-  −133, stored, and gradeable while the board read "No plays on the board."
-  Storing a prop and showing it are separate code paths; changing one does not
-  change the other. Plays carry their props inline via `_pick_line` →
-  `_hit_lines`, and the section skips `_play(g) == "pick"`, so nothing prints
-  twice.
+  **THE TELEGRAM BOARD IS PICKS ONLY** (`telegram_text`): the matchup, the
+  moneyline pick with its price if there is one, and the LOCKED props with
+  theirs. Nothing else. Everything that used to print — stat edge, consensus,
+  BvP, platoon, contact conditions, the pool census, the watch tags, the paper
+  parlay, the records — is still computed and still in
+  `output/picks_<date>.json`, and the readable version of it moved into
+  `build_summary` → `latest_summary.md`. That move was not cosmetic: dropping
+  those blocks from Telegram orphaned `_line_money_lines`, `_paper_parlay_lines`
+  and the no-play props section, so they were re-wired into the markdown rather
+  than left to rot.
+  An empty board distinguishes **"No picks today"** from **"No picks yet —
+  lineups not posted"**, because those are different facts and only one of them
+  means look again later.
+  **`_game_lines`, `_stay_line` and `_telegram_records_lines` are now UNUSED**
+  (`_game_lines` had no caller even before this). Left in place rather than
+  deleted — they are the detailed per-game renderer and a records formatter,
+  and reconstructing them to restore a richer board would be real work.
+  **`build_summary` renders a `## Props — games with no play` section**, and it
+  for the same reason it was once needed on Telegram: the selector posts props
+  on every game and `prop_grade` settles them, but the renderers only ever
+  walked PLAYS. On 2026-10-12 Max Muncy was posted at −133, stored and
+  gradeable while the board read "No plays on the board." Storing a prop and
+  showing it are separate code paths; changing one does not change the other.
+  Plays carry their props inline via `_pick_line` → `_hit_lines`, and the
+  section skips `_play(g) == "pick"`, so nothing prints twice.
   The second and third prop on one game cost no extra odds credits
   (`prop_odds.hit_line` caches the game's whole batter_hits board per day), but
   a game that is not a play is a new board to price, so it spends under the

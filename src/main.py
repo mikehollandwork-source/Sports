@@ -1636,9 +1636,22 @@ def build_summary(payload: dict) -> str:
                 "_Usually-favoured teams priced as dogs tonight. Labelled to "
                 "gather forward evidence; the backtest could not settle them. "
                 "**Do not bet these.**_", ""] + dogs
+    # PROPS ON NO-PLAY GAMES. The Telegram board shows picks only now, so this
+    # markdown is where the full read lives - including the games the
+    # moneyline rule passed on, which still carry props.
+    others = [g for g in board if _play(g) != "pick"
+              and ((g.get("pick_criteria") or {}).get("props")
+                   or (g.get("pick_criteria") or {}).get("prop_withheld"))]
+    if others:
+        out += ["", "## Props — games with no play", ""]
+        for g in others:
+            out += [f"**{g.get('matchup', '')}**"] + _hit_lines(g) + [""]
+    money = _line_money_lines(board, picks)
+    if money:
+        out += ["", "## Watching — line moved against the money (NOT bets)",
+                ""] + money
+    out += _paper_parlay_lines(date)
     out += ["", grade.records_block()]
-    # props stay backend-only for now (still computed + tracked in prop_ledger.json,
-    # just not shown on the board)
     return "\n".join(out)
 
 
@@ -2669,77 +2682,51 @@ def _paper_parlay_lines(date: str) -> list[str]:
     return out
 
 
+def _price(v) -> str:
+    return f"{v:+d}" if isinstance(v, int) else "no line"
+
+
 def telegram_text(payload: dict) -> str:
-    """Readable phone layout for Telegram: the pick(s) up top, then leans, then
-    the Day/Week/Month/YTD records — sectioned with blank lines and dividers."""
+    """The board: the PICKS and nothing else.
+
+    Everything that used to print here - the stat edge, consensus, BvP,
+    platoon, contact conditions, the pool census, the watch tags, the paper
+    parlay and the records - is still computed and still written to
+    `output/picks_<date>.json`. It is backend now. A board you act on should
+    show what to bet; the reasoning is for reading afterwards.
+
+    Only LOCKED props appear, for the same reason they are suppressed in the
+    detailed view: before the batting orders post the pick comes out of
+    `mlb_api.lineup`'s roster fallback and will change.
+    """
     date = payload["date"]
-    games = payload.get("games", [])
-    board = _board_games(games)
-    picks = _by_win([g for g in board if _play(g) == "pick"])
-    sp_all = _splits_or_empty(board)   # computed once; the cache makes it cheap
-
-    # The plays, one clean line each (ranked by win chance). Their props are
-    # carried inline by `_pick_line`.
-    L = [f"⚾ MLB BOARD — {date}", ""]
-    if picks:
-        L.append(f"{len(picks)} play{'s' if len(picks) != 1 else ''} today:")
-        L.append("")
-        for g in picks:
-            L.append(_pick_line(g, sp_all))
-            L.append("")
-        L.pop()          # no trailing blank before the divider
-    else:
-        L.append("No plays on the board.")
-
-    # PROPS ON NON-PLAY GAMES. The selector already posts props on every
-    # upcoming game and `prop_grade` settles them whether the moneyline rule
-    # landed on that game or not - but this board only ever rendered PLAYS, so
-    # on a night with no play they sat in the JSON and were never shown.
-    # 2026-10-12 was exactly that: Max Muncy posted at -133 while the board
-    # read "No plays on the board." Plays carry their props inline above, so
-    # this covers only the rest and nothing prints twice.
-    others = []
+    board = _board_games(payload.get("games", []))
+    L = [f"⚾ MLB BOARD — {date}", "", "Picks:"]
+    shown = pending = 0
     for g in board:
+        pc = g.get("pick_criteria") or {}
+        rows = []
         if _play(g) == "pick":
-            continue
-        pc0 = g.get("pick_criteria") or {}
-        if pc0.get("props") or pc0.get("prop_withheld"):
-            others.append(g)
-    if others:
-        L += ["", "🎯 PROPS — games with no play", "",
-              "Posted and graded the same as any other prop. The moneyline",
-              "rule not landing here says nothing about a hitter."]
-        for g in others:
-            st_ = _start_time(g)
-            L += ["", f"{g['matchup']}" + (f" · {st_}" if st_ else "")]
-            L += _hit_lines(g)
-
-    dogs = _good_dog_lines(board, picks)
-    money = _line_money_lines(board, picks)
-    if dogs or money:
-        L += ["", "👀 WATCHING — NOT BETS", "",
-              "Open questions the backtest could not close. Tracking only —",
-              "do not bet these."]
-        if dogs:
-            L += ["", "Usually-favoured teams priced as dogs tonight:", ""] + dogs
-        if money:
-            L += ["", "Line moved against the money — flagged side is the money:",
-                  ""] + money
-            rt = line_money.record_text(_line_money_record())
-            if rt:
-                L.append(f"      {rt}")
-    # Legend, printed only when a marker actually appears above - an unexplained
-    # emoji is worse than none, and a legend for symbols that are not on tonight's
-    # board is clutter.
-    if any("⭐" in x or "🧊" in x for x in L):
-        L += ["", f"⭐ we are up more than {PICK_REC_HOT:.0%} betting this team  ·  "
-                  f"🧊 down more than {-PICK_REC_COLD:.0%}",
-              f"   (our own record on it, {PICK_REC_MIN}+ picks. History, not a "
-              "forecast — team-by-team", "   differences here are not "
-              "distinguishable from luck.)"]
-    L += _paper_parlay_lines(date)
-    L += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _telegram_records_lines()
-    # prop records stay backend-only for now (tracked in prop_ledger.json, not posted)
+            team, ml = _bet_side(pc)
+            if team:
+                rows.append(f"   ML  {team} {_price(ml)}")
+        if pc.get("props_locked"):
+            for b in pc.get("props") or []:
+                rows.append(f"   {b.get('player')} 1+ H {_price(b.get('odds'))}")
+            hp = pc.get("hr_prop") or {}
+            if hp.get("player"):
+                rows.append(f"   {hp['player']} 1+ HR {_price(hp.get('odds'))}")
+        elif pc.get("props") or pc.get("prop_withheld"):
+            pending += 1
+        if rows:
+            L += ["", g.get("matchup", "")] + rows
+            shown += 1
+    if not shown:
+        # "nothing qualified" and "too early" are different facts and the
+        # difference decides whether to look again later.
+        L.append("")
+        L.append("No picks yet — lineups not posted."
+                 if pending else "No picks today.")
     return "\n".join(L)
 
 
