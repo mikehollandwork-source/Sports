@@ -251,7 +251,15 @@ def run(date: str) -> dict:
         warmed += 1
 
     for r in results:
-        if r.get("state") == "final":
+        # THE LOCK APPLIES TO PROPS TOO. This loop runs AFTER
+        # `_lock_started_games` has restored the frozen snapshot, so without
+        # this it recomputed props straight over the freeze: on 2026-10-12 the
+        # 5:00pm game was re-picked at 7:08pm, two hours into the game, and the
+        # prop the ledger settled (Brice Turang) was chosen while it was being
+        # played - off season gamelogs that by then contained that game's own
+        # at-bats. The guard used to be `state == "final"`, which let every
+        # LIVE game through.
+        if r.get("game_pk") in LOCKED_PKS or r.get("state") != "upcoming":
             continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
@@ -577,6 +585,12 @@ def _hold_on_missing_data(date: str, results: list) -> int:
     return held
 
 
+# Game pks frozen by the last `_lock_started_games` call. Everything that
+# WRITES to a game row after the lock has to consult this, or it silently
+# overwrites the freeze - which is exactly what the props loop was doing.
+LOCKED_PKS: set = set()
+
+
 def _lock_started_games(date: str, results: list) -> list:
     """Freeze any game whose first pitch has passed: replace the fresh computation
     with the previously committed snapshot so a started PICK stays a pick (and is
@@ -600,6 +614,7 @@ def _lock_started_games(date: str, results: list) -> list:
 
     now = dt.datetime.now(dt.timezone.utc)
     out, locked = [], 0
+    LOCKED_PKS.clear()
     for r in results:
         snap = prev.get(r.get("game_pk"))
         # start from the fresh result, falling back to the frozen snapshot so a
@@ -611,6 +626,7 @@ def _lock_started_games(date: str, results: list) -> list:
         locked_window = start is not None and now >= start - LOCK_LEAD
         if snap is not None and locked_window:
             out.append(snap)   # in the lock window -> keep the frozen snapshot
+            LOCKED_PKS.add(snap.get("game_pk"))
             locked += 1
         else:
             out.append(r)

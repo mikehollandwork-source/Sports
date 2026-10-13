@@ -326,6 +326,26 @@ unit-testable with mock `Game`/`Team` objects.
   reproduce the same key or `grade._add` would append a duplicate beside a
   settled entry. Rendering all 2026 boards before and after this change is
   byte-identical.
+  **THE LOCK APPLIES TO PROPS, and until 2026-10-13 it did not.**
+  `_lock_started_games` restores a frozen snapshot from `LOCK_LEAD` before
+  first pitch onward — but it runs at `main.py:182` and the props loop ran
+  after it, recomputing props straight over the freeze. The loop's guard was
+  `state == "final"`, which let every LIVE game through, and `state` is itself
+  refreshed post-lock, so a started game looked fresh. Measured over the last
+  20 dates: **4 of 29 board-games (14%) had their prop re-picked after first
+  pitch**, including BOTH of 2026-10-12's — Brice Turang was chosen at 7:08pm
+  for a 5:00pm game, off season gamelogs that by then contained that game's own
+  at-bats, and the ledger settled him. Earlier examples: 2026-10-04 Sean Murphy
+  → Ozzie Albies; 2026-10-12 José Ramírez → Jo Adell.
+  The guard is now `game_pk in LOCKED_PKS or state != "upcoming"`, and
+  `_lock_started_games` publishes `LOCKED_PKS` for exactly this. **Anything
+  that WRITES to a game row after the lock must consult that set** — the lock
+  is not self-enforcing, it only restores the row, and whatever runs next can
+  overwrite it.
+  **The affected ledger entries are NOT repaired and NOT re-graded** (records
+  are never altered). Prop singles settled before 2026-10-13 may include picks
+  made after first pitch; treat that population the way CLAUDE.md treats the 97
+  `k_ticker_stale` Kalshi entries — real results of a contaminated selection.
   **`telegram_text` renders a `🎯 PROPS — games with no play` section**, and it
   had to be added separately: the selector was already posting props on every
   game and `prop_grade` settling them, but the Telegram board only ever
