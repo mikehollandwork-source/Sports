@@ -2139,7 +2139,18 @@ def _prop_withheld(prop: dict, game: dict) -> dict | None:
     if not isinstance(score, (int, float)) or \
             not _conditions_against(game, prop.get("team")):
         return None
-    odds = prop.get("odds", prop_grade.PROP_PRICE)
+    # ONLY A REAL QUOTE CAN WITHHOLD. The bar IS the price, so with no price
+    # there is no bar - holding a bet against a number no book published is the
+    # gate inventing the opinion this docstring says it must not invent, and
+    # the assumed PROP_PRICE is not a quote, it is the ledger's ROI placeholder.
+    # It also sits exactly where it does the most damage: -200 demands 66.67%
+    # and the reads cluster in the low 60s, so the fallback withholds almost
+    # everything it touches. On 2026-10-13 it held a 66.3% read whose real line
+    # was -193 (65.9%) - the hold was an artifact of the placeholder, not of
+    # anything a book was offering.
+    if not isinstance(prop.get("odds"), int):
+        return None
+    odds = prop["odds"]
     try:
         need = _break_even(odds)
     except (TypeError, ValueError):
@@ -2148,7 +2159,7 @@ def _prop_withheld(prop: dict, game: dict) -> dict | None:
         return None
     return {"player": prop.get("player"), "score": round(score, 4),
             "need": round(need, 4), "odds": odds,
-            "real_line": "odds" in prop,
+            "real_line": True,
             "reason": f"conditions against the bat and the read "
                       f"({score:.0%}) is under the {need:.0%} that "
                       f"{odds:+d} needs"}
@@ -2700,7 +2711,12 @@ def _paper_parlay_lines(date: str) -> list[str]:
 
 
 def _price(v) -> str:
-    return f"{v:+d}" if isinstance(v, int) else "no line"
+    """The price to show. With no captured quote the board shows the assumed
+    one MARKED AS ASSUMED, because that is the number the prop is graded and
+    ROI'd at (`prop_grade.PROP_PRICE`) - printing "no line" hid the fact that
+    a price was being used anyway, one line below where the ledger used it.
+    """
+    return f"{v:+d}" if isinstance(v, int) else f"{prop_grade.PROP_PRICE:+d} assumed"
 
 
 def telegram_text(payload: dict) -> str:

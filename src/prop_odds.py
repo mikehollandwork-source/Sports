@@ -19,6 +19,8 @@ import datetime as dt
 import json
 import logging
 import os
+import re
+import unicodedata
 from pathlib import Path
 
 import requests
@@ -204,6 +206,49 @@ def _fetch_game_lines(event_id: str) -> dict:
     return out
 
 
+def _fold(name: str) -> str:
+    """A name in the one shape both feeds agree on: unaccented, punctuation-free.
+
+    THE TWO FEEDS DISAGREE ON ACCENTS IN BOTH DIRECTIONS. The Odds API served
+    `jose ramirez` while MLB says `Jose\u0301 Rami\u0301rez`, and it served
+    `agusti\u0301n rami\u0301rez` while it served `ronald acuna jr.` for a man MLB
+    spells `Acun\u0303a`. So neither side can be treated as canonical and a bare
+    `.lower()` misses whichever way the pair happens to fall.
+
+    Measured on the cached boards: 32 of 499 names (6.4%) cannot match on
+    `.lower()` alone - every accent, every `J.P.`/`A.J.`, every `(2002)`
+    disambiguator. It is not cosmetic. On 2026-10-13 Jose\u0301 Rami\u0301rez's real
+    -193 (break-even 65.9%) sat in the cache under `jose ramirez` while the
+    lookup missed it, fell back to the assumed -200 (66.7%) and withheld a
+    66.3% read by four tenths of a point.
+    """
+    s = unicodedata.normalize("NFKD", str(name))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = re.sub(r"\(.*?\)", " ", s)          # `max muncy (2002)` disambiguator
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
+
+def _row_for(board: dict, player: str) -> dict:
+    """The player's row from a cached game board, matched on the folded name.
+
+    Exact first so nothing already working changes, then the fold. Caches
+    written before this are matched the same way, since the fold is computed
+    on read rather than stored.
+    """
+    if not isinstance(board, dict):
+        return {}
+    lo = str(player).strip().lower()
+    if lo in board:
+        return _as_row(board[lo])
+    want = _fold(player)
+    if not want:
+        return {}
+    for k, v in board.items():
+        if _fold(k) == want:
+            return _as_row(v)
+    return {}
+
+
 def _as_row(v) -> dict:
     """Tolerate the OLD cache shape, which stored the over price as a bare int."""
     if isinstance(v, dict):
@@ -232,7 +277,7 @@ def hit_line(date: str, player: str, away_name: str, home_name: str,
         eid = _event_id(date, away_name, home_name)
         cache[game_key] = _fetch_game_lines(eid) if eid else {}
         _save_cache(date, cache)
-    return _as_row(cache[game_key].get(player.strip().lower())).get("over")
+    return _row_for(cache[game_key], player).get("over")
 
 
 HRR_MARKET = "batter_hits_runs_rbis"
@@ -312,7 +357,7 @@ def hrr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
         cache[game_key] = _fetch_hrr_lines(eid) if eid else {}
         OUTPUT_DIR.mkdir(exist_ok=True)
         _hrr_cache_path(date).write_text(json.dumps(cache, indent=1))
-    return _as_row(cache[game_key].get(player.strip().lower()))
+    return _row_for(cache[game_key], player)
 
 
 TB_MARKET = "batter_total_bases"
@@ -349,7 +394,7 @@ def tb_line(date: str, player: str, away_name: str, home_name: str) -> dict:
                            if eid else {})
         OUTPUT_DIR.mkdir(exist_ok=True)
         _tb_cache_path(date).write_text(json.dumps(cache, indent=1))
-    return _as_row(cache[game_key].get(player.strip().lower()))
+    return _row_for(cache[game_key], player)
 
 
 def warm(date: str, away_name: str, home_name: str) -> None:
@@ -414,7 +459,7 @@ def hr_line(date: str, player: str, away_name: str, home_name: str) -> dict:
         cache[game_key] = rows
         OUTPUT_DIR.mkdir(exist_ok=True)
         _hr_cache_path(date).write_text(json.dumps(cache, indent=1))
-    return _as_row(cache[game_key].get(player.strip().lower()))
+    return _row_for(cache[game_key], player)
 
 
 def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
@@ -431,7 +476,7 @@ def hit_sides(date: str, player: str, away_name: str, home_name: str) -> dict:
         eid = _event_id(date, away_name, home_name)
         cache[game_key] = _fetch_game_lines(eid) if eid else {}
         _save_cache(date, cache)
-    return _as_row(cache[game_key].get(player.strip().lower()))
+    return _row_for(cache[game_key], player)
 
 
 def credits_check() -> str:
