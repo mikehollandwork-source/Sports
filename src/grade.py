@@ -277,7 +277,9 @@ def day_recap_text(date: str, entries: list[dict]) -> str:
     its +/- units, then the day's record and total units up/down."""
     w = sum(1 for e in entries if e["result"] == "W")
     u = round(sum(e.get("profit", 0.0) for e in entries), 2)
-    lines = [f"🏁 RECAP — {date} (final)", ""]
+    lines = [f"🏁 RECAP — {date} (final)"]
+    if entries:
+        lines.append("")
     for e in entries:
         od = e["odds"]
         ods = f"+{od}" if od > 0 else str(od)
@@ -285,8 +287,61 @@ def day_recap_text(date: str, entries: list[dict]) -> str:
         lines.append(f"{mark}  {e['bet']} ({ods})   {e['profit']:+.2f}u")
         lines.append(f"        {e['score']}")
     arrow = "▲" if u >= 0 else "▼"
-    lines += ["", f"Day: {w}-{len(entries) - w}  ·  {u:+.2f}u {arrow}"]
+    if entries:
+        lines += ["", f"Day: {w}-{len(entries) - w}  ·  {u:+.2f}u {arrow}"]
+    else:
+        lines += ["", "No moneyline plays today."]
+    lines += _recap_props(date)
+    # The running records belong HERE and nowhere else now: the board itself is
+    # picks-only, so the recap is the one message that reports how it is going.
+    lines += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _record_lines()
     return "\n".join(lines)
+
+
+def _record_lines() -> list[str]:
+    """Day/Week/Month/YTD/All-time for the moneyline book, phone-shaped."""
+    book = load_ledger()["plays"]
+    today = dt.datetime.now(EASTERN).date()
+    rec = windowed_records(book, today)
+    if not rec:
+        return ["   no settled plays yet"]
+    out = ["Plays:"]
+    for label, (w, l, u) in rec:
+        out.append(f"   • {label}: {w}-{l} ({u:+.2f}u)")
+    w, l, u = _tally(book["entries"])
+    out.append(f"   • All-time: {w}-{l} ({u:+.2f}u)")
+    return out
+
+
+def _recap_props(date: str) -> list[str]:
+    """The day's PROPS, then the prop book's running record.
+
+    Imported late: `prop_grade` imports this module, so a top-level import
+    would be circular. Fails soft - a prop book problem must not cost the
+    moneyline recap.
+    """
+    try:
+        from . import prop_grade
+        led = prop_grade.load_ledger()
+    except Exception as exc:
+        log.warning("prop recap unavailable: %s", exc)
+        return []
+    out: list[str] = []
+    today = [e for e in led["singles"]["entries"] if e.get("date") == date]
+    today += [e for e in led["home_runs"]["entries"] if e.get("date") == date]
+    if today:
+        w = sum(1 for e in today if e["result"] == "W")
+        u = round(sum(e.get("profit", 0.0) for e in today), 2)
+        out += ["", f"Props: {w}-{len(today) - w}  ·  {u:+.2f}u"]
+        for e in today:
+            od = e["odds"]
+            mark = "✅" if e["result"] == "W" else "❌"
+            out.append(f"{mark}  {e['bet']} ({od:+d})   {e['profit']:+.2f}u")
+    try:
+        out += [""] + prop_grade.records_lines(md=False)
+    except Exception as exc:
+        log.warning("prop records unavailable: %s", exc)
+    return out
 
 
 def _recaps_sent() -> set[str]:
@@ -357,8 +412,15 @@ def send_day_recap_if_complete(date: str, send) -> bool:
         log.info("recap for %s held: games on the slate can still become picks", date)
         return False
     settled, pending = settle_day(date)   # settled = final+priced plays; pending = not-final
-    if pending or not settled:            # a play still live/undecided, or nothing to book
+    if pending:                           # a play still live/undecided
         return False
+    if not settled:
+        # PROPS-ONLY SLATE. Props post on every game now, so a day with no
+        # moneyline play still has a result to report - and those are exactly
+        # the days props are the only product. 2026-10-11 and 2026-10-12 both
+        # had graded props and got no recap at all, because this used to
+        # return early on `not settled`.
+        return _send_props_only_recap(date, send)
     # every play is final -> GRADE this date first, so the last game (incl. any
     # that finalized after midnight) is booked before the recap is built. Without
     # this the prior-day recap could read a ledger the loop never re-graded and
@@ -372,6 +434,41 @@ def send_day_recap_if_complete(date: str, send) -> bool:
     _mark_recap_sent(date)
     log.info("sent end-of-day recap for %s (%d plays, %+.2fu)",
              date, len(entries), sum(e.get("profit", 0.0) for e in entries))
+    return True
+
+
+def _all_games_final(date: str) -> bool:
+    """Every game on the board reached a final. Used to release a props-only
+    recap, where there is no play whose settlement would prove the day is over."""
+    try:
+        payload = json.loads((OUTPUT_DIR / f"picks_{date}.json").read_text())
+        res = mlb_api.results_for(date)
+    except Exception as exc:
+        log.warning("cannot confirm slate finished for %s: %s", date, exc)
+        return False
+    pks = [g.get("game_pk") for g in payload.get("games", [])]
+    return bool(pks) and all((res.get(pk) or {}).get("final") for pk in pks)
+
+
+def _send_props_only_recap(date: str, send) -> bool:
+    """Recap a day that had props but no moneyline play. Same once-only rule."""
+    if not _all_games_final(date):
+        return False
+    try:
+        from . import prop_grade
+        prop_grade.update(date)           # idempotent; books anything outstanding
+        led = prop_grade.load_ledger()
+        has = any(e.get("date") == date
+                  for book in ("singles", "home_runs")
+                  for e in led[book]["entries"])
+    except Exception as exc:
+        log.warning("props-only recap for %s unavailable: %s", date, exc)
+        return False
+    if not has:
+        return False
+    send(day_recap_text(date, []))
+    _mark_recap_sent(date)
+    log.info("sent props-only recap for %s", date)
     return True
 
 

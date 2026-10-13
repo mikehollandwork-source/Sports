@@ -382,6 +382,17 @@ unit-testable with mock `Game`/`Team` objects.
   An empty board distinguishes **"No picks today"** from **"No picks yet —
   lineups not posted"**, because those are different facts and only one of them
   means look again later.
+  **THE RECORDS LIVE IN THE END-OF-DAY RECAP** (`grade.day_recap_text`), which
+  is now the one message that reports how it is going: each play with its score
+  and units, then the day's PROPS with theirs, then the moneyline record
+  windows and `prop_grade.records_lines`. With the board stripped to picks,
+  nothing else carries them.
+  **The recap also fires on a PROPS-ONLY day** (`grade._send_props_only_recap`).
+  It used to return early on `not settled` — no moneyline play meant no recap —
+  so 2026-10-11 and 2026-10-12 both had graded props and got no recap at all,
+  which are exactly the days props are the only product. A props-only day is
+  released by `_all_games_final`, since there is no settled play to prove the
+  slate is over. Still once per date via `recaps_sent.json`.
   **`_game_lines`, `_stay_line` and `_telegram_records_lines` are now UNUSED**
   (`_game_lines` had no caller even before this). Left in place rather than
   deleted — they are the detailed per-game renderer and a records formatter,
