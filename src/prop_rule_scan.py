@@ -41,7 +41,7 @@ from pathlib import Path
 
 import requests
 
-from . import apitime, grade
+from . import apitime, grade, prop_odds
 
 log = logging.getLogger("prop_rule_scan")
 
@@ -72,7 +72,8 @@ def _box(game_pk: int) -> dict:
                 pa = 0
             if pa < 1:
                 continue
-            name = ((p.get("person") or {}).get("fullName") or "").strip().lower()
+            name = prop_odds.fold_name(
+                (p.get("person") or {}).get("fullName") or "")
             try:
                 order = int(str(p.get("battingOrder") or "0")) // 100
             except (TypeError, ValueError):
@@ -122,7 +123,7 @@ def collect() -> list[dict]:
     boxes = {pk: _box(pk) for pk in sorted({q["pk"] for q in quotes})}
     rows = []
     for q in quotes:
-        b = boxes.get(q["pk"], {}).get(q["name"])
+        b = boxes.get(q["pk"], {}).get(prop_odds.fold_name(q["name"]))
         if not b or b["team"] != q["bet_team"]:
             continue                      # not on the picked team, or did not bat
         rows.append({**q, "hit": b["hits"] >= 1, "order": b["order"]})

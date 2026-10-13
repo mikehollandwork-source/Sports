@@ -48,7 +48,7 @@ import statistics as st
 import subprocess
 from pathlib import Path
 
-from . import good_dog, grade, line_money, mlb_api, pitch_mix, props
+from . import good_dog, grade, line_money, mlb_api, pitch_mix, prop_odds, props
 
 log = logging.getLogger("record_audit")
 
@@ -453,6 +453,90 @@ def paper_parlay_guard() -> list[str]:
     return out + [""]
 
 
+def price_match_guard() -> list[str]:
+    """Assert every prop on a board found the price that was paid for.
+
+    The odds board for a game is fetched ONCE and cached whole, so a price the
+    budget already bought is either used or silently thrown away. It was being
+    thrown away: the lookup matched on a bare `.lower()` while The Odds API and
+    MLB disagree on accents in BOTH directions - `jose ramirez` against MLB's
+    `Jose\u0301 Rami\u0301rez`, but `agusti\u0301n rami\u0301rez` and `ronald acuna jr.` in the
+    same feed. 32 of 499 cached names could not match. The prop then fell back
+    to the assumed PROP_PRICE, which demands 66.67% and withheld it.
+
+    This counts, per board, props whose player is ABSENT from a cache that
+    holds the game - which is what a name-matching regression looks like from
+    the outside. A player genuinely not quoted by any book is indistinguishable
+    here, so the number is an upper bound; what matters is that it stays near
+    zero instead of tracking the share of accented names.
+    """
+    def _over(v):
+        return v.get("over") if isinstance(v, dict) else (
+            v if isinstance(v, int) else None)
+
+    out = ["## Guard: posted props matched a captured price", ""]
+    # Boards written before the prop LOCK shipped recomputed their props
+    # after first pitch, and the price lookup is skipped on a game that is no
+    # longer upcoming - so those boards carry `None` or the assumed price
+    # while the cache holds the real one, for a reason that is already fixed.
+    # Split out rather than mixed in, the same way `line_money.SHIPPED` marks
+    # where its forward evidence starts.
+    LOCKED_SINCE = "2026-10-13"
+    checked = missed = legacy = 0
+    examples: list[str] = []
+    for f in sorted(OUTPUT_DIR.glob("picks_*.json")):
+        date = f.stem.replace("picks_", "")
+        try:
+            board = json.loads(f.read_text())
+            cache = json.loads(
+                (OUTPUT_DIR / f"prop_odds_{date}.json").read_text())
+        except (OSError, ValueError):
+            continue
+        for r in board.get("games") or []:
+            rows = list(r.get("pick_criteria", {}).get("props") or [])
+            w = r.get("pick_criteria", {}).get("prop_withheld")
+            rows += (w if isinstance(w, list) else [w]) if w else []
+            quoted = cache.get((r.get("matchup") or "").replace(" @ ", "@"))
+            if not quoted:
+                continue
+            folded = {prop_odds.fold_name(k): _over(v) for k, v in quoted.items()}
+            for p in rows:
+                if not isinstance(p, dict) or not p.get("player"):
+                    continue
+                quote = folded.get(prop_odds.fold_name(p["player"]))
+                if not isinstance(quote, int):
+                    continue           # genuinely not quoted: nothing to assert
+                checked += 1
+                # THE ASSERTION THAT BITES: a price IS in the cache for this
+                # player, so the prop must be carrying it. Merely checking the
+                # name resolves would pass with the folding lookup removed,
+                # since this guard would fold both sides itself; comparing the
+                # PRICE is what proves the lookup used it.
+                if p.get("odds") != quote:
+                    if date < LOCKED_SINCE:
+                        legacy += 1
+                        continue
+                    missed += 1
+                    if len(examples) < 8:
+                        examples.append(
+                            f"  - {date} {p['player']}: board has "
+                            f"`{p.get('odds')}`, cache has `{quote:+d}`")
+    if not checked:
+        return out + ["- _no board had a cached odds board to check against._",
+                      ""]
+    out += [f"- props whose player HAS a captured price: **{checked}**",
+            f"- props NOT carrying that price: **{missed}**",
+            f"- same, on boards before the lock ({LOCKED_SINCE}), where props "
+            f"were recomputed post-first-pitch and the price lookup is "
+            f"skipped on a started game: **{legacy}** (known, not repaired)"]
+    out += examples
+    out.append("- " + ("**PASS** — every quoted prop carries its captured price"
+                       if missed == 0 else
+                       f"**{missed} prop(s) ignored a price that was already "
+                       f"bought and cached** — the lookup is not folding names."))
+    return out + [""]
+
+
 def build() -> str:
     rows = collect()
     md = ["# Record audit — what was posted vs what got graded", "",
@@ -668,6 +752,7 @@ def build() -> str:
     md += pitch_mix_guard()
     md += pull_gate_guard()
     md += paper_parlay_guard()
+    md += price_match_guard()
     md += ["## Price drift on the picks that survived", "",
            "_The ledger books the frozen closing price; the channel showed the "
            "earlier one. If they differ, the recorded ROI is not the ROI a "

@@ -94,7 +94,11 @@ def _pick_over(outs: list, who: str, point: float) -> int | None:
     for o in outs:
         if (o.get("name") or "").lower() != "over":
             continue
-        if (o.get("description") or "").strip().lower() != who.strip().lower():
+        # Folded, like every other cross-feed name match: The Odds API and
+        # MLB disagree on accents in both directions, so a bare .lower() loses
+        # the price and the whole ticket goes unbooked for a missing leg.
+        if prop_odds.fold_name(o.get("description") or "") != \
+                prop_odds.fold_name(who):
             continue
         if abs(float(o.get("point", -999)) - point) < 1e-6:
             return o.get("price")

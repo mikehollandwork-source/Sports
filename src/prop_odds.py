@@ -228,6 +228,9 @@ def _fold(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
 
 
+fold_name = _fold          # shared: any cross-feed player match must use it
+
+
 def _row_for(board: dict, player: str) -> dict:
     """The player's row from a cached game board, matched on the folded name.
 

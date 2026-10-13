@@ -45,7 +45,7 @@ from pathlib import Path
 
 import requests
 
-from . import apitime
+from . import apitime, prop_odds
 
 log = logging.getLogger("prop_price_drift")
 
@@ -85,7 +85,8 @@ def _box_hits(game_pk: int) -> dict:
                 pa = 0
             if pa < 1:
                 continue                       # did not bat: drop, never a loss
-            name = ((p.get("person") or {}).get("fullName") or "").strip().lower()
+            name = prop_odds.fold_name(
+                (p.get("person") or {}).get("fullName") or "")
             if name:
                 out[name] = int(bat.get("hits", 0) or 0)
     return out
@@ -129,7 +130,7 @@ def collect() -> list[dict]:
         hits_by_pk[pk] = _box_hits(pk)
     rows = []
     for q in quotes:
-        h = hits_by_pk.get(q["pk"], {}).get(q["name"])
+        h = hits_by_pk.get(q["pk"], {}).get(prop_odds.fold_name(q["name"]))
         if h is None:
             continue                           # quoted but did not bat
         rows.append({**q, "hit": h >= 1, "imp": _implied(q["over"])})

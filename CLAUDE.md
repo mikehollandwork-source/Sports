@@ -277,6 +277,51 @@ unit-testable with mock `Game`/`Team` objects.
   −0.04%, 25–50 PA +0.40%, 50+ PA **−0.51%**) and the largest, best-matched
   bucket runs the wrong way. Nothing survives controlling for how often he has
   batted there and for his own power.
+- **Any cross-feed PLAYER match MUST go through `prop_odds.fold_name`** — the
+  player-name counterpart of the `analysis._canon_abbr` rule above, and it bit
+  the same way. The Odds API and MLB disagree on accents **in both
+  directions**: the feed served `jose ramirez` where MLB says `José Ramírez`,
+  and served `agustín ramírez` alongside `ronald acuna jr.` for a man MLB
+  spells `Acuña`. So neither side is canonical and a bare `.lower()` misses
+  whichever way the pair happens to fall. **32 of 499 cached names (6.4%)
+  cannot match on `.lower()`** — every accent, every `J.P.`/`A.J.`, every
+  `max muncy (2002)` disambiguator. `fold_name` is NFKD, drop combining marks,
+  strip parentheticals, collapse punctuation; `_row_for` tries the exact key
+  first so caches already on disk match unchanged.
+  Measured cost on 2026-10-13: José Ramírez's real **−193** (break-even 65.9%)
+  sat in the cache under `jose ramirez`, the lookup missed it, the prop fell
+  back to the assumed −200 (66.67%) and a **66.3%** read was withheld by four
+  tenths of a point against a price no book was offering. Settlement is SAFE —
+  `player_hits`, `player_total_bases`, `pitcher_strikeouts` and `prop_grade`
+  all key on `player_id`, so nothing was ever mis-graded. The name path is used
+  by `prop_odds` (all five lookups), `parlay_paper._pick_over`,
+  `prop_price_drift` and `prop_rule_scan`; the last two silently dropped every
+  accented hitter from their samples.
+  `record_audit.price_match_guard` asserts it from the files, and it asserts
+  the PRICE rather than the name on purpose: a guard that folded both sides
+  itself would pass with the folding lookup removed.
+- **An ASSUMED price must never withhold a prop** (`main._prop_withheld`). The
+  gate's own rule is that the bar IS the price — so with no quote there is no
+  bar, and holding a bet against a number no book published is the gate
+  inventing the opinion it exists not to invent. `prop_grade.PROP_PRICE` is the
+  ledger's ROI placeholder, not an offer, and it sits exactly where it does the
+  most damage: −200 demands 66.67% while the reads cluster in the low 60s, so
+  the fallback withheld nearly everything it touched (4 of the 6 withholds on
+  the boards then on disk). An unpriced prop now POSTS, graded at the assumed
+  price as it always was, and the board prints `-200 assumed` rather than
+  `no line` so the number is visible where it is used. A REAL quote under its
+  break-even still withholds, unchanged.
+- **The frozen prop roster is `props_frozen`, not `props`**
+  (`main._refresh_locked_props`). `prop_withheld` stores a SUMMARY of a held
+  candidate — player, score, need, odds, reason — and not the candidate, so a
+  refresh that walked only `props` lost every held bat permanently, and once
+  the last posted prop fell under its price bar the next refresh had an empty
+  list to walk and the game went silently propless with no explanation. Seen
+  live on 2026-10-13 CLE@TB: Ramírez posted at 20:35, held at 22:01, gone by
+  23:01. The lock stores every bat it chose, posted or held; the refresh
+  re-decides which of them POST from the current price **in both directions**,
+  so a price that improves brings a frozen prop back. The players still never
+  change. Snapshots written before the key fall back to `props`.
 - **Any backtest reading `pm_books` / `kalshi_books` must cut readings at first
   pitch minus `LOCK_LEAD`.** Those logs run through the game and past
   settlement, so a losing side's last reading is `0.00/1.00`. `consensus.book_metrics`
