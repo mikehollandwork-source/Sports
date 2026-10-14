@@ -37,6 +37,37 @@ legs. (Many books now price same-game parlays WITH a correlation adjustment; if
 this book does, the captured price already contains it and the paper record
 will show that honestly.)
 
+THE STRUCTURE CHANGED ON 2026-10-14, BY REQUEST: the ticket is now TWO
+HITTERS WHO MADE THE SELECTION BUT WHOSE PRICE DOES NOT BEAT THEIR READ -
+exactly the `prop_withheld` population, the bats that cleared the rising
+filter, the short-night gate and the score order and were then held because a
+REAL quote demanded more than the read delivers.
+
+THIS IS EXPECTED TO LOSE MORE THAN THE SINGLES DID, AND THE ARITHMETIC SAYING
+SO IS NOT IN DOUBT. A parlay's EV is the PRODUCT of its legs' EVs, so two
+negative legs multiply: the first pair this was computed on (Aranda 56.8% at
+-179, DeLuca 55.0% at -181) are -11.5% and -14.6% alone and **-24.4%**
+together, needing 41.3% and delivering 31.2%. Nor does it depend on the reads
+being right - if they are too low and the true rates regress up toward the
+61.7% pooled rate, the legs get less bad but the parlay stays worse than the
+singles at every calibration, and the moment a leg turns positive the correct
+move is to post it as a SINGLE. The only thing that can make a parlay beat its
+legs is correlation, and `leg_markets` measured same-team HIT props at ×1.001
+on 5800 combos - noise. Reaching break-even on that first pair would have
+taken ×1.323.
+
+It is logged anyway because it was asked for, it costs nothing, and a forward
+record is the only thing that settles a disagreement about a number. Each
+ticket therefore stores `expected` - the modelled joint rate, the break-even
+the price demands and the EV - so the record can be read against what it was
+predicted to do rather than against zero.
+
+NO LEG HERE IS ALSO A SINGLE, and that inverts the old guard. The four-leg
+ticket's hits legs were POSTED props, so each had to exist in the singles book
+beside it; these are WITHHELD props, which by definition were not posted and
+must NOT appear there. `record_audit.paper_parlay_guard` asserts whichever
+direction applies, per ticket, from the `structure` stamp.
+
 WHAT IT IS EXPECTED TO DO
 Lose, slowly. `parlay_structure.md` puts the best available structure at −6.5%
 with the correlation lift credited in full, and the retired `prop_grade` parlay
@@ -66,6 +97,11 @@ STAKE = 5.0                # notional only; nothing is placed
 TB_POINT = 1.5             # "2+ total bases" is the OVER 1.5 outcome
 HITS_POINT = 0.5           # "1+ hit" is the OVER 0.5 outcome
 TIER = "log"               # yields to the posted bets in prop_odds.may_spend
+
+# Stamped on every ticket so the book stays separable: the four-leg tickets
+# already settled are a different product and must not be pooled with these.
+STRUCTURE = "held_pair"
+LEGS_WANTED = 2
 
 TB_MARKET = "batter_total_bases"
 
@@ -106,10 +142,19 @@ def _pick_over(outs: list, who: str, point: float) -> int | None:
 
 
 def build_ticket(date: str) -> dict | None:
-    """Assemble tonight's ticket from the board. Returns it, or None.
+    """Assemble tonight's held-pair ticket from the board. Returns it, or None.
 
-    One game only, chosen as the board's PLAY if there is one - that is the
-    game whose moneyline leg exists - otherwise the first upcoming game.
+    The pool is every WITHHELD prop on an upcoming game: a bat that made the
+    data cut and whose price does not beat its read. Ranked by that read and
+    the top two taken, which is the same order the props themselves are
+    ranked in.
+
+    Legs may come from DIFFERENT GAMES and that is deliberate. The four-leg
+    ticket was same-game because `parlay_structure` credited a same-team
+    correlation lift; `leg_markets` then corrected that to ×1.001 on 5800
+    combos, so for HIT props there is nothing to harvest by staying in one
+    game, and ranking across the slate finds two held bats on nights one game
+    has only one.
     """
     board_path = OUTPUT_DIR / f"picks_{date}.json"
     try:
@@ -117,122 +162,87 @@ def build_ticket(date: str) -> dict | None:
     except (OSError, ValueError) as exc:
         log.warning("no board for %s (%s)", date, exc)
         return None
-    games = [g for g in board.get("games", [])
-             if g.get("state") == "upcoming"]
-    if not games:
-        log.info("parlay_paper: no upcoming game on %s", date)
-        return None
-    plays = [g for g in games
-             if (g.get("pick_criteria") or {}).get("play") == "pick"]
-    g = (plays or games)[0]
-    pc = g.get("pick_criteria") or {}
-    away, home = (g.get("matchup") or " @ ").split(" @ ")
 
-    eid = None
-    try:
-        for e in prop_odds._get("/events", dateFormat="iso") or []:
-            if (e.get("away_team") == away and e.get("home_team") == home
-                    and market_log._et_date(e.get("commence_time")) == date):
-                eid = e.get("id")
-                break
-    except Exception as exc:
-        log.warning("event lookup failed: %s", exc)
-
-    legs = []
-    missing = []
-
-    # 1. the board's moneyline pick
-    ml = pc.get("bet_moneyline")
-    team = pc.get("bet_team")
-    if ml is None:
-        ml, team = pc.get("advantage_moneyline"), pc.get("advantage_team")
-    if pc.get("play") == "pick" and team and isinstance(ml, int):
-        legs.append({"leg": "moneyline", "team": team, "odds": ml,
-                     "note": "the pick already on the board"})
-    else:
-        missing.append("moneyline (no play on this game)")
-
-    # THREE DISTINCT HITTERS. Not a style preference - 2+ TOTAL BASES CANNOT
-    # HAPPEN WITHOUT A HIT, so the same player on both legs is a NESTED leg:
-    # the ticket carries three legs of real risk while being priced as four.
-    # The first live four-leg ticket did exactly that, putting Max Muncy on
-    # both. (Relative to independent pricing a nested leg is actually
-    # favourable, which is precisely why books refuse or re-price it - so it is
-    # not a bet that would stand, and a paper record of a bet that would be
-    # rejected teaches nothing.)
-    #
-    # The HR pick is RESERVED for total bases before the hits legs are filled,
-    # because he is chosen by the power model and is the point of that leg.
-    # Without one, the hits legs fill first and total bases takes a leftover -
-    # a thin slate must not spend its only prop on the speculative leg.
-    hp = pc.get("hr_prop") or {}
-    tb_who, tb_id = hp.get("player"), hp.get("player_id")
-    reserved = {tb_id} if tb_who else set()
-
-    used: set = set()
-    for b in pc.get("props") or []:
-        if len(used) >= 2:
-            break
-        pid_ = b.get("player_id")
-        if pid_ in used or pid_ in reserved:
+    pool = []
+    for g in board.get("games", []):
+        if g.get("state") != "upcoming":
             continue
-        used.add(pid_)
-        legs.append({"leg": "hits", "player": b.get("player"),
-                     "player_id": pid_, "line": HITS_POINT,
-                     "odds": b.get("odds"),
-                     "note": "1+ hit; also recorded as its own single"})
-    short = 2 - len(used)
-    if short > 0:
-        missing.append(f"hits ({short} short of two distinct players; the "
-                       f"board posted {len(pc.get('props') or [])} prop(s) on "
-                       "this game"
-                       + (", and the HR pick is reserved for total bases"
-                          if reserved else "") + ")")
+        pc = g.get("pick_criteria") or {}
+        held = pc.get("prop_withheld")
+        for h in (held if isinstance(held, list) else [held]) if held else []:
+            # A real captured quote is the whole point of the structure: the
+            # leg is here BECAUSE the price beats the read, which cannot be
+            # said of an assumed price. `_prop_withheld` only withholds on a
+            # real quote now, so this is belt and braces.
+            if not isinstance(h, dict) or not h.get("player_id") \
+                    or not isinstance(h.get("odds"), int) \
+                    or not isinstance(h.get("score"), (int, float)):
+                continue
+            pool.append({**h, "game_pk": g.get("game_pk"),
+                         "matchup": g.get("matchup")})
+    pool.sort(key=lambda h: h["score"], reverse=True)
 
-    if not tb_who:
-        spare = [b for b in (pc.get("props") or [])
-                 if b.get("player_id") not in used]
-        if spare:
-            tb_who, tb_id = spare[0].get("player"), spare[0].get("player_id")
-    if tb_who:
-        price = _pick_over(_outcomes(eid, TB_MARKET), tb_who,
-                           TB_POINT) if eid else None
-        legs.append({"leg": "total_bases", "player": tb_who,
-                     "player_id": tb_id, "line": TB_POINT, "odds": price,
-                     "note": "2+ total bases; the bat the power model likes"
-                             + ("" if hp.get("player") else
-                                " (no HR pick tonight, so the best posted bat "
-                                "not already on a hits leg)")})
-    else:
-        missing.append("total_bases (no hitter left who is not already on a "
-                       "hits leg)")
+    legs, used, missing = [], set(), []
+    for h in pool:
+        if len(legs) >= LEGS_WANTED:
+            break
+        if h["player_id"] in used:
+            continue
+        used.add(h["player_id"])
+        legs.append({"leg": "hits", "player": h.get("player"),
+                     "player_id": h["player_id"], "game_pk": h["game_pk"],
+                     "matchup": h.get("matchup"), "team": h.get("team"),
+                     "line": HITS_POINT, "odds": h["odds"],
+                     "read": round(float(h["score"]), 4),
+                     "needs": round(float(h.get("need") or 0), 4),
+                     "note": "1+ hit; HELD as a single - the price does not "
+                             "beat the read"})
+    if len(legs) < LEGS_WANTED:
+        missing.append(f"hits ({LEGS_WANTED - len(legs)} short of "
+                       f"{LEGS_WANTED} held bats; the slate withheld "
+                       f"{len(pool)} priced prop(s))")
 
-    priced = [x for x in legs if isinstance(x.get("odds"), int)]
-    ticket = {"date": date, "game_pk": g.get("game_pk"),
-              "matchup": g.get("matchup"), "event_id": eid,
+    ticket = {"date": date, "structure": STRUCTURE,
+              "matchup": " + ".join(sorted({x["matchup"] for x in legs
+                                            if x.get("matchup")})) or None,
               "built_at": dt.datetime.now(dt.timezone.utc).isoformat(),
               "stake": STAKE, "paper": True,
               "legs": legs, "missing": missing}
-    if len(priced) == len(legs) and legs:
+    if legs and not missing:
         dec = 1.0
+        joint = 1.0
         for x in legs:
             dec *= _dec(int(x["odds"]))
+            joint *= x["read"]
         ticket["parlay_odds"] = _american(dec)
         ticket["returns"] = round(STAKE * dec, 2)
-    else:
-        ticket["unpriced"] = [x["leg"] for x in legs
-                              if not isinstance(x.get("odds"), int)]
+        # Stored so the forward record is read against the prediction rather
+        # than against zero. `joint` assumes independence, which is what the
+        # ×1.001 measured lift says to assume for hit props.
+        ticket["expected"] = {
+            "joint_rate": round(joint, 4),
+            "break_even": round(1 / dec, 4),
+            "ev": round(joint * dec - 1, 4),
+            "basis": "legs independent (leg_markets same-team hit lift "
+                     "x1.001 on 5800 combos)"}
     OUTPUT_DIR.mkdir(exist_ok=True)
     _ticket_path(date).write_text(json.dumps(ticket, indent=1))
-    log.info("parlay_paper %s: %d leg(s), %d priced, missing=%s",
-             date, len(legs), len(priced), missing or "none")
+    log.info("parlay_paper %s: %s, %d/%d leg(s), missing=%s",
+             date, STRUCTURE, len(legs), LEGS_WANTED, missing or "none")
     return ticket
 
 
 # --- settlement ---------------------------------------------------------------
 
 def _grade_leg(leg: dict, pk: int, results: dict) -> bool | None:
-    """Did this leg win? None when it cannot be confirmed yet."""
+    """Did this leg win? None when it cannot be confirmed yet.
+
+    `pk` is the ticket's game. A held-pair ticket may draw its legs from
+    DIFFERENT games, so a leg carrying its own `game_pk` settles against that
+    one; a leg without it falls back to the ticket's, which is every leg on
+    every four-leg ticket already written to disk.
+    """
+    pk = leg.get("game_pk") or pk
     kind = leg["leg"]
     if kind == "moneyline":
         r = results.get(pk)
@@ -277,7 +287,7 @@ def settle(date: str) -> dict:
         log.info("parlay_paper %s: ticket was never fully priced, not booked",
                  date)
         return book
-    pk = ticket["game_pk"]
+    pk = ticket.get("game_pk")          # absent on a held-pair ticket
     results = mlb_api.results_for(date)
     graded = []
     for leg in legs:
@@ -292,6 +302,8 @@ def settle(date: str) -> dict:
     profit = (round(ticket["returns"] - STAKE, 2) if won else -STAKE)
     book["entries"].append({
         "date": date, "matchup": ticket["matchup"],
+        "structure": ticket.get("structure", "four_leg"),
+        "expected": ticket.get("expected"),
         "odds": ticket["parlay_odds"], "legs": graded,
         "result": "W" if won else "L", "profit": profit,
         "lost_on": [x["leg"] for x in graded if not x["won"]]})

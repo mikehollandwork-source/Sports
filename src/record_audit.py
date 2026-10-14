@@ -421,34 +421,48 @@ def paper_parlay_guard() -> list[str]:
         return out + ["- prop ledger unreadable; cannot check.", ""]
     singles = {e.get("key") for e in led.get("singles", {}).get("entries", [])}
     par = {e.get("key") for e in led.get("parlays", {}).get("entries", [])}
-    leaked = missing = legs = 0
+    leaked = missing = legs = held_legs = held_wrong = 0
     for e in book.get("entries", []):
+        # WHICH DIRECTION TO ASSERT DEPENDS ON THE STRUCTURE. A four-leg
+        # ticket's hits legs were POSTED props, so each must also exist as its
+        # own single - the paper book sits beside the record, not instead of
+        # it. A held-pair ticket's legs were WITHHELD, so the opposite must
+        # hold: they must NOT be in the singles book, or a prop the board
+        # declined to post is being settled as if it had been.
+        held = e.get("structure") == "held_pair"
         for leg in e.get("legs") or []:
             if leg.get("leg") != "hits":
                 continue
-            legs += 1
-            # the single that must exist beside it
-            key = None
-            for s in singles:
-                if s and s.startswith(f"{e['date']}#") and \
-                        s.endswith(f"#{leg.get('player_id')}"):
-                    key = s
-                    break
-            if key is None:
-                missing += 1
+            present = any(
+                k and k.startswith(f"{e['date']}#")
+                and k.endswith(f"#{leg.get('player_id')}") for k in singles)
+            if held:
+                held_legs += 1
+                if present:
+                    held_wrong += 1
+            else:
+                legs += 1
+                if not present:
+                    missing += 1
     # a paper ticket must never appear as a booked parlay
     for e in book.get("entries", []):
         if any(k and k.startswith(f"{e['date']}#") for k in par):
             leaked += 1
     out += [f"- settled paper tickets: **{len(book.get('entries', []))}** "
             f"(paper bankroll {book.get('bankroll', 0):+.2f}, nothing staked)",
-            f"- hits legs checked against the singles book: **{legs}**",
-            f"- legs with NO matching single: **{missing}**",
+            f"- POSTED hits legs (four-leg tickets), which must also be "
+            f"singles: **{legs}**",
+            f"- of those, with NO matching single: **{missing}**",
+            f"- HELD hits legs (held-pair tickets), which must NOT be "
+            f"singles: **{held_legs}**",
+            f"- of those, found in the singles book: **{held_wrong}**",
             f"- paper dates that also booked a real parlay: **{leaked}**"]
+    bad = missing + held_wrong + leaked
     out.append("- " + ("**PASS** — the paper book sits beside the recorded "
                        "props and has leaked nothing into any ledger"
-                       if missing == 0 and leaked == 0 else
-                       f"**FAIL — {missing} leg(s) have no single and "
+                       if bad == 0 else
+                       f"**FAIL — {missing} posted leg(s) have no single, "
+                       f"{held_wrong} held leg(s) were settled as singles, "
                        f"{leaked} date(s) leaked into the parlay book.**"))
     return out + [""]
 

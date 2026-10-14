@@ -584,8 +584,43 @@ unit-testable with mock `Game`/`Team` objects.
   **This cuts against how props are posted, deliberately:** three props from
   BOTH lineups is right for three SINGLES and wrong for a parlay, which wants
   correlated same-team legs. Different products; the board posts singles.
+- **The paper ticket is now the HELD PAIR, by request** (`parlay_paper.STRUCTURE
+  = "held_pair"`, from 2026-10-14). Two hitters who made the selection — rising
+  filter, short-night gate, score order — but whose REAL price does not beat
+  their read: exactly the `prop_withheld` population. Ranked by read, top two,
+  and legs may come from DIFFERENT games because `leg_markets` corrected the
+  same-team hit-prop lift to ×1.001, so there is nothing to harvest by staying
+  in one game.
+  **It is expected to lose MORE than the singles did and the arithmetic is not
+  in doubt.** A parlay's EV is the PRODUCT of its legs' EVs, so two negative
+  legs multiply. The first pair computed (Aranda 56.8% at −179, DeLuca 55.0% at
+  −181) are −11.5% and −14.6% alone and **−24.4%** together — 31.2% delivered
+  against the 41.3% the price demands. **The result does not depend on the
+  reads being right**: if they are too low and regress up toward the 61.7%
+  pooled rate, the legs get less bad but the parlay stays worse than the
+  singles at EVERY calibration, and the moment a leg turns positive the correct
+  move is to post it as a SINGLE. Reaching break-even on that first pair needed
+  a ×1.323 correlation lift against the ×1.001 measured on 5800 combos.
+  It is logged because it was asked for, it costs nothing, and a forward record
+  is the only thing that settles a disagreement about a number. Every ticket
+  stores `expected` — modelled joint rate, break-even, EV — so the record reads
+  against the prediction rather than against zero.
+  **The guard INVERTS for this structure.** A four-leg ticket's hits legs were
+  POSTED props and each must ALSO exist as its own single; a held-pair ticket's
+  legs were WITHHELD and must NOT appear in the singles book, or a prop the
+  board declined to post is being settled as though it had been.
+  `record_audit.paper_parlay_guard` branches on the `structure` stamp and
+  asserts whichever direction applies, per ticket. The stamp also keeps the two
+  products separable in one book — four-leg entries already settled must not be
+  pooled with these. Legs carry their own `game_pk`; `_grade_leg` falls back to
+  the ticket's, which is every four-leg ticket already on disk.
+  `_prop_withheld` now returns `player_id` and `team` so a held bat is
+  settleable at all — settlement keys on the id, never the name.
 - **The FOUR-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
   `output/parlay_paper.json`, built by its own workflow after the board).
+  **SUPERSEDED as of 2026-10-14 by the held-pair structure above** — kept
+  because its settled entries stay in the book and `_grade_leg` still has to
+  grade every leg type they contain.
   Structure: the board's moneyline pick, two DIFFERENT players for 1+ hit, and
   2+ total bases for the power model's hitter. Nothing is staked. It touches no ledger — the hit props keep
   being recorded as singles exactly as before, and

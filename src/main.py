@@ -2157,7 +2157,11 @@ def _prop_withheld(prop: dict, game: dict) -> dict | None:
         return None
     if score >= need:
         return None
-    return {"player": prop.get("player"), "score": round(score, 4),
+    # `player_id` travels with the reason: a withheld bat is now a product in
+    # its own right (the held-pair paper ticket) and settlement keys on the id,
+    # never the name.
+    return {"player": prop.get("player"), "player_id": prop.get("player_id"),
+            "team": prop.get("team"), "score": round(score, 4),
             "need": round(need, 4), "odds": odds,
             "real_line": True,
             "reason": f"conditions against the bat and the read "
@@ -2677,8 +2681,15 @@ def _paper_parlay_lines(date: str) -> list[str]:
         return []
     out = ["", "📄 PAPER PARLAY — NOT A BET, NOT IN ANY LEDGER", "",
            "Logged at real prices in its own book so the structure earns a",
-           "record of its own. Measured expectation is NEGATIVE: the best",
-           "parlay this data supports is about -6.5% (parlay_structure.md)."]
+           "record of its own. Measured expectation is NEGATIVE."]
+    if t.get("structure") == "held_pair":
+        out += ["Two hitters who made the data cut but whose price does not",
+                "beat the read. These legs are HELD as singles and are not in",
+                "the prop ledger; a parlay's EV is the PRODUCT of its legs',",
+                "so two negative legs multiply rather than offset."]
+    else:
+        out.append("The best parlay this data supports is about -6.5% "
+                   "(parlay_structure.md).")
     if t.get("parlay_odds"):
         out.append("")
         out.append(f"{t['matchup']} · {t['parlay_odds']:+d} · "
@@ -2698,6 +2709,13 @@ def _paper_parlay_lines(date: str) -> list[str]:
                        f"{leg.get('prior_starts')} starts — clears "
                        f"{leg.get('measured_rate', 0):.1%} of the time,")
             out.append("     not always: a prior minimum is not a floor")
+    exp = t.get("expected") or {}
+    if exp:
+        out.append("")
+        out.append(f"   modelled {exp['joint_rate']:.1%} against the "
+                   f"{exp['break_even']:.1%} this price needs "
+                   f"— expected {exp['ev']:+.1%}")
+        out.append(f"   ({exp.get('basis', '')})")
     if t.get("missing"):
         out.append("")
         out.append("   legs unavailable tonight: " + "; ".join(t["missing"]))
