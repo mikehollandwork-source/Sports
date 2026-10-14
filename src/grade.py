@@ -295,7 +295,22 @@ def day_recap_text(date: str, entries: list[dict]) -> str:
     # The running records belong HERE and nowhere else now: the board itself is
     # picks-only, so the recap is the one message that reports how it is going.
     lines += ["", "📊 RECORDS ($1/bet · pre-game ML)"] + _record_lines()
+    lines += _recap_paper_parlay(date)
     return "\n".join(lines)
+
+
+def _recap_paper_parlay(date: str) -> list[str]:
+    """The paper parlay, LAST and clearly fenced off from the real records.
+
+    Imported late and failing soft for the same reason `_recap_props` is: a
+    paper experiment must never be able to cost the recap its actual record.
+    """
+    try:
+        from . import parlay_paper
+        return parlay_paper.recap_lines(date)
+    except Exception as exc:
+        log.warning("paper parlay recap failed: %s", exc)
+        return []
 
 
 def _record_lines() -> list[str]:

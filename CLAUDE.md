@@ -632,6 +632,20 @@ unit-testable with mock `Game`/`Team` objects.
   the ticket's, which is every four-leg ticket already on disk.
   `_prop_withheld` now returns `player_id` and `team` so a held bat is
   settleable at all — settlement keys on the id, never the name.
+  **It is REPORTED IN THE RECAP** (`parlay_paper.recap_lines`, called from
+  `grade._recap_paper_parlay`), LAST and under its own heading that says *not
+  a bet · no money · not in any ledger* on the line itself — it sits directly
+  beneath the real records and a reader skimming on a phone must not be able
+  to confuse the two. Each settled ticket prints beside the expectation it was
+  built with, so the record reads against the prediction. `recap_lines` calls
+  `settle(date)` first, because the recap can fire before this module's own
+  workflow has run and a result that exists must not be missing from the one
+  message that reports how it is going; settlement is idempotent per date and
+  all-or-nothing, so that can never double-book or book a partial ticket. Both
+  it and `_recap_paper_parlay` fail SOFT: a paper experiment must never cost
+  the recap its actual record. The running line SPLITS held-pair out whenever
+  the book also holds four-leg entries — pooling two structures into one
+  number is the thing the `structure` stamp exists to prevent.
 - **The FOUR-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
   `output/parlay_paper.json`, built by its own workflow after the board).
   **SUPERSEDED as of 2026-10-14 by the held-pair structure above** — kept

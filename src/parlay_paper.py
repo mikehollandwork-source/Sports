@@ -340,6 +340,69 @@ def lines() -> list[str]:
     return out
 
 
+def recap_lines(date: str) -> list[str]:
+    """The day's paper ticket and the book's running record, for the recap.
+
+    Settles first, because the recap can fire before this module's own
+    workflow has run and a result that exists must not be missing from the
+    one message that reports how it is going. `settle` is idempotent per date
+    and all-or-nothing, so calling it here can never double-book or book a
+    partial ticket.
+
+    LABELLED PAPER ON EVERY LINE IT CAN BE. It sits directly under the real
+    records in the recap, and a reader skimming on a phone must not be able to
+    mistake one for the other.
+    """
+    try:
+        settle(date)
+    except Exception as exc:                 # never cost the recap its records
+        log.warning("paper settle during recap failed: %s", exc)
+    book = _load_book()
+    entries = book.get("entries") or []
+    today = [e for e in entries if e.get("date") == date]
+    out = ["", "📄 PAPER PARLAY (not a bet · no money · not in any ledger)"]
+    if today:
+        for e in today:
+            mark = "✅ WON " if e["result"] == "W" else "❌ LOST"
+            legs = " + ".join(f"{x.get('player') or x.get('team')}"
+                              for x in e.get("legs") or [])
+            out.append(f"{mark}  {legs} ({e['odds']:+d})")
+            exp = e.get("expected") or {}
+            if exp:
+                out.append(f"        modelled {exp['joint_rate']:.0%} vs the "
+                           f"{exp['break_even']:.0%} it needed "
+                           f"({exp['ev']:+.0%} expected)")
+            if e.get("lost_on"):
+                lost = ", ".join(
+                    x.get("player") or x.get("team") or x["leg"]
+                    for x in e.get("legs") or [] if not x.get("won"))
+                out.append(f"        lost on {lost}")
+    else:
+        # Say WHICH, because "no ticket" and "not settled" mean different
+        # things and only one of them means look again.
+        try:
+            t = json.loads(_ticket_path(date).read_text())
+            out.append("   built but not settled: "
+                       + (", ".join(t.get("missing") or [])
+                          or "waiting on a final boxscore"))
+        except (OSError, ValueError):
+            out.append("   no ticket today")
+    n = len(entries)
+    if n:
+        roi = book["bankroll"] / (n * STAKE) * 100
+        out.append(f"   Paper record: {book['record']['wins']}-"
+                   f"{book['record']['losses']} ({roi:+.1f}% on paper)")
+        # The structure changed on 2026-10-14, so a pooled line over both is
+        # two products in one number. Split whenever both are present.
+        held = [e for e in entries if e.get("structure") == "held_pair"]
+        if held and len(held) != n:
+            hp = sum(e["profit"] for e in held)
+            hw = sum(1 for e in held if e["result"] == "W")
+            out.append(f"   of which held-pair: {hw}-{len(held) - hw} "
+                       f"({hp / (len(held) * STAKE) * 100:+.1f}%)")
+    return out
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO,
                         format="%(levelname)s %(name)s: %(message)s")
