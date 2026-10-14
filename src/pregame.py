@@ -25,16 +25,46 @@ log = logging.getLogger("pregame")
 OUTPUT_DIR = picks_main.OUTPUT_DIR
 
 
+def _board_state(payload: dict) -> tuple:
+    """What the board SHOWS, which is what a change must be measured against.
+
+    This compared picks and coin-flips only. The board posts PROPS too, and
+    props are the half that changes at a lock wake - the moment both lineups
+    post, the selection freezes and two hitters appear. A lock wake runs
+    without --telegram, so `force_telegram` is False, and with no moneyline
+    play on the slate `picks` is empty and unchanged all day. Both halves of
+    the test were therefore False at exactly the moment the board gained its
+    content, and nothing was sent.
+
+    Seen on 2026-10-14: a no-play slate whose two props (Contreras, Turang)
+    appeared at the lock and were announced by nothing.
+
+    Only the PUBLISHED props count - `props_locked` is the publication gate,
+    so a provisional selection churning in the background must not put a
+    board on the phone it is not yet willing to show.
+    """
+    props = []
+    for g in payload.get("games") or []:
+        pc = g.get("pick_criteria") or {}
+        if pc.get("props_locked"):
+            props.append((g.get("game_pk"),
+                          tuple(sorted((b.get("player"), b.get("odds"))
+                                       for b in pc.get("props") or [])),
+                          ((pc.get("hr_prop") or {}).get("player"),
+                           (pc.get("hr_prop") or {}).get("odds"))))
+    return (payload.get("picks"), payload.get("coin_flips"), tuple(props))
+
+
 def run(force_telegram: bool = False) -> bool:
     date = picks_main.today_eastern()
 
-    # remember the currently committed picks (+ coin-flip plays) to detect changes
+    # remember what the BOARD currently shows, to detect changes
     old_picks = None
     pf = OUTPUT_DIR / f"picks_{date}.json"
     if pf.exists():
         try:
             prev = json.loads(pf.read_text())
-            old_picks = (prev.get("picks"), prev.get("coin_flips"))
+            old_picks = _board_state(prev)
         except ValueError:
             pass
 
@@ -53,7 +83,7 @@ def run(force_telegram: bool = False) -> bool:
         prop_grade.update(d)                # settle the day's hit props (own ledger)
         grade.send_day_recap_if_complete(d, notify.send_telegram)
 
-    changed = (payload.get("picks"), payload.get("coin_flips")) != old_picks
+    changed = _board_state(payload) != old_picks
     if force_telegram or changed:
         notify.send_telegram(picks_main.telegram_text(payload))
         log.info("telegram sent (%s)", "hourly on-the-hour" if force_telegram and not changed

@@ -311,6 +311,21 @@ unit-testable with mock `Game`/`Team` objects.
   price as it always was, and the board prints `-200 assumed` rather than
   `no line` so the number is visible where it is used. A REAL quote under its
   break-even still withholds, unchanged.
+- **The board-changed test must look at PROPS, not just picks**
+  (`pregame._board_state`). It compared `picks` and `coin_flips` only, and the
+  board posts props too — the half that changes at a LOCK WAKE, which is the
+  moment both lineups post, the selection freezes and the hitters appear. A
+  lock wake runs `python -m src.pregame` WITHOUT `--telegram`, so
+  `force_telegram` is False; and on a no-play slate `picks` is empty and
+  unchanged all day, so `changed` is False too. **Both halves of the test were
+  False at exactly the moment the board gained its content, and nothing was
+  sent.** Seen on 2026-10-14: a no-play Brewers @ Dodgers slate whose two props
+  (Contreras −174, Turang −153) appeared at the lock and were announced by
+  nothing until the next on-the-hour post forced one.
+  Only PUBLISHED props count — `props_locked` is the publication gate, so a
+  provisional selection churning in the background must not put a board on the
+  phone that the board is not yet willing to show. A re-price on a locked prop
+  DOES count, since the board prints the price.
 - **Skipping the props recompute must not mean WRITING NOTHING**
   (`main._carry_props`). There is a window where a game has stopped being
   `upcoming` but first pitch minus `LOCK_LEAD` has not arrived: the props loop
