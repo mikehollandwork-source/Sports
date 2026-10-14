@@ -1,6 +1,6 @@
 {
   "date": "2026-10-14",
-  "generated_at": "2026-10-14T07:01:52.481881+00:00",
+  "generated_at": "2026-10-14T08:02:23.936721+00:00",
   "games": [
     {
       "game_pk": 849811,
@@ -162,9 +162,10 @@
         "verdict": "sources split",
         "note": "sources disagree on the public side (scoresodds_bets, polymarket_bets differ)",
         "flags": [
-          "money is on the other side from the public tickets"
+          "money is on the other side from the public tickets",
+          "reverse line move \u2014 money went against the public %"
         ],
-        "line": "flat",
+        "line": "against public",
         "money": "against public",
         "money_side": "home",
         "money_pct": 64
@@ -446,38 +447,40 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -180,
-        "opponent_moneyline": 148,
+        "advantage_moneyline": -182,
+        "opponent_moneyline": 149,
         "line_check": {
           "open": -166,
-          "current": -180,
-          "implied_shift": 0.019,
-          "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-166\u2192-180, +1.9%)"
+          "current": -182,
+          "implied_shift": 0.021,
+          "status": "confirms",
+          "tier": "moderate",
+          "reason": "moderate sharp move toward the pick (-166\u2192-182, +2.1%)"
         },
         "form_edge": false,
         "form_gap": -0.058,
         "sharp_money": true,
         "sp_dog_edge": 2.348,
         "pitching_dog": false,
-        "signals_hit": 4,
+        "signals_hit": 5,
         "public_pct_against": 52,
         "mild_public_overridden": "money on us vs tickets on them",
         "book_stance": {
           "side": "Los Angeles Dodgers",
           "against_us": false,
           "tells": [
-            "money vs tickets"
+            "money vs tickets",
+            "reverse line move"
           ],
-          "strength": 1,
+          "strength": 2,
           "fooled": true
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": 148,
+          "odds": 149,
           "basis": "money %",
-          "hold_home": 31111,
-          "hold_away": 750400
+          "hold_home": 58462,
+          "hold_away": 725200
         },
         "play": "stay_away",
         "starred": [],
@@ -486,7 +489,7 @@
         "pm_quote": {
           "pm_pct": 62,
           "pm_american": -163,
-          "edge_pts": 2.3,
+          "edge_pts": 2.5,
           "vs_book": "better"
         },
         "projected": {
