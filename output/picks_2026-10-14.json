@@ -1,6 +1,6 @@
 {
   "date": "2026-10-14",
-  "generated_at": "2026-10-14T08:02:23.936721+00:00",
+  "generated_at": "2026-10-14T09:01:56.446302+00:00",
   "games": [
     {
       "game_pk": 849811,
@@ -12,7 +12,7 @@
       "park_factor": 0.98,
       "statistical_advantage": {
         "team": "Los Angeles Dodgers",
-        "home_score": 0.43236800000000003,
+        "home_score": 0.429344,
         "away_score": 0.1035,
         "home": {
           "name": "Los Angeles Dodgers",
@@ -104,18 +104,18 @@
         }
       },
       "public_majority": {
-        "team": "Milwaukee Brewers",
+        "team": "Los Angeles Dodgers",
         "detail": {
           "consensus": null,
           "forum": {
-            "pick": "Milwaukee Brewers",
-            "home": 0,
+            "pick": "Los Angeles Dodgers",
+            "home": 1,
             "away": 1
           },
           "agree": null,
-          "forum_lean": -1.0,
+          "forum_lean": 0.0,
           "consensus_lean": null,
-          "blended_lean": -0.305,
+          "blended_lean": 0.44,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -140,33 +140,25 @@
       "public_check": {
         "sources": [
           {
-            "name": "forum",
-            "side": "away",
-            "agrees": true
-          },
-          {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           }
         ],
-        "majority_side": "away",
-        "agree": 1,
-        "dissent": 2,
-        "trusted": false,
-        "verdict": "sources split",
-        "note": "sources disagree on the public side (scoresodds_bets, polymarket_bets differ)",
-        "flags": [
-          "money is on the other side from the public tickets",
-          "reverse line move \u2014 money went against the public %"
-        ],
-        "line": "against public",
-        "money": "against public",
+        "majority_side": "home",
+        "agree": 2,
+        "dissent": 0,
+        "trusted": true,
+        "verdict": "corroborated",
+        "note": "all 2 sources agree on the public side",
+        "flags": [],
+        "line": "with public",
+        "money": "with public",
         "money_side": "home",
         "money_pct": 64
       },
@@ -389,22 +381,22 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (against public) \u2014 no play",
+        "reason": "line moved with the money \u2014 no price discount, no play",
         "advantage_team": "Los Angeles Dodgers",
-        "public_edge": true,
-        "public_trusted": false,
+        "public_edge": false,
+        "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.498,
+        "confidence": 0.448,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.329,
-            "strength": 0.822,
+            "margin": 0.326,
+            "strength": 0.815,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.305,
-            "strength": 0.102,
+            "blended_lean": 0.44,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -455,25 +447,25 @@
           "implied_shift": 0.021,
           "status": "confirms",
           "tier": "moderate",
-          "reason": "moderate sharp move toward the pick (-166\u2192-182, +2.1%)"
+          "reason": "moderate sharp move toward the pick (-166\u2192-182, +2.1%)",
+          "morning": -182,
+          "early_shift": 0.021,
+          "late_shift": 0.0,
+          "timing": "early",
+          "pinny_morning": -171
         },
         "form_edge": false,
         "form_gap": -0.058,
-        "sharp_money": true,
+        "sharp_money": false,
         "sp_dog_edge": 2.348,
         "pitching_dog": false,
-        "signals_hit": 5,
-        "public_pct_against": 52,
-        "mild_public_overridden": "money on us vs tickets on them",
+        "signals_hit": 4,
         "book_stance": {
-          "side": "Los Angeles Dodgers",
+          "side": null,
           "against_us": false,
-          "tells": [
-            "money vs tickets",
-            "reverse line move"
-          ],
-          "strength": 2,
-          "fooled": true
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
@@ -493,10 +485,10 @@
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 59.9,
+          "win_prob": 59.8,
           "fair_american": -149
         },
-        "line_vs_money": "against",
+        "line_vs_money": "with",
         "bet_team": null,
         "bet_moneyline": null,
         "good_dog": null,
@@ -682,10 +674,10 @@
       "pick": null,
       "game_datetime": "2026-10-15T00:00:00Z",
       "weather": {
-        "temp_f": 77,
+        "temp_f": 76,
         "wind_mph": 7,
-        "wind_dir": "SW",
-        "wind_deg": 227,
+        "wind_dir": "WSW",
+        "wind_deg": 242,
         "precip_pct": 0,
         "roof": "open"
       },
