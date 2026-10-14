@@ -311,6 +311,22 @@ unit-testable with mock `Game`/`Team` objects.
   price as it always was, and the board prints `-200 assumed` rather than
   `no line` so the number is visible where it is used. A REAL quote under its
   break-even still withholds, unchanged.
+- **Skipping the props recompute must not mean WRITING NOTHING**
+  (`main._carry_props`). There is a window where a game has stopped being
+  `upcoming` but first pitch minus `LOCK_LEAD` has not arrived: the props loop
+  refuses to compute (`state != "upcoming"`) and `_lock_started_games` refuses
+  to restore (not yet in the lock window), so the row is written with NO props
+  — and from the next run on the lock faithfully restores that now-empty
+  snapshot, which makes the loss permanent. The two guards are correct
+  individually and leave a hole between them.
+  Seen live on 2026-10-13 CLE@TB: first pitch 00:00Z, lock window from 23:45Z,
+  and the **23:44Z** refresh wiped a José Ramírez prop that had been published
+  to Telegram at 23:28Z tagged LOCKED. `prop_grade` settles what the BOARD
+  carries, so it would never have been graded — the board showed a bet it then
+  declined to score. The prop block is now carried verbatim across the skip,
+  never re-priced, because once the game has started the pre-game price is the
+  only honest one. `_carry_props` fills only what the fresh row is MISSING, so
+  a row the lock restored whole is untouched.
 - **The frozen prop roster is `props_frozen`, not `props`**
   (`main._refresh_locked_props`). `prop_withheld` stores a SUMMARY of a held
   candidate — player, score, need, odds, reason — and not the candidate, so a

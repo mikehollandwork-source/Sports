@@ -268,6 +268,22 @@ def run(date: str) -> dict:
         # at-bats. The guard used to be `state == "final"`, which let every
         # LIVE game through.
         if r.get("game_pk") in LOCKED_PKS or r.get("state") != "upcoming":
+            # SKIPPING THE RECOMPUTE MUST NOT MEAN WRITING NOTHING. There is a
+            # window where the game has stopped being "upcoming" but first
+            # pitch minus LOCK_LEAD has not arrived, so this loop refuses to
+            # compute AND `_lock_started_games` refuses to restore - and the
+            # row is written with no props at all. From the next run on the
+            # lock faithfully restores that now-empty snapshot, so the gap
+            # makes the loss permanent.
+            # Seen live on 2026-10-13 CLE@TB: first pitch 00:00Z, lock window
+            # from 23:45Z, and the 23:44Z refresh wiped a José Ramírez prop
+            # that had been published to Telegram at 23:28Z as LOCKED. It was
+            # then never graded, because `prop_grade` settles what the board
+            # carries.
+            # Carried verbatim, never re-priced: the game has started, so the
+            # pre-game price is the only honest one.
+            _carry_props(r, (prev_snap.get(r.get("game_pk")) or {}).get(
+                "pick_criteria") or {})
             continue
         gm = gbypk.get(r.get("game_pk"))
         if gm is None:
@@ -2069,6 +2085,27 @@ def _break_even(odds: int) -> float:
     """The hit rate a 1+ hit bet needs at this price just to break even."""
     o = int(odds)
     return abs(o) / (abs(o) + 100.0) if o < 0 else 100.0 / (o + 100.0)
+
+
+PROP_KEYS = ("props", "prop", "props_frozen", "prop_withheld",
+             "props_locked", "lineup_confirmed", "hit_bats", "prop_pool",
+             "opp_starter", "hr_prop", "hr_withheld", "shadow_hrr")
+
+
+def _carry_props(r: dict, snap_pc: dict) -> None:
+    """Copy a started game's frozen prop block forward, unchanged.
+
+    Only fills what the fresh row is MISSING, so a row restored whole by
+    `_lock_started_games` is left exactly as it is. Nothing is re-priced and
+    nothing is re-gated - the selection and the price are both whatever they
+    were before first pitch.
+    """
+    if not snap_pc:
+        return
+    pc = r.setdefault("pick_criteria", {})
+    for key in PROP_KEYS:
+        if key not in pc and key in snap_pc:
+            pc[key] = snap_pc[key]
 
 
 def _refresh_locked_props(r: dict, snap_pc: dict, gm, date: str) -> None:
