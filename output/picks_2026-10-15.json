@@ -1,6 +1,6 @@
 {
   "date": "2026-10-15",
-  "generated_at": "2026-10-15T20:02:57.448884+00:00",
+  "generated_at": "2026-10-15T20:29:50.309857+00:00",
   "games": [
     {
       "game_pk": 849818,
@@ -998,16 +998,22 @@
       "public_majority": {
         "team": "Los Angeles Dodgers",
         "detail": {
-          "consensus": null,
+          "consensus": {
+            "pick": "Lad",
+            "pcts": {
+              "Mil": 31.0,
+              "Lad": 69.0
+            }
+          },
           "forum": {
             "pick": "Los Angeles Dodgers",
-            "home": 35,
-            "away": 26
+            "home": 36,
+            "away": 27
           },
-          "agree": null,
-          "forum_lean": 0.148,
-          "consensus_lean": null,
-          "blended_lean": 0.134,
+          "agree": true,
+          "forum_lean": 0.143,
+          "consensus_lean": 0.38,
+          "blended_lean": 0.18,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1032,6 +1038,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "covers",
+            "side": "home",
+            "agrees": true
+          },
+          {
             "name": "forum",
             "side": "home",
             "agrees": true
@@ -1048,11 +1059,11 @@
           }
         ],
         "majority_side": "home",
-        "agree": 3,
+        "agree": 4,
         "dissent": 0,
         "trusted": true,
         "verdict": "corroborated",
-        "note": "all 3 sources agree on the public side",
+        "note": "all 4 sources agree on the public side",
         "flags": [
           "money is on the other side from the public tickets",
           "reverse line move \u2014 money went against the public %"
@@ -1136,7 +1147,18 @@
           ]
         }
       },
-      "betting_lines": null,
+      "betting_lines": {
+        "majority": {
+          "team": "Los Angeles Dodgers",
+          "consensus_pct": 69.0,
+          "moneyline": "-146"
+        },
+        "non_majority": {
+          "team": "Milwaukee Brewers",
+          "consensus_pct": 31.0,
+          "moneyline": "+135"
+        }
+      },
       "consistency": {
         "home": {
           "runs_to_win": 4,
@@ -1299,7 +1321,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.134,
+            "blended_lean": 0.18,
             "strength": 0.0,
             "weight": 0.45
           },
