@@ -1,6 +1,6 @@
 {
   "date": "2026-10-15",
-  "generated_at": "2026-10-15T14:03:04.272596+00:00",
+  "generated_at": "2026-10-15T15:14:58.092165+00:00",
   "games": [
     {
       "game_pk": 849818,
@@ -13,7 +13,7 @@
       "statistical_advantage": {
         "team": "Cleveland Guardians",
         "home_score": 0.4816,
-        "away_score": 0.3563435555555557,
+        "away_score": 0.33945955555555574,
         "home": {
           "name": "Cleveland Guardians",
           "probable_pitcher": "Gavin Williams",
@@ -104,7 +104,7 @@
         }
       },
       "public_majority": {
-        "team": "Cleveland Guardians",
+        "team": "Tampa Bay Rays",
         "detail": {
           "consensus": {
             "pick": "Tb",
@@ -114,14 +114,14 @@
             }
           },
           "forum": {
-            "pick": "Cleveland Guardians",
+            "pick": "Tampa Bay Rays",
             "home": 6,
-            "away": 5
+            "away": 7
           },
-          "agree": false,
-          "forum_lean": 0.091,
+          "agree": true,
+          "forum_lean": -0.077,
           "consensus_lean": -0.08,
-          "blended_lean": 0.03,
+          "blended_lean": -0.03,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -132,8 +132,8 @@
           "books": {
             "polymarket_bets": {
               "away": 46,
-              "home": 55,
-              "lean": 0.09
+              "home": 54,
+              "lean": 0.08
             },
             "scoresodds_bets": {
               "away": 48,
@@ -153,42 +153,40 @@
           {
             "name": "covers",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "forum",
-            "side": "home",
+            "side": "away",
             "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "vsin_bets",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
+        "majority_side": "away",
         "agree": 3,
         "dissent": 2,
         "trusted": true,
         "verdict": "mostly agrees",
-        "note": "3/5 sources agree (covers, vsin_bets differ)",
-        "flags": [
-          "money is on the other side from the public tickets"
-        ],
+        "note": "3/5 sources agree (scoresodds_bets, polymarket_bets differ)",
+        "flags": [],
         "line": "flat",
-        "money": "against public",
+        "money": "with public",
         "money_side": "away",
-        "money_pct": 67
+        "money_pct": 66
       },
       "bvp": {
         "home_eff": 0.62,
@@ -262,14 +260,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "Cleveland Guardians",
-          "consensus_pct": 46.0,
-          "moneyline": "-139"
-        },
-        "non_majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 54.0,
-          "moneyline": "+110"
+          "moneyline": "+113"
+        },
+        "non_majority": {
+          "team": "Cleveland Guardians",
+          "consensus_pct": 46.0,
+          "moneyline": "-120"
         }
       },
       "consistency": {
@@ -420,22 +418,22 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (against public) \u2014 no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "Cleveland Guardians",
-        "public_edge": false,
+        "public_edge": true,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.172,
+        "confidence": 0.204,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.125,
-            "strength": 0.313,
+            "margin": 0.142,
+            "strength": 0.355,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.03,
-            "strength": 0.0,
+            "blended_lean": -0.03,
+            "strength": 0.018,
             "weight": 0.45
           },
           "consistency": {
@@ -478,19 +476,19 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -134,
-        "opponent_moneyline": 111,
+        "advantage_moneyline": -130,
+        "opponent_moneyline": 108,
         "line_check": {
           "open": -133,
-          "current": -134,
-          "implied_shift": 0.002,
-          "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-133\u2192-134, +0.2%)",
-          "morning": -134,
-          "early_shift": 0.002,
+          "current": -130,
+          "implied_shift": -0.006,
+          "status": "contradicts",
+          "reason": "line moved away from the pick (-133\u2192-130, -0.6%)",
+          "morning": -130,
+          "early_shift": -0.006,
           "late_shift": 0.0,
           "timing": null,
-          "pinny_morning": -123
+          "pinny_morning": -120
         },
         "form_edge": true,
         "form_gap": 0.073,
@@ -498,34 +496,33 @@
         "sp_dog_edge": 0.405,
         "pitching_dog": false,
         "signals_hit": 3,
+        "public_pct_against": 51,
         "book_stance": {
-          "side": "Tampa Bay Rays",
-          "against_us": true,
-          "tells": [
-            "money vs tickets"
-          ],
-          "strength": 1,
-          "fooled": true
+          "side": null,
+          "against_us": false,
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Cleveland Guardians",
-          "odds": -134,
+          "odds": -130,
           "basis": "money %",
-          "hold_home": 2966119,
-          "hold_away": -2895900
+          "hold_home": 2789231,
+          "hold_away": -2609600
         },
         "play": "stay_away",
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
-          "pm_pct": 55,
-          "pm_american": -122,
-          "edge_pts": 2.3,
+          "pm_pct": 54,
+          "pm_american": -117,
+          "edge_pts": 2.5,
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 53.8,
-          "fair_american": -116
+          "win_prob": 54.3,
+          "fair_american": -119
         },
         "line_vs_money": "flat",
         "bet_team": null,
@@ -533,18 +530,9 @@
         "starred": [],
         "good_dog": null,
         "line_money": null,
+        "props_locked": true,
         "lineup_confirmed": true,
-        "prop_pool": {
-          "candidates": 10,
-          "probed": 6,
-          "rising": 3,
-          "window_too_thin": 1,
-          "by_side": {
-            "Tampa Bay Rays": 5,
-            "Cleveland Guardians": 5
-          }
-        },
-        "hit_bats": [
+        "props_frozen": [
           {
             "player": "Yandy D\u00edaz",
             "player_id": 650490,
@@ -580,78 +568,74 @@
             "odds": -213
           },
           {
-            "player": "Chandler Simpson",
-            "player_id": 802415,
-            "hit_rate": 78,
-            "all_rate": 72,
-            "gap": 7,
-            "form": -32,
+            "player": "Jonathan Aranda",
+            "player_id": 666018,
+            "hit_rate": 75,
+            "all_rate": 69,
+            "gap": 6,
+            "form": -9,
             "super_hot": false,
             "bvp": {
-              "pa": 4,
-              "ops": 1.0
+              "pa": 5,
+              "ops": 0.45
             },
-            "wins_played": 93,
-            "games_played": 152,
-            "avg_pa": 4.2,
-            "short_night_rate": 0.154,
-            "mean_pa_per_start": 4.18,
-            "short_nights": "17/146 starts of 3 PA or fewer",
+            "wins_played": 96,
+            "games_played": 160,
+            "avg_pa": 4.4,
+            "short_night_rate": 0.057,
+            "mean_pa_per_start": 4.43,
+            "short_nights": "4/150 starts of 3 PA or fewer",
             "team": "Tampa Bay Rays",
             "opp_sp": "Gavin Williams",
-            "fit": 5,
+            "fit": -2,
             "platoon": {
               "hand": "R",
-              "avg": 0.318,
-              "pa": 401,
-              "delta": 0.011,
-              "shrunk": 0.0065
+              "avg": 0.284,
+              "pa": 478,
+              "delta": 0.01,
+              "shrunk": 0.0059
             },
-            "trend_factor": 0.96,
-            "trend": "falling: last 5 vs prior 10 \u2014 air 18% vs 35%, ISO 0.000 vs 0.049 -> x0.96"
+            "trend_factor": 1.05,
+            "trend": "rising: last 5 vs prior 10 \u2014 air 64% vs 50%, ISO 0.167 vs 0.176 -> x1.05",
+            "prop_score": 0.6239,
+            "selector": "all_rate+bvp+fit+platoon+rising",
+            "odds": -143
           },
           {
-            "player": "Junior Caminero",
-            "player_id": 691406,
-            "hit_rate": 79,
-            "all_rate": 74,
-            "gap": 6,
-            "form": 6,
-            "super_hot": false,
+            "player": "Jos\u00e9 Ram\u00edrez",
+            "player_id": 608070,
+            "hit_rate": 75,
+            "all_rate": 63,
+            "gap": 12,
+            "form": 37,
+            "super_hot": true,
             "bvp": {
-              "pa": 10,
-              "ops": 0.7
+              "pa": 19,
+              "ops": 0.669
             },
-            "wins_played": 102,
-            "games_played": 167,
-            "avg_pa": 4.4,
-            "short_night_rate": 0.09,
-            "mean_pa_per_start": 4.32,
-            "short_nights": "10/164 starts of 3 PA or fewer",
-            "team": "Tampa Bay Rays",
-            "opp_sp": "Gavin Williams",
+            "wins_played": 71,
+            "games_played": 131,
+            "avg_pa": 4.5,
+            "short_night_rate": 0.035,
+            "mean_pa_per_start": 4.41,
+            "short_nights": "5/126 starts of 3 PA or fewer",
+            "team": "Cleveland Guardians",
+            "opp_sp": "Griffin Jax",
             "fit": 1,
             "platoon": {
               "hand": "R",
-              "avg": 0.272,
-              "pa": 507,
-              "delta": -0.004,
-              "shrunk": -0.0026
+              "avg": 0.212,
+              "pa": 380,
+              "delta": -0.023,
+              "shrunk": -0.0126
             },
-            "trend_factor": 1.0,
-            "trend": "trend window too thin"
+            "trend_factor": 1.05,
+            "trend": "rising: last 5 vs prior 10 \u2014 air 100% vs 60%, ISO 0.429 vs 0.100 -> x1.05",
+            "prop_score": 0.6074,
+            "selector": "all_rate+bvp+fit+platoon+rising",
+            "odds": -200
           }
         ],
-        "prop_withheld": {
-          "player": "Jos\u00e9 Ram\u00edrez",
-          "player_id": 608070,
-          "team": "Cleveland Guardians",
-          "score": 0.6074,
-          "need": 0.6667,
-          "odds": -200,
-          "real_line": true,
-          "reason": "conditions against the bat and the read (61%) is under the 67% that -200 needs"
-        },
         "props": [
           {
             "player": "Yandy D\u00edaz",
@@ -756,8 +740,19 @@
           "selector": "all_rate+bvp+fit+platoon+rising",
           "odds": -213
         },
-        "props_locked": true,
-        "props_frozen": [
+        "prop_withheld": [
+          {
+            "player": "Jos\u00e9 Ram\u00edrez",
+            "player_id": 608070,
+            "team": "Cleveland Guardians",
+            "score": 0.6074,
+            "need": 0.6667,
+            "odds": -200,
+            "real_line": true,
+            "reason": "conditions against the bat and the read (61%) is under the 67% that -200 needs"
+          }
+        ],
+        "hit_bats": [
           {
             "player": "Yandy D\u00edaz",
             "player_id": 650490,
@@ -793,83 +788,87 @@
             "odds": -213
           },
           {
-            "player": "Jonathan Aranda",
-            "player_id": 666018,
-            "hit_rate": 75,
-            "all_rate": 69,
-            "gap": 6,
-            "form": -9,
+            "player": "Chandler Simpson",
+            "player_id": 802415,
+            "hit_rate": 78,
+            "all_rate": 72,
+            "gap": 7,
+            "form": -32,
             "super_hot": false,
             "bvp": {
-              "pa": 5,
-              "ops": 0.45
+              "pa": 4,
+              "ops": 1.0
             },
-            "wins_played": 96,
-            "games_played": 160,
-            "avg_pa": 4.4,
-            "short_night_rate": 0.057,
-            "mean_pa_per_start": 4.43,
-            "short_nights": "4/150 starts of 3 PA or fewer",
+            "wins_played": 93,
+            "games_played": 152,
+            "avg_pa": 4.2,
+            "short_night_rate": 0.154,
+            "mean_pa_per_start": 4.18,
+            "short_nights": "17/146 starts of 3 PA or fewer",
             "team": "Tampa Bay Rays",
             "opp_sp": "Gavin Williams",
-            "fit": -2,
+            "fit": 5,
             "platoon": {
               "hand": "R",
-              "avg": 0.284,
-              "pa": 478,
-              "delta": 0.01,
-              "shrunk": 0.0059
+              "avg": 0.318,
+              "pa": 401,
+              "delta": 0.011,
+              "shrunk": 0.0065
             },
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 64% vs 50%, ISO 0.167 vs 0.176 -> x1.05",
-            "prop_score": 0.6239,
-            "selector": "all_rate+bvp+fit+platoon+rising",
-            "odds": -143
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 18% vs 35%, ISO 0.000 vs 0.049 -> x0.96"
           },
           {
-            "player": "Jos\u00e9 Ram\u00edrez",
-            "player_id": 608070,
-            "hit_rate": 75,
-            "all_rate": 63,
-            "gap": 12,
-            "form": 37,
-            "super_hot": true,
+            "player": "Junior Caminero",
+            "player_id": 691406,
+            "hit_rate": 79,
+            "all_rate": 74,
+            "gap": 6,
+            "form": 6,
+            "super_hot": false,
             "bvp": {
-              "pa": 19,
-              "ops": 0.669
+              "pa": 10,
+              "ops": 0.7
             },
-            "wins_played": 71,
-            "games_played": 131,
-            "avg_pa": 4.5,
-            "short_night_rate": 0.035,
-            "mean_pa_per_start": 4.41,
-            "short_nights": "5/126 starts of 3 PA or fewer",
-            "team": "Cleveland Guardians",
-            "opp_sp": "Griffin Jax",
+            "wins_played": 102,
+            "games_played": 167,
+            "avg_pa": 4.4,
+            "short_night_rate": 0.09,
+            "mean_pa_per_start": 4.32,
+            "short_nights": "10/164 starts of 3 PA or fewer",
+            "team": "Tampa Bay Rays",
+            "opp_sp": "Gavin Williams",
             "fit": 1,
             "platoon": {
               "hand": "R",
-              "avg": 0.212,
-              "pa": 380,
-              "delta": -0.023,
-              "shrunk": -0.0126
+              "avg": 0.272,
+              "pa": 507,
+              "delta": -0.004,
+              "shrunk": -0.0026
             },
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 100% vs 60%, ISO 0.429 vs 0.100 -> x1.05",
-            "prop_score": 0.6074,
-            "selector": "all_rate+bvp+fit+platoon+rising",
-            "odds": -200
+            "trend_factor": 1.0,
+            "trend": "trend window too thin"
           }
-        ]
+        ],
+        "prop_pool": {
+          "candidates": 10,
+          "probed": 6,
+          "rising": 3,
+          "window_too_thin": 1,
+          "by_side": {
+            "Tampa Bay Rays": 5,
+            "Cleveland Guardians": 5
+          }
+        }
       },
       "flagged": false,
       "pick": null,
       "game_datetime": "2026-10-15T17:00:00Z",
       "weather": {
-        "temp_f": 59,
+        "temp_f": 62,
         "wind_mph": 5,
-        "wind_dir": "ESE",
-        "wind_deg": 123,
+        "wind_dir": "SE",
+        "wind_deg": 126,
         "precip_pct": 2,
         "roof": "open"
       },
@@ -1000,11 +999,11 @@
           "consensus": null,
           "forum": {
             "pick": "Los Angeles Dodgers",
-            "home": 38,
-            "away": 32
+            "home": 45,
+            "away": 38
           },
           "agree": null,
-          "forum_lean": 0.086,
+          "forum_lean": 0.084,
           "consensus_lean": null,
           "blended_lean": 0.097,
           "reddit": null,
@@ -1058,7 +1057,7 @@
         "line": "against public",
         "money": "with public",
         "money_side": "home",
-        "money_pct": 57
+        "money_pct": 53
       },
       "bvp": null,
       "bvp_pen": {
@@ -1327,10 +1326,11 @@
           "implied_shift": -0.024,
           "status": "contradicts",
           "reason": "line moved away from the pick (-174\u2192-157, -2.4%)",
-          "morning": -162,
-          "early_shift": -0.017,
-          "late_shift": -0.007,
-          "timing": null
+          "morning": -157,
+          "early_shift": -0.024,
+          "late_shift": 0.0,
+          "timing": null,
+          "pinny_morning": -147
         },
         "form_edge": false,
         "form_gap": -0.057,
@@ -1351,8 +1351,8 @@
           "bet": "Los Angeles Dodgers",
           "odds": -157,
           "basis": "money %",
-          "hold_home": 468599,
-          "hold_away": 77000
+          "hold_home": 926943,
+          "hold_away": -567000
         },
         "play": "pick",
         "stay_bet": null,
