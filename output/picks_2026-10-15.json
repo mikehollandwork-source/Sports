@@ -1,6 +1,6 @@
 {
   "date": "2026-10-15",
-  "generated_at": "2026-10-15T09:02:44.867093+00:00",
+  "generated_at": "2026-10-15T09:46:55.222878+00:00",
   "games": [
     {
       "game_pk": 849818,
@@ -104,7 +104,7 @@
         }
       },
       "public_majority": {
-        "team": "Tampa Bay Rays",
+        "team": "Cleveland Guardians",
         "detail": {
           "consensus": {
             "pick": "Tb",
@@ -115,13 +115,13 @@
           },
           "forum": {
             "pick": "Cleveland Guardians",
-            "home": 2,
+            "home": 3,
             "away": 2
           },
-          "agree": null,
-          "forum_lean": 0.0,
+          "agree": false,
+          "forum_lean": 0.2,
           "consensus_lean": -0.08,
-          "blended_lean": -0.043,
+          "blended_lean": 0.058,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -148,28 +148,35 @@
           {
             "name": "covers",
             "side": "away",
+            "agrees": false
+          },
+          {
+            "name": "forum",
+            "side": "home",
             "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "away",
-            "agrees": true
+            "agrees": false
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": false
+            "agrees": true
           }
         ],
-        "majority_side": "away",
+        "majority_side": "home",
         "agree": 2,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "2/3 sources agree (polymarket_bets differ)",
-        "flags": [],
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, scoresodds_bets differ)",
+        "flags": [
+          "money is on the other side from the public tickets"
+        ],
         "line": "flat",
-        "money": "with public",
+        "money": "against public",
         "money_side": "away",
         "money_pct": 72
       },
@@ -249,14 +256,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "Tampa Bay Rays",
-          "consensus_pct": 54.0,
-          "moneyline": "+108"
-        },
-        "non_majority": {
           "team": "Cleveland Guardians",
           "consensus_pct": 46.0,
-          "moneyline": "-133"
+          "moneyline": "-125"
+        },
+        "non_majority": {
+          "team": "Tampa Bay Rays",
+          "consensus_pct": 54.0,
+          "moneyline": "+113"
         }
       },
       "consistency": {
@@ -407,12 +414,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Cleveland Guardians",
-        "public_edge": true,
-        "public_trusted": true,
+        "public_edge": false,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.151,
+        "confidence": 0.138,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -421,8 +428,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.043,
-            "strength": 0.029,
+            "blended_lean": 0.058,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -485,13 +492,14 @@
         "sp_dog_edge": 0.405,
         "pitching_dog": false,
         "signals_hit": 3,
-        "public_pct_against": 52,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Tampa Bay Rays",
+          "against_us": true,
+          "tells": [
+            "money vs tickets"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Cleveland Guardians",
@@ -851,12 +859,12 @@
           "forum": {
             "pick": "Los Angeles Dodgers",
             "home": 32,
-            "away": 26
+            "away": 28
           },
           "agree": null,
-          "forum_lean": 0.103,
+          "forum_lean": 0.067,
           "consensus_lean": null,
-          "blended_lean": 0.198,
+          "blended_lean": 0.179,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -902,8 +910,10 @@
         "trusted": true,
         "verdict": "corroborated",
         "note": "all 3 sources agree on the public side",
-        "flags": [],
-        "line": "flat",
+        "flags": [
+          "reverse line move \u2014 money went against the public %"
+        ],
+        "line": "against public",
         "money": "with public",
         "money_side": "home",
         "money_pct": 66
@@ -1130,7 +1140,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.198,
+            "blended_lean": 0.179,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1167,17 +1177,17 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -162,
-        "opponent_moneyline": 134,
+        "advantage_moneyline": -157,
+        "opponent_moneyline": 130,
         "line_check": {
           "open": -174,
-          "current": -162,
-          "implied_shift": -0.017,
+          "current": -157,
+          "implied_shift": -0.024,
           "status": "contradicts",
-          "reason": "line moved away from the pick (-174\u2192-162, -1.7%)",
+          "reason": "line moved away from the pick (-174\u2192-157, -2.4%)",
           "morning": -162,
           "early_shift": -0.017,
-          "late_shift": 0.0,
+          "late_shift": -0.007,
           "timing": null
         },
         "form_edge": false,
@@ -1187,27 +1197,30 @@
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
-          "side": null,
-          "against_us": false,
-          "tells": [],
-          "strength": 0,
-          "fooled": false
+          "side": "Milwaukee Brewers",
+          "against_us": true,
+          "tells": [
+            "reverse line move"
+          ],
+          "strength": 1,
+          "fooled": true
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": 134,
+          "odds": 130,
           "basis": "money %",
-          "hold_home": -471852,
-          "hold_away": 1430800
+          "hold_home": -562675,
+          "hold_away": 1526000
         },
         "play": "pick",
         "starred": [],
+        "stance_warning": "book's informed money is on Milwaukee Brewers",
         "win_prob": 68,
         "win_driver": "consensus",
         "pm_quote": {
           "pm_pct": 58,
           "pm_american": -138,
-          "edge_pts": 3.8,
+          "edge_pts": 3.1,
           "vs_book": "better"
         },
         "projected": {
@@ -1216,7 +1229,7 @@
         },
         "line_vs_money": "against",
         "bet_team": "Los Angeles Dodgers",
-        "bet_moneyline": -162,
+        "bet_moneyline": -157,
         "consensus": {
           "drift": -0.005,
           "imbalance": -0.907,
@@ -1225,8 +1238,8 @@
         "good_dog": null,
         "line_money": {
           "team": "Los Angeles Dodgers",
-          "odds": -162,
-          "move": 0.017,
+          "odds": -157,
+          "move": 0.024,
           "strong": false,
           "line_team": "Milwaukee Brewers"
         },
