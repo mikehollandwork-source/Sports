@@ -1,6 +1,6 @@
 {
   "date": "2026-10-15",
-  "generated_at": "2026-10-15T15:14:58.092165+00:00",
+  "generated_at": "2026-10-15T19:01:48.603501+00:00",
   "games": [
     {
       "game_pk": 849818,
@@ -892,7 +892,7 @@
           "losses": 38
         }
       },
-      "state": "upcoming"
+      "state": "live"
     },
     {
       "game_pk": 849810,
@@ -904,8 +904,8 @@
       "park_factor": 0.98,
       "statistical_advantage": {
         "team": "Los Angeles Dodgers",
-        "home_score": 0.39114400000000005,
-        "away_score": 0.21180000000000002,
+        "home_score": 0.42931511111111115,
+        "away_score": 0.1815,
         "home": {
           "name": "Los Angeles Dodgers",
           "probable_pitcher": "Tyler Glasnow",
@@ -925,7 +925,7 @@
             "woba_neutral": 0.294,
             "iso_neutral": 0.135
           },
-          "platoon_factor": 1.0,
+          "platoon_factor": 1.001,
           "starter_fip_last5": 3.14,
           "starter_k9": 12.41,
           "starter_fip_season": 2.82,
@@ -946,14 +946,14 @@
               "bp_opp_win": 0.5259754098360655
             }
           },
-          "offense_index": -0.013,
+          "offense_index": -0.012,
           "pitching_index": 0.2536,
-          "score": 0.2406
+          "score": 0.2416
         },
         "away": {
           "name": "Milwaukee Brewers",
-          "probable_pitcher": null,
-          "starter_hand": null,
+          "probable_pitcher": "Shane Drohan",
+          "starter_hand": "L",
           "offense": {
             "avg": 0.262,
             "obp": 0.348,
@@ -970,27 +970,29 @@
             "iso_neutral": 0.115
           },
           "platoon_factor": 1.003,
-          "starter_fip_last5": null,
-          "starter_k9": null,
-          "starter_fip_season": null,
-          "starter_ip_last5": 0.0,
-          "bullpen_fip_last5": 3.806,
-          "bullpen_ip_last5": 141.33,
+          "starter_fip_last5": 4.605,
+          "starter_k9": 9.09,
+          "starter_fip_season": 3.734,
+          "starter_ip_last5": 31.67,
+          "bullpen_fip_last5": 3.738,
+          "bullpen_ip_last5": 131.0,
           "pen_arms_down": 0,
-          "combined_fip_sos_adj": 3.739,
+          "combined_fip_sos_adj": 3.863,
           "strength_of_schedule": {
             "bat_opp_pitching_factor": 1.042,
-            "arm_opp_offense_factor": 1.0,
+            "arm_opp_offense_factor": 1.008,
             "raw": {
               "bat_opp_fip": 4.016229784530166,
               "bat_opp_win": 0.5453847780126849,
-              "bp_opp_woba": 0.3203504832559088,
-              "bp_opp_win": 0.536629716981132
+              "sp_opp_woba": 0.3173574863073625,
+              "sp_opp_win": 0.5224315789473684,
+              "bp_opp_woba": 0.32098372477266335,
+              "bp_opp_win": 0.5400814249363866
             }
           },
           "offense_index": 0.0836,
-          "pitching_index": 0.0882,
-          "score": 0.1718
+          "pitching_index": 0.0579,
+          "score": 0.1415
         }
       },
       "public_majority": {
@@ -999,13 +1001,13 @@
           "consensus": null,
           "forum": {
             "pick": "Los Angeles Dodgers",
-            "home": 45,
-            "away": 38
+            "home": 34,
+            "away": 26
           },
           "agree": null,
-          "forum_lean": 0.084,
+          "forum_lean": 0.133,
           "consensus_lean": null,
-          "blended_lean": 0.097,
+          "blended_lean": 0.127,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -1020,9 +1022,9 @@
               "lean": 0.16
             },
             "scoresodds_bets": {
-              "away": 47,
-              "home": 53,
-              "lean": 0.06
+              "away": 46,
+              "home": 54,
+              "lean": 0.08
             }
           }
         }
@@ -1052,14 +1054,30 @@
         "verdict": "corroborated",
         "note": "all 3 sources agree on the public side",
         "flags": [
+          "money is on the other side from the public tickets",
           "reverse line move \u2014 money went against the public %"
         ],
         "line": "against public",
-        "money": "with public",
-        "money_side": "home",
-        "money_pct": 53
+        "money": "against public",
+        "money_side": "away",
+        "money_pct": 50
       },
-      "bvp": null,
+      "bvp": {
+        "home_eff": 0.669,
+        "away_eff": 0.515,
+        "home_ops": 0.549,
+        "away_ops": 0.355,
+        "home_pa": 36,
+        "away_pa": 76,
+        "home_hand_ops": 0.756,
+        "away_hand_ops": 0.759,
+        "home_hand_pa": 1947,
+        "away_hand_pa": 4374,
+        "total_pa": 6433,
+        "edge_team": "Los Angeles Dodgers",
+        "gap": 0.154,
+        "meaningful": true
+      },
       "bvp_pen": {
         "home_ops": 0.845,
         "away_ops": 0.82,
@@ -1124,7 +1142,7 @@
           "runs_to_win": 4,
           "runs_to_allow": 2,
           "expected_opponent_runs": 3.13,
-          "expected_own_runs": 2.55,
+          "expected_own_runs": 2.64,
           "games": 5,
           "back_test": {
             "scored_target": 2,
@@ -1195,7 +1213,7 @@
         "away": {
           "runs_to_win": 3,
           "runs_to_allow": 3,
-          "expected_opponent_runs": 2.55,
+          "expected_opponent_runs": 2.64,
           "expected_own_runs": 3.13,
           "games": 5,
           "back_test": {
@@ -1266,22 +1284,22 @@
         }
       },
       "pick_criteria": {
-        "status": "pick",
-        "reason": "handle+tickets agree, line moved against us",
+        "status": "stay_away",
+        "reason": "no handle/ticket agreement (against public) \u2014 no play",
         "advantage_team": "Los Angeles Dodgers",
         "public_edge": false,
         "public_trusted": true,
         "edge_strong": false,
-        "confidence": 0.247,
+        "confidence": 0.341,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
-            "margin": 0.179,
-            "strength": 0.448,
+            "margin": 0.248,
+            "strength": 0.62,
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.097,
+            "blended_lean": 0.127,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -1293,9 +1311,9 @@
         "consistency_hits": 3,
         "projections": {
           "runs": {
-            "full": 6.93,
-            "f5": 3.71,
-            "basis": "starter FIP 3.14 + pen 3.44 weighted 59%/41% by innings vs league 4.20 (full x0.78, F5 x0.75 starters only)"
+            "full": 7.82,
+            "f5": 4.57,
+            "basis": "starter FIP 3.87 + pen 3.41 weighted 59%/41% by innings vs league 4.20 (full x0.88, F5 x0.92 starters only)"
           },
           "strikeouts": [
             {
@@ -1304,6 +1322,13 @@
               "k9": 11.78,
               "exp_ip": 5.6,
               "basis": "11.78 K/9 over 5.6 IP \u00b7 lineup K 22.6% (x1.00)"
+            },
+            {
+              "pitcher": "Shane Drohan",
+              "proj": 4.9,
+              "k9": 9.0,
+              "exp_ip": 4.9,
+              "basis": "9.00 K/9 over 4.9 IP \u00b7 lineup K 22.3% (x0.99)"
             }
           ],
           "hits": {
@@ -1335,26 +1360,27 @@
         "form_edge": false,
         "form_gap": -0.057,
         "sharp_money": false,
-        "sp_dog_edge": null,
+        "sp_dog_edge": 0.914,
         "pitching_dog": false,
         "signals_hit": 3,
         "book_stance": {
           "side": "Milwaukee Brewers",
           "against_us": true,
           "tells": [
+            "money vs tickets",
             "reverse line move"
           ],
-          "strength": 1,
+          "strength": 2,
           "fooled": true
         },
         "vegas": {
           "bet": "Los Angeles Dodgers",
           "odds": -157,
           "basis": "money %",
-          "hold_home": 926943,
-          "hold_away": -567000
+          "hold_home": 1270701,
+          "hold_away": -1050000
         },
-        "play": "pick",
+        "play": "stay_away",
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
@@ -1364,27 +1390,19 @@
           "vs_book": "better"
         },
         "projected": {
-          "win_prob": 55.4,
-          "fair_american": -124
+          "win_prob": 57.4,
+          "fair_american": -135
         },
         "line_vs_money": "against",
-        "bet_team": "Los Angeles Dodgers",
-        "bet_moneyline": -157,
+        "bet_team": null,
+        "bet_moneyline": null,
         "starred": [],
-        "consensus": {
-          "drift": -0.025,
-          "imbalance": -0.956,
-          "line": "against"
-        },
-        "win_prob": 68,
-        "win_driver": "consensus",
         "good_dog": null,
-        "line_money": {
-          "team": "Los Angeles Dodgers",
-          "odds": -157,
-          "move": 0.024,
-          "strong": false,
-          "line_team": "Milwaukee Brewers"
+        "line_money": null,
+        "fade_watch": {
+          "team": "Milwaukee Brewers",
+          "odds": 130,
+          "reason": "Los Angeles Dodgers -157 was withdrawn"
         },
         "lineup_confirmed": false,
         "prop_pool": {
@@ -1433,30 +1451,6 @@
             "odds": -171
           },
           {
-            "player": "Freddie Freeman",
-            "player_id": 518692,
-            "hit_rate": 74,
-            "all_rate": 67,
-            "gap": 7,
-            "form": -27,
-            "super_hot": false,
-            "bvp": null,
-            "wins_played": 95,
-            "games_played": 160,
-            "avg_pa": 4.4,
-            "short_night_rate": 0.071,
-            "mean_pa_per_start": 4.3,
-            "short_nights": "13/154 starts of 3 PA or fewer",
-            "team": "Los Angeles Dodgers",
-            "opp_sp": null,
-            "fit": 2,
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 60% vs 55%, ISO 0.158 vs 0.075 -> x1.05",
-            "prop_score": 0.69,
-            "selector": "all_rate+bvp+fit+platoon+rising",
-            "odds": -197
-          },
-          {
             "player": "Andy Pages",
             "player_id": 681624,
             "hit_rate": 74,
@@ -1464,7 +1458,10 @@
             "gap": 5,
             "form": -9,
             "super_hot": false,
-            "bvp": null,
+            "bvp": {
+              "pa": 6,
+              "ops": 0.834
+            },
             "wins_played": 84,
             "games_played": 140,
             "avg_pa": 4.4,
@@ -1472,12 +1469,60 @@
             "mean_pa_per_start": 4.35,
             "short_nights": "7/133 starts of 3 PA or fewer",
             "team": "Los Angeles Dodgers",
-            "opp_sp": null,
+            "opp_sp": "Shane Drohan",
             "fit": -3,
+            "platoon": {
+              "hand": "L",
+              "avg": 0.293,
+              "pa": 167,
+              "delta": 0.019,
+              "shrunk": 0.0068
+            },
             "trend_factor": 1.0,
             "trend": "trend window too thin"
+          },
+          {
+            "player": "Kyle Tucker",
+            "player_id": 663656,
+            "hit_rate": 64,
+            "all_rate": 59,
+            "gap": 5,
+            "form": 21,
+            "super_hot": true,
+            "bvp": {
+              "pa": 5,
+              "ops": 1.15
+            },
+            "wins_played": 97,
+            "games_played": 160,
+            "avg_pa": 4.2,
+            "short_night_rate": 0.05,
+            "mean_pa_per_start": 4.22,
+            "short_nights": "15/148 starts of 3 PA or fewer",
+            "team": "Los Angeles Dodgers",
+            "opp_sp": "Shane Drohan",
+            "fit": 1,
+            "platoon": {
+              "hand": "L",
+              "avg": 0.247,
+              "pa": 191,
+              "delta": 0.014,
+              "shrunk": 0.0054
+            },
+            "trend_factor": 0.96,
+            "trend": "falling: last 5 vs prior 10 \u2014 air 62% vs 64%, ISO 0.067 vs 0.083 -> x0.96"
           }
         ],
+        "prop_withheld": {
+          "player": "Freddie Freeman",
+          "player_id": 518692,
+          "team": "Los Angeles Dodgers",
+          "score": 0.5728,
+          "need": 0.6633,
+          "odds": -197,
+          "real_line": true,
+          "reason": "conditions against the bat and the read (57%) is under the 66% that -197 needs"
+        },
         "props": [
           {
             "player": "Brice Turang",
@@ -1512,30 +1557,6 @@
             "prop_score": 0.7151,
             "selector": "all_rate+bvp+fit+platoon+rising",
             "odds": -171
-          },
-          {
-            "player": "Freddie Freeman",
-            "player_id": 518692,
-            "hit_rate": 74,
-            "all_rate": 67,
-            "gap": 7,
-            "form": -27,
-            "super_hot": false,
-            "bvp": null,
-            "wins_played": 95,
-            "games_played": 160,
-            "avg_pa": 4.4,
-            "short_night_rate": 0.071,
-            "mean_pa_per_start": 4.3,
-            "short_nights": "13/154 starts of 3 PA or fewer",
-            "team": "Los Angeles Dodgers",
-            "opp_sp": null,
-            "fit": 2,
-            "trend_factor": 1.05,
-            "trend": "rising: last 5 vs prior 10 \u2014 air 60% vs 55%, ISO 0.158 vs 0.075 -> x1.05",
-            "prop_score": 0.69,
-            "selector": "all_rate+bvp+fit+platoon+rising",
-            "odds": -197
           }
         ],
         "prop": {
@@ -1571,17 +1592,6 @@
           "prop_score": 0.7151,
           "selector": "all_rate+bvp+fit+platoon+rising",
           "odds": -171
-        },
-        "shadow_hrr": {
-          "player": "Brice Turang",
-          "player_id": 668930,
-          "market": "hits+runs+RBIs over 1.5",
-          "over": 110,
-          "under": -145,
-          "bet": false
-        },
-        "hr_withheld": {
-          "reason": "no HR pick \u2014 wind is blowing IN (mixed \u2014 for: 88\u00b0F  \u00b7  against: park 0.98 \u00b7 wind 11 mph in (angled))"
         }
       },
       "flagged": false,
@@ -1612,9 +1622,7 @@
       "state": "upcoming"
     }
   ],
-  "picks": [
-    "Los Angeles Dodgers"
-  ],
+  "picks": [],
   "coin_flips": [],
   "leans": []
 }
