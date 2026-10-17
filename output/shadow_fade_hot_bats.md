@@ -4,7 +4,7 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **54** · graded: **54**
+- qualifying games: **55** · graded: **54**
 
 ## Running record
 
@@ -56,3 +56,5 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-09-25 | New York Mets @ Washington Nationals | Washington Nationals | -105 | W +0.95u |
 | 2026-10-01 | Philadelphia Phillies @ Atlanta Braves | Philadelphia Phillies | -111 | L -1.00u |
 | 2026-10-11 | Los Angeles Dodgers @ Milwaukee Brewers | Los Angeles Dodgers | -107 | L -1.00u |
+
+_1 recorded but not yet graded._
