@@ -111,6 +111,39 @@ python -m py_compile src/*.py           # quick compile check
 There is no test suite yet. The `analysis.py` decision logic is pure and easily
 unit-testable with mock `Game`/`Team` objects.
 
+### Operating it from a sandbox session
+
+The dev sandbox firewalls covers.com and the MLB API, so **nothing live can be
+tested here** — every real run is a GitHub Actions dispatch, and the committed
+`output/` is how you read the result back.
+
+```bash
+# launch a board (this is "launch a fresh board")
+gh api -X POST repos/mikehollandwork-source/Sports/actions/workflows/daily.yml/dispatches \
+  -f ref=claude/claude-md-docs-jx2xtz
+# then poll, then: git pull --rebase, and render
+python -c "import json,sys; sys.path.insert(0,'.'); from src import main as m; \
+  print(m.telegram_text(json.load(open('output/picks_<date>.json'))))"
+```
+
+**`gh api` CANNOT fetch Actions logs.** The endpoint 302s to
+`productionresultssa*.blob.core.windows.net` and this client refuses redirects
+off api.github.com, so a run's stdout is unreadable from here. Diagnose from
+what the run COMMITTED instead — `output/picks_<date>.json`,
+`output/source_health_<date>.md`, `output/covers_diag.md` — and if something
+needs to be visible that currently only logs, write it to `output/`.
+
+Schedules, all US/Eastern: `daily.yml` fires once at **11:00am**; `pregame.yml`
+("Board refresh") hourly from **noon to 1:00am**, each kick running a ~4.75h
+loop that also wakes at a game's lock. So an EARLY (1:05pm) game has only the
+11am and noon runs before first pitch — dispatch manually if its lineup matters.
+Other workflows worth knowing: `parlay_paper.yml` (builds/settles the paper
+ticket, runs after the board), `covers_diag.yml` (dumps what covers.com
+actually returned, for an outage), `source_health.yml`.
+
+Secrets live in Actions (`THE_ODDS_API_KEY`, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`, `REDDIT_*`) and are never echoed.
+
 ### Key conventions & gotchas
 
 - **covers.com selectors are best-effort and unverified** — they will likely need
@@ -386,6 +419,53 @@ unit-testable with mock `Game`/`Team` objects.
   now cuts for you; anything that walks `readings` itself must do the same, or its
   "drift" reports the winner instead of the money. Measured cost of getting this
   wrong: +9.9% against -5.0% on the same 714 games.
+
+### OPEN — awaiting a decision, or known and not done
+
+Carried forward so a fresh session neither drops these nor re-derives them.
+
+- **FOUR ledger entries are wrong and are UNTOUCHED pending your call.** They
+  are the postponed-settlement bug above, and they are NOT ordinary results —
+  three of them settled a game that was never played. Standing instruction is
+  that records are never altered, so nothing was changed; this needs an
+  explicit yes.
+  | key | booked | what actually happened |
+  |---|---|---|
+  | `2026-10-16#849817#802415` Chandler Simpson 1+ H | L −1.00u | game postponed (rain), never played → should be **VOID** |
+  | `2026-10-16#849817#800050` Chase DeLauter 1+ H | L −1.00u | same game → should be **VOID** |
+  | `2026-07-27#824490` Elly De La Cruz 1+ H | L −1.00u | played 07-28, he went **2-for-4** → should be **W** |
+  | `2026-07-27#824490` (retired parlay book) Reds ML + Elly | L −1.00u | **L is correct by accident** — the Reds ML leg genuinely lost 5–6; leave it |
+  Voiding the first two and correcting the third moves prop singles by
+  +3 bets. The code fix stops it recurring; it does not reach back.
+- **`source_health` has no notion of TIME OF DAY**, so a board built before the
+  public has bet cries outage. Every board in the repo was generated 19:44–23:20
+  ET except one dispatched at **01:01 ET on 2026-10-14**, which is the only one
+  that ever tripped `SILENT FAILURE` — consensus, forum, handle, scoresodds and
+  vsin all measure public ACTION and have nothing to report at 1am. Four of the
+  five recovered by the 4pm run on their own. A pre-noon board should not report
+  those five as dead; nothing has been changed.
+- **covers.com's FORUM page returned a captcha** in `covers_diag.md` on
+  2026-10-14 (`0 tables`, `page text contains 'captcha'` — a block, not a markup
+  change, so no selector fix helps). It was NOT costing anything then —
+  `src: forum` read 1/1 healthy on real runs the same afternoon — so it looks
+  intermittent or rate-limited from the diagnostic's own request. If forum starts
+  reading dead on real runs, this is why. The CONSENSUS page is fine and parses
+  (`covers-CoversConsensus-*` classes all present, HTTP 200).
+- **The HR pick only attaches to a game the board has an OPINION on.**
+  `main._attach_hr_prop` runs under `if adv:`, and `adv` is None unless the game
+  is a `pick` or carries a good-dog tag — so a `stay_away` game never gets one.
+  Asked for a Dodgers HR pick on 2026-10-14 and there was none for exactly this
+  reason. The same argument that put hit props on every game (a prop is its own
+  bet and does not need the moneyline rule to have landed) applies here and has
+  NOT been acted on.
+- **The prop-records header conflates two books.** It reads
+  `1+ hit · 135/217 real lines, rest assumed -200` while counting singles and
+  the retired parlays together. Flagged twice, never fixed.
+- **Telegram delivery has never been confirmed from this side.** `send_telegram`
+  fails SOFT — it logs a warning and returns False — and the logs are
+  unreadable from a sandbox session (see above), so a silent send failure is
+  indistinguishable from a quiet board. If boards stop arriving, the first move
+  is to write the send result into `output/` rather than guess.
 
 ### Git & Branching
 
