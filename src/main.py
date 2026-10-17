@@ -2793,6 +2793,12 @@ def telegram_text(payload: dict) -> str:
     shown = pending = 0
     for g in board:
         pc = g.get("pick_criteria") or {}
+        # NOTHING IS BETTABLE ON A POSTPONED GAME. Its props may well be
+        # locked - they were chosen while it was still going ahead - and
+        # printing them offers a bet that cannot be placed.
+        if g.get("state") == "postponed":
+            L += ["", f"{g.get('matchup', '')} — POSTPONED"]
+            continue
         rows = []
         if _play(g) == "pick":
             team, ml = _bet_side(pc)

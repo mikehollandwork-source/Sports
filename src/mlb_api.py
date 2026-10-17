@@ -133,8 +133,36 @@ def schedule_for(date: str) -> list[Game]:
     return games
 
 
-def _state(abstract: str) -> str:
-    """Normalize MLB's abstractGameState to upcoming / live / final."""
+# A game that was never played. MLB reports all of these with
+# abstractGameState "Final" - the game is over as far as THAT DATE's schedule
+# is concerned - so the abstract state alone cannot tell a played game from one
+# that was rained out, and only `detailedState` can.
+NOT_PLAYED = ("postponed", "cancelled", "canceled", "suspended")
+
+
+def _played(detailed: str | None) -> bool:
+    d = (detailed or "").lower()
+    return not any(k in d for k in NOT_PLAYED)
+
+
+def _state(abstract: str, detailed: str | None = None) -> str:
+    """Normalize MLB's game state to upcoming / live / final / postponed.
+
+    POSTPONED IS ITS OWN STATE AND MUST NOT READ AS FINAL. MLB serves a
+    rained-out game as abstractGameState "Final" with detailedState
+    "Postponed", codedGameState "D" and both scores None, so a check on the
+    abstract state alone calls it played. Everything that settles keys on
+    `final`, so the props on that game were graded - against a boxscore where
+    nobody batted, which reads as nought hits and books a LOSS.
+
+    Measured cost: 2026-10-16 Rays @ Guardians was postponed for rain and
+    Chandler Simpson and Chase DeLauter were both booked -1.00u on a game that
+    did not happen. The same thing settled 2026-07-27 Elly De La Cruz as a
+    loss when the game was later made up and he went 2-for-4 - the stale L
+    stood because `grade._add` is idempotent per key and never looked again.
+    """
+    if not _played(detailed):
+        return "postponed"
     a = (abstract or "").lower()
     return "final" if a == "final" else "live" if a == "live" else "upcoming"
 
@@ -148,8 +176,12 @@ def results_for(date: str) -> dict[int, dict]:
     for day in data.get("dates", []):
         for g in day.get("games", []):
             home, away = g["teams"]["home"], g["teams"]["away"]
-            abstract = g.get("status", {}).get("abstractGameState")
-            final = abstract == "Final"
+            status = g.get("status", {}) or {}
+            abstract = status.get("abstractGameState")
+            detailed = status.get("detailedState")
+            # `final` is the gate every settler gates on, so it has to mean
+            # PLAYED, not merely "off the schedule".
+            final = abstract == "Final" and _played(detailed)
             hs, as_ = home.get("score"), away.get("score")
             winner = ""
             if home.get("isWinner"):
@@ -159,7 +191,8 @@ def results_for(date: str) -> dict[int, dict]:
             elif final and hs is not None and as_ is not None:
                 winner = (home if hs > as_ else away)["team"].get("name", "")
             out[g["gamePk"]] = {
-                "state": _state(abstract), "final": final, "winner": winner,
+                "state": _state(abstract, detailed), "final": final,
+                "detailed": detailed, "winner": winner,
                 "home": home["team"].get("name", ""), "away": away["team"].get("name", ""),
                 "home_score": hs, "away_score": as_,
             }

@@ -462,7 +462,13 @@ def _all_games_final(date: str) -> bool:
         log.warning("cannot confirm slate finished for %s: %s", date, exc)
         return False
     pks = [g.get("game_pk") for g in payload.get("games", [])]
-    return bool(pks) and all((res.get(pk) or {}).get("final") for pk in pks)
+    # A POSTPONED game is done for this date and never reaches Final, so
+    # requiring `final` on it would block the recap forever - the same reason
+    # `totals_signal._scores` excludes them before caching a date.
+    def _done(pk):
+        r = res.get(pk) or {}
+        return bool(r.get("final")) or r.get("state") == "postponed"
+    return bool(pks) and all(_done(pk) for pk in pks)
 
 
 def _send_props_only_recap(date: str, send) -> bool:

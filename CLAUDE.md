@@ -277,6 +277,33 @@ unit-testable with mock `Game`/`Team` objects.
   −0.04%, 25–50 PA +0.40%, 50+ PA **−0.51%**) and the largest, best-matched
   bucket runs the wrong way. Nothing survives controlling for how often he has
   batted there and for his own power.
+- **A POSTPONED game reads as `Final` in MLB's abstract state, and settling on
+  that books losses on games that were never played** (`mlb_api._played`,
+  `_state`, `results_for`). MLB serves a rained-out game as
+  `abstractGameState: "Final"` with `detailedState: "Postponed"`,
+  `codedGameState: "D"` and both scores `None` — the game is over as far as
+  THAT DATE's schedule goes. `final = abstract == "Final"` therefore called it
+  played, and `final` is the gate every settler keys on
+  (`prop_grade`, `grade`, `parlay_paper`). The boxscore of an unplayed game has
+  nobody batting, so `player_hits` returns 0, which reads as no hit and books a
+  **LOSS**.
+  **Measured cost: 4 ledger entries, and one of them is the opposite of the
+  truth.** 2026-10-16 Rays @ Guardians was postponed for rain and Chandler
+  Simpson (−216) and Chase DeLauter (−194) were each booked −1.00u on a game
+  that did not happen. 2026-07-27 game 824490 was listed on that date, graded
+  while postponed, then played on 07-28 where **Elly De La Cruz went 2-for-4** —
+  the stale **L** stood because `grade._add` is idempotent per key and the
+  makeup date's board carried no prop, so nothing ever looked again. (Its
+  paired entry in the retired parlay book also reads L, which is the right
+  answer by accident: the Reds ML leg genuinely lost 5–6.)
+  The fix is at the source so every settler inherits it: `_played()` reads
+  `detailedState`, `postponed` is its own state, and `final` now means PLAYED
+  rather than merely off the schedule. Two downstream spots needed the same
+  idea: `grade._all_games_final` counts a postponed game as DONE or the recap
+  would wait on it forever, and `telegram_text` prints
+  `— POSTPONED` instead of the locked props, because those props were chosen
+  while the game was still going ahead and printing them offers a bet that
+  cannot be placed.
 - **Any cross-feed PLAYER match MUST go through `prop_odds.fold_name`** — the
   player-name counterpart of the `analysis._canon_abbr` rule above, and it bit
   the same way. The Odds API and MLB disagree on accents **in both
