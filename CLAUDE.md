@@ -424,19 +424,26 @@ Secrets live in Actions (`THE_ODDS_API_KEY`, `TELEGRAM_BOT_TOKEN`,
 
 Carried forward so a fresh session neither drops these nor re-derives them.
 
-- **FOUR ledger entries are wrong and are UNTOUCHED pending your call.** They
-  are the postponed-settlement bug above, and they are NOT ordinary results —
-  three of them settled a game that was never played. Standing instruction is
-  that records are never altered, so nothing was changed; this needs an
-  explicit yes.
-  | key | booked | what actually happened |
+- **The four entries the postponed bug wrote are CORRECTED** (2026-10-17, on
+  an explicit instruction to fix the record). They were never ordinary
+  results — three settled a game that was not played — so the usual
+  never-alter-records rule did not apply to them.
+  | key | was | now |
   |---|---|---|
-  | `2026-10-16#849817#802415` Chandler Simpson 1+ H | L −1.00u | game postponed (rain), never played → should be **VOID** |
-  | `2026-10-16#849817#800050` Chase DeLauter 1+ H | L −1.00u | same game → should be **VOID** |
-  | `2026-07-27#824490` Elly De La Cruz 1+ H | L −1.00u | played 07-28, he went **2-for-4** → should be **W** |
-  | `2026-07-27#824490` (retired parlay book) Reds ML + Elly | L −1.00u | **L is correct by accident** — the Reds ML leg genuinely lost 5–6; leave it |
-  Voiding the first two and correcting the third moves prop singles by
-  +3 bets. The code fix stops it recurring; it does not reach back.
+  | `2026-10-16#849817#802415` Chandler Simpson 1+ H | L −1.00u | **VOID** — removed; game never played, so there was no bet |
+  | `2026-10-16#849817#800050` Chase DeLauter 1+ H | L −1.00u | **VOID** — removed |
+  | `2026-07-27#824490` Elly De La Cruz 1+ H | L −1.00u | **W +0.50** — played 07-28, went 2-for-4, graded at the assumed −200 it was booked under |
+  | `2026-07-27#824490` (parlay book) Reds ML + Elly | L −1.00u | **L, unchanged** — the Reds ML leg genuinely lost 5–6; only its empty score string was filled |
+  A void is a REMOVAL, not a 0.00 push: there was no bet. Both corrected rows
+  carry a `corrected` field saying why. `bankroll_after` was recomputed as a
+  cascade from the entries, and each book's bankroll and record recomputed
+  from its own rows rather than adjusted by hand.
+  **Singles moved 159 bets / 99-60 / −10.41u → 157 bets / 100-57 / −6.91u**;
+  the parlay book is unchanged at 20-47 / −18.89u. Verified afterwards: no
+  entry still carries a `None` score, all three cascades reconcile to their
+  stated bankroll, and re-running `prop_grade.update` on both dates adds
+  nothing back — the postponed fix now reports 849817 as
+  `state: postponed / final: False`, which is what keeps it from returning.
 - **`source_health` has no notion of TIME OF DAY**, so a board built before the
   public has bet cries outage. Every board in the repo was generated 19:44–23:20
   ET except one dispatched at **01:01 ET on 2026-10-14**, which is the only one
