@@ -4,11 +4,11 @@ _Forward record only. No money, no board, no effect on the main ledger. Recorded
 
 - rule: `back the cold-bats side when the line moves against the hot side and the cold side is -130 or cheaper`
 - recording since **2026-08-11**
-- qualifying games: **55** · graded: **54**
+- qualifying games: **56** · graded: **55**
 
 ## Running record
 
-- **24-30** (44%) · -9.01u · **-16.7%** ROI
+- **25-30** (45%) · -8.21u · **-14.9%** ROI
 
 For context, and not as a target: the backtest cell returned +3.4% on n=34 with a corrected p of 0.478, and ~663 games would be needed to call a real +10% edge. At roughly 34 qualifying games a quarter this stays inconclusive for years.
 
@@ -16,7 +16,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 
 | date | matchup | bet | odds | result |
 |---|---|---|---|---|
-| 2026-08-25 | Kansas City Royals @ Toronto Blue Jays | Toronto Blue Jays | -120 | L -1.00u |
 | 2026-08-26 | Philadelphia Phillies @ Seattle Mariners | Philadelphia Phillies | -128 | W +0.78u |
 | 2026-08-26 | Chicago Cubs @ Arizona Diamondbacks | Arizona Diamondbacks | -104 | W +0.96u |
 | 2026-08-27 | Arizona Diamondbacks @ San Francisco Giants | Arizona Diamondbacks | -112 | L -1.00u |
@@ -56,5 +55,6 @@ For context, and not as a target: the backtest cell returned +3.4% on n=34 with 
 | 2026-09-25 | New York Mets @ Washington Nationals | Washington Nationals | -105 | W +0.95u |
 | 2026-10-01 | Philadelphia Phillies @ Atlanta Braves | Philadelphia Phillies | -111 | L -1.00u |
 | 2026-10-11 | Los Angeles Dodgers @ Milwaukee Brewers | Los Angeles Dodgers | -107 | L -1.00u |
+| 2026-10-18 | Tampa Bay Rays @ Cleveland Guardians | Tampa Bay Rays | -126 | W +0.79u |
 
 _1 recorded but not yet graded._
