@@ -1,11 +1,11 @@
 {
  "paper": true,
  "stake": 5.0,
- "bankroll": -5.0,
+ "bankroll": 2.5,
  "record": {
-  "wins": 0,
+  "wins": 1,
   "losses": 1,
-  "tickets": 1
+  "tickets": 2
  },
  "entries": [
   {
@@ -54,6 +54,51 @@
    "lost_on": [
     "hits"
    ]
+  },
+  {
+   "date": "2026-10-19",
+   "matchup": "Cleveland Guardians @ Tampa Bay Rays",
+   "structure": "held_pair",
+   "expected": {
+    "joint_rate": 0.3034,
+    "break_even": 0.3998,
+    "ev": -0.2412,
+    "basis": "legs independent (leg_markets same-team hit lift x1.001 on 5800 combos)"
+   },
+   "odds": 150,
+   "legs": [
+    {
+     "leg": "hits",
+     "player": "Yandy D\u00edaz",
+     "player_id": 650490,
+     "game_pk": 849815,
+     "matchup": "Cleveland Guardians @ Tampa Bay Rays",
+     "team": "Tampa Bay Rays",
+     "line": 0.5,
+     "odds": -220,
+     "read": 0.6292,
+     "needs": 0.6875,
+     "note": "1+ hit; HELD as a single - the price does not beat the read",
+     "won": true
+    },
+    {
+     "leg": "hits",
+     "player": "Nathaniel Lowe",
+     "player_id": 663993,
+     "game_pk": 849815,
+     "matchup": "Cleveland Guardians @ Tampa Bay Rays",
+     "team": "Cleveland Guardians",
+     "line": 0.5,
+     "odds": -139,
+     "read": 0.4822,
+     "needs": 0.5816,
+     "note": "1+ hit; HELD as a single - the price does not beat the read",
+     "won": true
+    }
+   ],
+   "result": "W",
+   "profit": 7.5,
+   "lost_on": []
   }
  ]
 }
