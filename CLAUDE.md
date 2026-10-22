@@ -337,6 +337,12 @@ Secrets live in Actions (`THE_ODDS_API_KEY`, `TELEGRAM_BOT_TOKEN`,
   `— POSTPONED` instead of the locked props, because those props were chosen
   while the game was still going ahead and printing them offers a bet that
   cannot be placed.
+  **CONFIRMED END TO END IN PRODUCTION.** Game 849817 was made up on
+  **2026-10-18**, got its own board, locked its own props and settled them
+  against a real boxscore — DeLauter +0.51, Díaz +0.43, Simpson +0.50, all
+  against `Tampa Bay Rays 3 @ Cleveland Guardians 1`. So the makeup date
+  grades normally and the voided 10-16 rows stayed voided through it. Nothing
+  here needs re-investigating.
 - **Any cross-feed PLAYER match MUST go through `prop_odds.fold_name`** — the
   player-name counterpart of the `analysis._canon_abbr` rule above, and it bit
   the same way. The Odds API and MLB disagree on accents **in both
@@ -438,12 +444,37 @@ Carried forward so a fresh session neither drops these nor re-derives them.
   carry a `corrected` field saying why. `bankroll_after` was recomputed as a
   cascade from the entries, and each book's bankroll and record recomputed
   from its own rows rather than adjusted by hand.
-  **Singles moved 159 bets / 99-60 / −10.41u → 157 bets / 100-57 / −6.91u**;
-  the parlay book is unchanged at 20-47 / −18.89u. Verified afterwards: no
+  **Singles moved 159 bets / 99-60 / −10.41u → 157 bets / 100-57 / −6.91u** at
+  the time of the correction; the parlay book was unchanged at 20-47 / −18.89u.
+  (Those are the BEFORE/AFTER of the edit, not a running total — as of
+  2026-10-22 singles sit at 162 bets / 104-58 / −5.91u with later days graded
+  on top.) Verified afterwards: no
   entry still carries a `None` score, all three cascades reconcile to their
   stated bankroll, and re-running `prop_grade.update` on both dates adds
   nothing back — the postponed fix now reports 849817 as
   `state: postponed / final: False`, which is what keeps it from returning.
+- **The price bar's CONDITIONS trigger is deciding which props post more than
+  the price is, and the effect is visible across three consecutive boards.**
+  `_prop_withheld` fires only when the night suppresses contact AND the read is
+  under the break-even, so on a neutral night a prop posts at ANY price. What
+  that produced:
+  | date | posted | withheld |
+  |---|---|---|
+  | 2026-10-17 | Chandler Simpson **−270** | Chase DeLauter −221, Yandy Díaz −250 |
+  | 2026-10-19 | Chase DeLauter −177 | Yandy Díaz −220, Nathaniel Lowe **−139** |
+  The dearest price on the 10-17 board posted while two cheaper ones were held,
+  and on 10-19 the cheapest price on the board was held. **Both are the gate
+  behaving exactly as specified** — it is a contact-conditions gate, not a
+  price ceiling.
+  **IMPORTANT CORRECTION, so nobody re-litigates it:** the −270 was NOT a case
+  of the gate passing something it should have caught. Simpson's read was
+  **0.7427** against the **0.7297** that −270 demands, so he cleared on merit
+  and would have posted even with the gate engaged. The asymmetry is real and
+  worth watching; the specific −270 was not a failure.
+  **Nothing has been changed.** Adding an unconditional price ceiling is a
+  genuine threshold change and must be PRE-REGISTERED before more results land,
+  never fitted to the record it would then be judged against — the same rule
+  CLAUDE.md sets for every other threshold here.
 - **`source_health` has no notion of TIME OF DAY**, so a board built before the
   public has bet cries outage. Every board in the repo was generated 19:44–23:20
   ET except one dispatched at **01:01 ET on 2026-10-14**, which is the only one
@@ -466,8 +497,10 @@ Carried forward so a fresh session neither drops these nor re-derives them.
   bet and does not need the moneyline rule to have landed) applies here and has
   NOT been acted on.
 - **The prop-records header conflates two books.** It reads
-  `1+ hit · 135/217 real lines, rest assumed -200` while counting singles and
-  the retired parlays together. Flagged twice, never fixed.
+  `1+ hit · N/M real lines, rest assumed -200` while counting singles and the
+  retired parlays together, so the denominator is larger than the singles book
+  it sits above. Flagged three times, never fixed — display only, it changes
+  no number in either record.
 - **Telegram delivery has never been confirmed from this side.** `send_telegram`
   fails SOFT — it logs a warning and returns False — and the logs are
   unreadable from a sandbox session (see above), so a silent send failure is
@@ -775,6 +808,18 @@ Carried forward so a fresh session neither drops these nor re-derives them.
   the recap its actual record. The running line SPLITS held-pair out whenever
   the book also holds four-leg entries — pooling two structures into one
   number is the thing the `structure` stamp exists to prevent.
+  **THE FORWARD RECORD STARTS 2026-10-17.** Two tickets so far, **1-1,
+  +2.50 on paper**:
+  | date | legs | price | result |
+  |---|---|---|---|
+  | 2026-10-17 | Chase DeLauter + José Ramírez | +115 | L −5.00 |
+  | 2026-10-19 | Yandy Díaz + Nathaniel Lowe | +150 | **W +7.50** |
+  **Two tickets prove nothing and the win does not reopen the argument** — the
+  structure is modelled at about **−24%**, so a 50% hit rate over two is
+  exactly the variance you would expect to see either way early. Read it
+  against each ticket's stored `expected`, never against zero, and do not let
+  an early positive bankroll become an argument for staking it. The question
+  this book answers needs dozens of tickets, not two.
 - **The FOUR-leg ticket is PAPER TRADED in its own book** (`parlay_paper.py` →
   `output/parlay_paper.json`, built by its own workflow after the board).
   **SUPERSEDED as of 2026-10-14 by the held-pair structure above** — kept
