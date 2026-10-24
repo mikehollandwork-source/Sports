@@ -1,6 +1,6 @@
 {
   "date": "2026-10-24",
-  "generated_at": "2026-10-24T12:02:41.070845+00:00",
+  "generated_at": "2026-10-24T13:02:58.126658+00:00",
   "games": [
     {
       "game_pk": 849802,
@@ -109,19 +109,19 @@
           "consensus": {
             "pick": "Tb",
             "pcts": {
-              "Tb": 59.0,
-              "Mil": 41.0
+              "Tb": 60.0,
+              "Mil": 40.0
             }
           },
           "forum": {
             "pick": "Tampa Bay Rays",
-            "home": 20,
+            "home": 21,
             "away": 23
           },
           "agree": true,
-          "forum_lean": -0.07,
-          "consensus_lean": -0.18,
-          "blended_lean": -0.06,
+          "forum_lean": -0.045,
+          "consensus_lean": -0.2,
+          "blended_lean": -0.023,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -134,6 +134,11 @@
               "away": 46,
               "home": 54,
               "lean": 0.08
+            },
+            "scoresodds_bets": {
+              "away": 45,
+              "home": 55,
+              "lean": 0.1
             }
           }
         }
@@ -151,6 +156,11 @@
             "agrees": true
           },
           {
+            "name": "scoresodds_bets",
+            "side": "home",
+            "agrees": false
+          },
+          {
             "name": "polymarket_bets",
             "side": "home",
             "agrees": false
@@ -158,14 +168,15 @@
         ],
         "majority_side": "away",
         "agree": 2,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "2/3 sources agree (polymarket_bets differ)",
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (scoresodds_bets, polymarket_bets differ)",
         "flags": [],
         "line": "flat",
-        "money": "unknown",
-        "money_side": null
+        "money": "with public",
+        "money_side": "away",
+        "money_pct": 54
       },
       "bvp": {
         "home_eff": 0.771,
@@ -244,13 +255,13 @@
       "betting_lines": {
         "majority": {
           "team": "Tampa Bay Rays",
-          "consensus_pct": 59.0,
-          "moneyline": "+111"
+          "consensus_pct": 60.0,
+          "moneyline": "+100"
         },
         "non_majority": {
           "team": "Milwaukee Brewers",
-          "consensus_pct": 41.0,
-          "moneyline": "-120"
+          "consensus_pct": 40.0,
+          "moneyline": "-125"
         }
       },
       "consistency": {
@@ -401,12 +412,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (unknown) \u2014 no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": true,
-        "public_trusted": true,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.389,
+        "confidence": 0.377,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -415,8 +426,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.06,
-            "strength": 0.04,
+            "blended_lean": -0.023,
+            "strength": 0.011,
             "weight": 0.45
           },
           "consistency": {
@@ -459,27 +470,27 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -127,
-        "opponent_moneyline": 106,
+        "advantage_moneyline": -120,
+        "opponent_moneyline": 100,
         "line_check": {
           "open": -119,
-          "current": -127,
-          "implied_shift": 0.016,
+          "current": -120,
+          "implied_shift": 0.002,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-119\u2192-127, +1.6%)",
+          "reason": "only a slight move our way, below the 2% signal floor (-119\u2192-120, +0.2%)",
           "morning": -127,
           "early_shift": 0.016,
-          "late_shift": 0.0,
+          "late_shift": -0.014,
           "timing": null,
           "pinny_morning": -121
         },
         "form_edge": true,
         "form_gap": 0.035,
-        "sharp_money": null,
+        "sharp_money": false,
         "sp_dog_edge": -0.572,
         "pitching_dog": false,
         "signals_hit": 4,
-        "public_pct_against": 53,
+        "public_pct_against": 51,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -489,10 +500,10 @@
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": -127,
-          "basis": "ticket %",
-          "hold_home": 1098111,
-          "hold_away": -618008
+          "odds": -120,
+          "basis": "money %",
+          "hold_home": 1096667,
+          "hold_away": -560000
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -500,14 +511,14 @@
         "pm_quote": {
           "pm_pct": 54,
           "pm_american": -117,
-          "edge_pts": 1.9,
-          "vs_book": "better"
+          "edge_pts": 0.5,
+          "vs_book": "same"
         },
         "projected": {
           "win_prob": 58.1,
           "fair_american": -139
         },
-        "line_vs_money": "against",
+        "line_vs_money": "flat",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": [],
@@ -629,10 +640,10 @@
       "pick": null,
       "game_datetime": "2026-10-25T00:00:00Z",
       "weather": {
-        "temp_f": 58,
+        "temp_f": 57,
         "wind_mph": 4,
         "wind_dir": "S",
-        "wind_deg": 173,
+        "wind_deg": 171,
         "precip_pct": 3,
         "roof": "retract"
       },
