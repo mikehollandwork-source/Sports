@@ -1,6 +1,6 @@
 {
   "date": "2026-10-26",
-  "generated_at": "2026-10-26T05:02:23.717947+00:00",
+  "generated_at": "2026-10-26T06:02:20.199056+00:00",
   "games": [
     {
       "game_pk": 849804,
@@ -104,7 +104,7 @@
         }
       },
       "public_majority": {
-        "team": "Tampa Bay Rays",
+        "team": "Milwaukee Brewers",
         "detail": {
           "consensus": {
             "pick": "Tb",
@@ -113,11 +113,15 @@
               "Tb": 73.0
             }
           },
-          "forum": null,
-          "agree": null,
-          "forum_lean": null,
+          "forum": {
+            "pick": "Milwaukee Brewers",
+            "home": 0,
+            "away": 1
+          },
+          "agree": false,
+          "forum_lean": -1.0,
           "consensus_lean": 0.46,
-          "blended_lean": 0.25,
+          "blended_lean": -0.397,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -139,20 +143,25 @@
           {
             "name": "covers",
             "side": "home",
+            "agrees": false
+          },
+          {
+            "name": "forum",
+            "side": "away",
             "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
-        "agree": 2,
-        "dissent": 0,
-        "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 2 sources agree on the public side",
+        "majority_side": "away",
+        "agree": 1,
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, polymarket_bets differ)",
         "flags": [],
         "line": "flat",
         "money": "unknown",
@@ -230,14 +239,14 @@
       },
       "betting_lines": {
         "majority": {
-          "team": "Tampa Bay Rays",
-          "consensus_pct": 73.0,
-          "moneyline": "-110"
-        },
-        "non_majority": {
           "team": "Milwaukee Brewers",
           "consensus_pct": 27.0,
           "moneyline": "+105"
+        },
+        "non_majority": {
+          "team": "Tampa Bay Rays",
+          "consensus_pct": 73.0,
+          "moneyline": "-111"
         }
       },
       "consistency": {
@@ -390,10 +399,10 @@
         "status": "stay_away",
         "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Milwaukee Brewers",
-        "public_edge": true,
-        "public_trusted": true,
+        "public_edge": false,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.39,
+        "confidence": 0.277,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -402,8 +411,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.25,
-            "strength": 0.25,
+            "blended_lean": -0.397,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -461,7 +470,6 @@
         "sp_dog_edge": 0.015,
         "pitching_dog": false,
         "signals_hit": 4,
-        "public_pct_against": 62,
         "book_stance": {
           "side": null,
           "against_us": false,
@@ -470,15 +478,16 @@
           "fooled": false
         },
         "vegas": {
-          "bet": "Milwaukee Brewers",
-          "odds": -101,
+          "bet": "Tampa Bay Rays",
+          "odds": -120,
           "basis": "ticket %",
-          "hold_home": -1020833,
-          "hold_away": 1775990
+          "hold_home": 1652778,
+          "hold_away": -1126238
         },
         "play": "stay_away",
-        "stay_bet": null,
-        "stay_odds": null,
+        "starred": [],
+        "win_prob": 76,
+        "win_driver": "bvp + consistency + favorite",
         "pm_quote": {
           "pm_pct": 48,
           "pm_american": 108,
@@ -492,7 +501,6 @@
         "line_vs_money": "flat",
         "bet_team": null,
         "bet_moneyline": null,
-        "starred": [],
         "good_dog": null,
         "line_money": null,
         "lineup_confirmed": false,
