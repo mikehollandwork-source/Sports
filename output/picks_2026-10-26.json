@@ -1,6 +1,6 @@
 {
   "date": "2026-10-26",
-  "generated_at": "2026-10-26T07:02:15.305922+00:00",
+  "generated_at": "2026-10-26T08:02:14.701396+00:00",
   "games": [
     {
       "game_pk": 849804,
@@ -104,7 +104,7 @@
         }
       },
       "public_majority": {
-        "team": "Tampa Bay Rays",
+        "team": "Milwaukee Brewers",
         "detail": {
           "consensus": {
             "pick": "Tb",
@@ -114,14 +114,14 @@
             }
           },
           "forum": {
-            "pick": "Tampa Bay Rays",
+            "pick": "Milwaukee Brewers",
             "home": 1,
-            "away": 1
+            "away": 2
           },
-          "agree": null,
-          "forum_lean": 0.0,
+          "agree": false,
+          "forum_lean": -0.333,
           "consensus_lean": 0.46,
-          "blended_lean": 0.147,
+          "blended_lean": -0.053,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -148,30 +148,33 @@
           {
             "name": "covers",
             "side": "home",
+            "agrees": false
+          },
+          {
+            "name": "forum",
+            "side": "away",
             "agrees": true
           },
           {
             "name": "scoresodds_bets",
             "side": "away",
-            "agrees": false
+            "agrees": true
           },
           {
             "name": "polymarket_bets",
             "side": "home",
-            "agrees": true
+            "agrees": false
           }
         ],
-        "majority_side": "home",
+        "majority_side": "away",
         "agree": 2,
-        "dissent": 1,
-        "trusted": true,
-        "verdict": "mostly agrees",
-        "note": "2/3 sources agree (scoresodds_bets differ)",
-        "flags": [
-          "money is on the other side from the public tickets"
-        ],
+        "dissent": 2,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (covers, polymarket_bets differ)",
+        "flags": [],
         "line": "flat",
-        "money": "against public",
+        "money": "with public",
         "money_side": "away",
         "money_pct": 53
       },
@@ -247,14 +250,14 @@
       },
       "betting_lines": {
         "majority": {
+          "team": "Milwaukee Brewers",
+          "consensus_pct": 27.0,
+          "moneyline": "+108"
+        },
+        "non_majority": {
           "team": "Tampa Bay Rays",
           "consensus_pct": 73.0,
           "moneyline": "-111"
-        },
-        "non_majority": {
-          "team": "Milwaukee Brewers",
-          "consensus_pct": 27.0,
-          "moneyline": "+106"
         }
       },
       "consistency": {
@@ -405,12 +408,12 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "no handle/ticket agreement (against public) \u2014 no play",
+        "reason": "line moved flat the money \u2014 no price discount, no play",
         "advantage_team": "Milwaukee Brewers",
-        "public_edge": true,
-        "public_trusted": true,
+        "public_edge": false,
+        "public_trusted": false,
         "edge_strong": false,
-        "confidence": 0.321,
+        "confidence": 0.277,
         "edge_threshold": 0.4,
         "components": {
           "stat_edge": {
@@ -419,8 +422,8 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": 0.147,
-            "strength": 0.098,
+            "blended_lean": -0.053,
+            "strength": 0.0,
             "weight": 0.45
           },
           "consistency": {
@@ -474,20 +477,16 @@
         },
         "form_edge": true,
         "form_gap": 0.044,
-        "sharp_money": true,
+        "sharp_money": false,
         "sp_dog_edge": 0.015,
         "pitching_dog": false,
-        "signals_hit": 5,
-        "public_pct_against": 56,
-        "mild_public_overridden": "money on us vs tickets on them",
+        "signals_hit": 4,
         "book_stance": {
-          "side": "Milwaukee Brewers",
+          "side": null,
           "against_us": false,
-          "tells": [
-            "money vs tickets"
-          ],
-          "strength": 1,
-          "fooled": true
+          "tells": [],
+          "strength": 0,
+          "fooled": false
         },
         "vegas": {
           "bet": "Tampa Bay Rays",
@@ -699,10 +698,10 @@
       "pick": null,
       "game_datetime": "2026-10-27T00:00:00Z",
       "weather": {
-        "temp_f": 73,
-        "wind_mph": 12,
-        "wind_dir": "NNE",
-        "wind_deg": 26,
+        "temp_f": 71,
+        "wind_mph": 15,
+        "wind_dir": "NE",
+        "wind_deg": 35,
         "precip_pct": 1,
         "roof": "dome"
       },
