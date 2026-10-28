@@ -58,6 +58,8 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 - bare `NN%` occurrences in the HTML: **110** (first few: 100, 100, 93, 100, 100, 57, 100, 100, 100, 100)
 - distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-linkcont`, `data-target`, `data-toggle`
 
+- elements whose whole text is `NN%`: **0**
+
 </details>
 
 ## Odds / slate lines
@@ -116,13 +118,15 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 - bare `NN%` occurrences in the HTML: **119** (first few: 93, 100, 100, 93, 100, 100, 57, 100, 100, 100)
 - distinct `data-*` attributes (**29**): `data-action`, `data-area`, `data-away-conference`, `data-away-team-rank`, `data-betslip-legs`, `data-betslip-source`, `data-blockingmode`, `data-book`, `data-casino-target`, `data-cbid`, `data-controller`, `data-cookieconsent`, `data-date`, `data-dismiss`, `data-enable-betslip`, `data-fallback-url`, `data-game`, `data-home-conference`, `data-home-team-rank`, `data-is-deeplink`
 
+- elements whose whole text is `NN%`: **0**
+
 </details>
 
 ## Forum listing
 
 `https://www.covers.com/forum/mlb-betting-27`
 
-- HTTP **200** · 1,083,037 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 1,082,947 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/forum/mlb-betting-27`
 - title: `MLB Betting Forum | Covers`
 - `__NEXT_DATA__` present: **False**
@@ -174,6 +178,8 @@ Icon, active, align-items-center, align-items-md-start, animate-fade, app-banner
 
 - bare `NN%` occurrences in the HTML: **272** (first few: 100, 100, 100, 100, 100, 100, 100, 100, 100, 0)
 - distinct `data-*` attributes (**24**): `data-aatracker`, `data-ad-attribute`, `data-backdrop`, `data-blockingmode`, `data-bs-target`, `data-bs-toggle`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-entry-id`, `data-forum-id`, `data-hasmore`, `data-linkcont`, `data-mini`, `data-page-number`, `data-parent-target`, `data-role`, `data-target`, `data-thread-id`
+
+- elements whose whole text is `NN%`: **0**
 
 </details>
 
