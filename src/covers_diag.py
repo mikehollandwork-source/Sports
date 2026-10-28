@@ -92,6 +92,7 @@ def _hunt(text: str, soup) -> list[str]:
     inlined in a script, or percentages hiding in data- attributes.
     """
     import re as _re
+    from bs4 import BeautifulSoup
     out = ["<details><summary>where did the data go?</summary>", ""]
 
     # 1. endpoints the page might fetch the table from
@@ -122,11 +123,31 @@ def _hunt(text: str, soup) -> list[str]:
     if not hits:
         out.append("    - none")
 
-    # 3. the numbers themselves, wherever they are
+    # 3. the numbers themselves, wherever they are.
+    #    RAW-TEXT COUNTS LIE. The first version of this reported 110 `NN%` in
+    #    the HTML and I read that as "the data is there" - but they were
+    #    mostly `width:100%` in CSS (the sample was 100,100,93,100,100,...).
+    #    What decides it is percentages in VISIBLE text, with script and style
+    #    stripped out first.
     pcts = _re.findall(r"\b(\d{1,3})\s?%", text)
-    out += ["", f"- bare `NN%` occurrences in the HTML: **{len(pcts)}**"
-            + (f" (first few: {', '.join(pcts[:10])})" if pcts else
-               " — the percentages are NOT in the delivered HTML at all")]
+    vis_soup = BeautifulSoup(text, "html.parser")
+    for bad in vis_soup(["script", "style", "noscript"]):
+        bad.decompose()
+    visible = vis_soup.get_text(" ", strip=True)
+    vis_pcts = _re.findall(r"\b(\d{1,3})\s?%", visible)
+    out += ["", f"- `NN%` in RAW html: **{len(pcts)}** "
+            f"(includes CSS widths — not evidence on its own)",
+            f"- `NN%` in VISIBLE text, script/style stripped: **{len(vis_pcts)}**"
+            + (f" (first few: {', '.join(vis_pcts[:12])})" if vis_pcts else
+               " — **the percentages are genuinely NOT being delivered**")]
+    # the anchor the old parser keyed teams off, and the visible shape
+    team_links = vis_soup.select('a[href*="/consensus/pickleadersbyteam/"]')
+    out += [f"- `pickleadersbyteam` team anchors: **{len(team_links)}**"
+            + (f" (e.g. {', '.join(a.get_text(strip=True) for a in team_links[:6])})"
+               if team_links else " — the team anchors are gone too")]
+    out += [f"- visible text length: **{len(visible):,}** chars",
+            "", "    first 400 chars of visible text:", "",
+            "    ```", "    " + visible[:400].replace("\n", " "), "    ```"]
     dattrs = sorted({a for el in soup.find_all() for a in el.attrs
                      if a.startswith("data-")})
     out += [f"- distinct `data-*` attributes (**{len(dattrs)}**): "
