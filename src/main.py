@@ -59,6 +59,11 @@ def run(date: str) -> dict:
 
     # Public sentiment (fetched once, shared across games).
     consensus = covers.consensus()
+    # WHY the consensus is empty, recorded on the board. Missing because
+    # covers published no matchups is a different fact from missing because
+    # the fetch or the selectors failed, and only the second is ours to fix.
+    # `source_health` reads this to decide whether to cry outage.
+    consensus_empty_upstream = covers.CONSENSUS_EMPTY_UPSTREAM
     teams = [(t.name, t.abbreviation) for g in games for t in (g.home, g.away)]
     forum_counts = covers.forum_majority(teams, date)
     try:
@@ -538,6 +543,10 @@ def run(date: str) -> dict:
         "picks": picks,            # the PLAYS (single tier now)
         "coin_flips": [],          # retired, kept for payload-shape compat
         "leans": [],               # retired tier, kept for payload-shape compat
+        # Additive and optional: absent on every board written before
+        # 2026-10-28, and `source_health` treats absent as "unknown" so those
+        # keep reading exactly as they always did.
+        "consensus_empty_upstream": consensus_empty_upstream,
     }
 
 

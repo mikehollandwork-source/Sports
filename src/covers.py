@@ -105,6 +105,17 @@ def _fingerprint(text: str, final_url: str, soup: BeautifulSoup, what: str) -> N
     )
 
 
+# covers' own words when its board has no rows. Checked against the raw text
+# rather than the parsed DOM so a markup change cannot hide it.
+NO_MATCHUPS = "No other matchups available"
+
+# Set by `consensus()` on every call: True when the page was served correctly
+# and simply had no matchups. Read by `main` so the board can record WHY the
+# consensus was missing, and by `source_health` so an empty upstream board is
+# not reported as a silent failure.
+CONSENSUS_EMPTY_UPSTREAM = False
+
+
 def consensus(url: str | None = None) -> dict[str, dict]:
     """
     Parse a contests.covers.com consensus table.
@@ -120,12 +131,27 @@ def consensus(url: str | None = None) -> dict[str, dict]:
     is the same parser against a different URL - the table markup is shared
     across sports on this site.
     """
+    global CONSENSUS_EMPTY_UPSTREAM
+    CONSENSUS_EMPTY_UPSTREAM = False
     soup, text, final_url = _fetch(url or CONSENSUS_URL)
     if soup is None:
         return {}
     out = _parse_consensus_rows(soup)
     if not out:
-        _fingerprint(text, final_url, soup, "consensus")
+        # EMPTY BECAUSE COVERS PUBLISHED NOTHING, OR BECAUSE WE BROKE? The
+        # page says so itself. On 2026-10-28 the board came back 200 with the
+        # covers-CoversConsensus-* chrome intact, 0 tables, 0 rows, and the
+        # words "No other matchups available" in its visible text - and the
+        # away, home and public-money views all said the same. Our selectors
+        # were fine; covers simply had no MLB rows up. Reporting that as a
+        # dead feed trains the alarm into noise, which is the thing
+        # `source_health` exists to avoid.
+        CONSENSUS_EMPTY_UPSTREAM = NO_MATCHUPS in text
+        if CONSENSUS_EMPTY_UPSTREAM:
+            log.info("covers consensus: page served fine but lists no "
+                     "matchups — upstream has nothing, not a parse failure")
+        else:
+            _fingerprint(text, final_url, soup, "consensus")
     return out
 
 

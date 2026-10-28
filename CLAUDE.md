@@ -475,6 +475,35 @@ Carried forward so a fresh session neither drops these nor re-derives them.
   genuine threshold change and must be PRE-REGISTERED before more results land,
   never fitted to the record it would then be judged against — the same rule
   CLAUDE.md sets for every other threshold here.
+- **An EMPTY covers board is not an outage, and covers says so itself**
+  (`covers.NO_MATCHUPS`, `CONSENSUS_EMPTY_UPSTREAM`;
+  `source_health` `upstream_empty`). On 2026-10-28 `covers tickets` read 0/1
+  and the report cried SILENT FAILURE — but `covers_diag` showed the page was
+  **fine**: HTTP 200, 306KB, right title, `covers-CoversConsensus-*` chrome
+  intact, no captcha. It just had `tables: 0 · rows: 0`, zero
+  `pickleadersbyteam` anchors, and the words **"No other matchups
+  available"** in its visible text. The AWAY, HOME and PUBLIC-MONEY views all
+  said the same. Our selectors were never broken; covers published nothing.
+  `consensus()` now checks the raw text for that phrase and sets
+  `CONSENSUS_EMPTY_UPSTREAM`; `main` records it on the payload as
+  `consensus_empty_upstream`; `source_health` routes it to a third bucket
+  beside `no_data` and `unresolved`, so it does not count toward
+  `silent_failure` and the report says *served correctly but empty at the
+  source* instead.
+  **A GENUINE break still alerts** — the flag is set ONLY when that phrase is
+  present, so a markup change, a captcha or a failed fetch leaves it False,
+  `_fingerprint` fires as before and `silent_failure` goes True. Verified all
+  three ways on the real 2026-10-28 board: empty-upstream → no alert; same
+  board with the flag False → SILENT FAILURE; flag ABSENT (every board written
+  before this) → still alerts, because absent means unknown.
+  **TWO TRAPS HIT WHILE DIAGNOSING THIS, both worth remembering.** (1) The
+  first probe counted `NN%` in the RAW html, found 110, and I read it as "the
+  data is still there" — they were `width:100%` in CSS. Count percentages in
+  VISIBLE text with script/style stripped; the real count was 5, and 4 of
+  those were an FAQ sentence about favourites winning "58% to 62%".
+  (2) A count alone never settles it — the decisive evidence was dumping the
+  text AROUND each percentage, which is where "No other matchups available"
+  appeared. `covers_diag._hunt` now does all of this plus the sibling views.
 - **`source_health` has no notion of TIME OF DAY**, so a board built before the
   public has bet cries outage. Every board in the repo was generated 19:44–23:20
   ET except one dispatched at **01:01 ET on 2026-10-14**, which is the only one

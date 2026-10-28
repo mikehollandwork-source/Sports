@@ -181,12 +181,24 @@ def assess(date: str | None = None) -> dict:
     # Split the dead rows: a feed that returned nothing is an outage, one that
     # returned data the rule could not use is a judgement the rule made.
     no_data, unresolved = [], []
+    # COVERS PUBLISHED AN EMPTY BOARD is a third thing, and it is neither a
+    # feed we broke nor a judgement our rule made. On 2026-10-28 covers served
+    # its consensus page correctly, with the words "No other matchups
+    # available", across the overall, away, home and public-money views alike;
+    # our selectors were fine and there was simply nothing to read. Calling
+    # that a silent failure every day of a short postseason slate is how the
+    # alarm gets trained into noise.
+    empty_upstream = bool(day.get("consensus_empty_upstream"))
+    upstream_empty: list = []
     for k in out["dead"]:
         probe = ARRIVED.get(k)
-        if probe and any(probe(g) for g in games):
+        if k == "covers tickets" and empty_upstream:
+            upstream_empty.append(k)  # covers had no rows to give
+        elif probe and any(probe(g) for g in games):
             unresolved.append(k)      # data arrived, the rule could not use it
         else:
             no_data.append(k)         # nothing came back at all
+    out["upstream_empty"] = upstream_empty
     out["no_data"], out["unresolved"] = no_data, unresolved
     # the case the board cannot report on its own
     out["silent_failure"] = bool(out["no_data"]) and picks == 0
@@ -201,7 +213,7 @@ def _append_history(rec: dict) -> None:
     hist = [h for h in hist if h.get("date") != rec.get("date")]
     hist.append({k: rec.get(k) for k in
                  ("date", "games", "picks", "dead", "no_data", "unresolved",
-                  "degraded", "silent_failure")})
+                  "upstream_empty", "degraded", "silent_failure")})
     hist.sort(key=lambda h: h.get("date") or "")
     HISTORY.write_text(json.dumps(hist[-120:], indent=1))
 
@@ -226,6 +238,14 @@ def report(rec: dict) -> str:
                "USABILITY by design, but the feed answered — for the handle "
                "that means the money sources disagreed on the side. Not an "
                "outage, and it does not alert._", ""]
+    upstream = rec.get("upstream_empty") or []
+    if upstream:
+        md += [f"_Served correctly but EMPTY at the source: "
+               f"**{', '.join(upstream)}**. covers' own page says \"No other "
+               "matchups available\" — checked on the overall, away, home and "
+               "public-money views alike — so there were no rows to read. "
+               "Counted dead above, which measures coverage, but nothing on "
+               "our side is broken and it does not alert._", ""]
     if rec.get("silent_failure"):
         md += ["## ❌ SILENT FAILURE", "",
                f"The board shows **0 picks** while these inputs returned "
@@ -239,6 +259,13 @@ def report(rec: dict) -> str:
                "it is running on fewer gates than it is supposed to.", ""]
     elif rec.get("degraded"):
         md += [f"## ⚠️ Degraded: {', '.join(rec['degraded'])}", ""]
+    elif upstream:
+        # Do not print "all inputs healthy" over a row showing ❌: the table
+        # measures COVERAGE and covers genuinely covered nothing.
+        md += [f"## ✅ Nothing broken — {', '.join(upstream)} had no rows to "
+               "give", "",
+               "Every input we control answered. An empty board today would "
+               "be a genuinely quiet slate.", ""]
     else:
         md += ["## ✅ All inputs healthy", "",
                "An empty board today would be a genuinely quiet slate.", ""]
