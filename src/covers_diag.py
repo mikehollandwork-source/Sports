@@ -131,6 +131,23 @@ def _hunt(text: str, soup) -> list[str]:
                      if a.startswith("data-")})
     out += [f"- distinct `data-*` attributes (**{len(dattrs)}**): "
             + (", ".join(f"`{a}`" for a in dattrs[:20]) or "none")]
+    # 4. THE DECISIVE ONE: if the numbers ARE in the HTML but not in rows,
+    #    the markup moved off <table>/<tr> and the parser needs repinning on
+    #    whatever now wraps them. Print the ancestor chain of the first few so
+    #    the new selector can be written from evidence, not guessed.
+    pct_els = [el for el in soup.find_all(string=_re.compile(r"^\s*\d{1,3}\s?%\s*$"))]
+    out += ["", f"- elements whose whole text is `NN%`: **{len(pct_els)}**"]
+    for node in pct_els[:6]:
+        chain = []
+        el = node.parent
+        for _ in range(5):
+            if el is None or el.name in (None, "[document]"):
+                break
+            cls = ".".join(el.get("class", []) or [])
+            chain.append(f"{el.name}" + (f".{cls}" if cls else ""))
+            el = el.parent
+        out.append(f"    - `{str(node).strip()}` in  "
+                   + "  <  ".join(chain))
     out += ["", "</details>", ""]
     return out
 
