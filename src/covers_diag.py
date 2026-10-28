@@ -198,6 +198,20 @@ def main() -> None:
           "outage leaves no stack trace — this is what the site actually "
           "returned._", ""]
     md += _probe("Consensus (tickets + handle)", covers.CONSENSUS_URL)
+    # SIBLING CONSENSUS VIEWS. On 2026-10-28 the main board came back healthy
+    # but said "No other matchups available", which is covers reporting no
+    # rows rather than our selectors failing. These are the same data cut
+    # differently; if one of them HAS tonight's game then the default view is
+    # the problem and we can read another, and if none of them do then covers
+    # simply is not publishing it and no code change helps.
+    for label, url in (
+            ("Consensus — AWAY view",
+             "https://contests.covers.com/consensus/topconsensusaway/mlb/overall"),
+            ("Consensus — HOME view",
+             "https://contests.covers.com/consensus/topconsensushome/mlb/overall"),
+            ("Consensus — public MONEY",
+             "https://contests.covers.com/consensus/publicmoney")):
+        md += _probe(label, url)
     md += _probe("Odds / slate lines", covers.ODDS_URL)
     md += _probe("Forum listing", covers.FORUM_URL)
 
