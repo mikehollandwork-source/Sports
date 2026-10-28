@@ -90,11 +90,247 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 
 </details>
 
+## Consensus — AWAY view
+
+`https://contests.covers.com/consensus/topconsensusaway/mlb/overall`
+
+- HTTP **200** · 302,146 bytes · content-type `text/html; charset=utf-8`
+- final URL after redirects: `https://contests.covers.com/consensus/topconsensusaway/mlb/overall`
+- title: `MLB Public Betting, Money Percentages & Splits`
+- `__NEXT_DATA__` present: **False**
+- tables: **0** · rows: **0**
+
+- class names containing 'overs'/'onsensus' (**100**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `cmg_consensus_dropdown`, `consensus-caret`, `consensusFilterSelect`, `consensusLeagueSelect`, `consensusSidesSelect`, `covers`, `covers-Container`, `covers-Container-aside`, `covers-Container-main`, `covers-CoversConsensus-consensusNav`, `covers-CoversConsensus-definitionBrick`, `covers-CoversConsensus-header`, `covers-CoversConsensus-i`, `covers-CoversConsensus-introText`, `covers-CoversDesktop-arrowRight`, `covers-CoversDesktop-sporticon`, `covers-CoversFooter-desktopSocial`, `covers-CoversFooter-gambleAware`, `covers-CoversFooter-gambleAwareComp`
+
+<details><summary>first 40 class names on the page</summary>
+
+```
+Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Covers-CoversFooter-top, Covers-CoversFooterV2-logo, Covers-CoversFooterV2-verifiedSafe, app-banner, app-banner-container, app-banner-headline, app-banner-left, app-banner-right, app-banner-store-logo, baseball-icon, basketball-icon, betting, bettingTitle, border-radius-4px, casinoTitle, close, cmg_communityLeaders_spinner, cmg_consensus_dropdown, cmg_date_picker--new, cmg_gambleaware_ca, cmg_gambleaware_int, cmg_gambleaware_us, cmg_geocontent_ca, cmg_geocontent_us, cmg_geocontent_zz, col, col-md-10, col-md-2, col-md-3, col-md-4, col-md-8, col-sm-5, col-xs-12, col-xs-6, collapse, collapsed, consensus-caret
+```
+</details>
+
+<details><summary>where did the data go?</summary>
+
+- candidate data URLs (**77**):
+
+    - `/consensus/faq`
+    - `/consensus/pickleaders`
+    - `/consensus/pickleadersbyleagueteam`
+    - `/consensus/publicmoney`
+    - `/consensus/topconsensus/mlb/overall`
+    - `/consensus/topconsensusaway/all/overall`
+    - `/consensus/topconsensusaway/cfl/overall`
+    - `/consensus/topconsensusaway/mlb/expert`
+    - `/consensus/topconsensusaway/mlb/overall`
+    - `/consensus/topconsensusaway/mlb/top10pct`
+    - `/consensus/topconsensusaway/nba/overall`
+    - `/consensus/topconsensusaway/ncaaf/overall`
+    - `/consensus/topconsensusaway/nfl/overall`
+    - `/consensus/topconsensusaway/nhl/overall`
+    - `/consensus/topconsensusaway/wnba/overall`
+    - `/consensus/topconsensushome/mlb/overall`
+    - `/consensus/topoverunderconsensus/mlb/overall`
+    - `https://apps.apple.com/us/app/covers-scores-picks-and-odds/id6749450176`
+    - `https://contests.covers.com/consensus`
+    - `https://contests.covers.com/consensus/faq`
+    - `https://contests.covers.com/consensus/pickleaders/all?orderPickBy=Overall&amp;orderBy=Units`
+    - `https://contests.covers.com/consensus/pickleadersbyleagueteam`
+    - `https://contests.covers.com/consensus/publicmoney`
+    - `https://contests.covers.com/consensus/topconsensus/all`
+    - `https://contests.covers.com/consensus/topconsensus/cfl/overall`
+
+- scripts mentioning consensus/percent/tickets (**1**):
+
+    - `(anonymous)` (1,751 chars): `$(".covers-CoversConsensus-i").click(function (e) {             e.stopPropagation();             $(".covers-CoversConsensus-definitionBrick").slideToggle(); `
+
+- `NN%` in RAW html: **108** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **3** (first few: 10, 59, 59)
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **15,255** chars
+
+    visible text around each `NN%`:
+
+    ```
+    … ers are making with consensus picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact  …
+    … us picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact Us Careers Our Team Brand T …
+    … eagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact Us Careers Our Team Brand Testimonials Be …
+    ```
+
+    HTML around the first one:
+
+    ```html
+    <div class="covers-CoversConsensus-consensusNav" style="display: none;">
+    <div class="cmg_date_picker--new">
+    <input class="text-box single-line" data-currentpage="/consensus/topconsensusaway/mlb/overall" id="CompetitionDate" name="SelectedDate" type="text" value=""/>
+    </div>
+    <div class="consensusLeagueSelect form-group">
+    <span class="consensus-caret"></span>
+    <select class="form-control cmg_consensus_dropdown" id="consensusLeagueDDL" name="consensusLeagueDDL"><option value="/consensus/topconsensusaway/all/overall">All Leagues</option>
+    <option value="/consensus/topconsensusaway/ncaaf/overall">NCAAF</option>
+    <option value="/consensus/topconsensusaway/nfl/overall">NFL</option>
+    <option selected="se
+    ```
+- distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-linkcont`, `data-target`, `data-toggle`
+
+- elements whose whole text is `NN%`: **0**
+
+</details>
+
+## Consensus — HOME view
+
+`https://contests.covers.com/consensus/topconsensushome/mlb/overall`
+
+- HTTP **200** · 302,146 bytes · content-type `text/html; charset=utf-8`
+- final URL after redirects: `https://contests.covers.com/consensus/topconsensushome/mlb/overall`
+- title: `MLB Public Betting, Money Percentages & Splits`
+- `__NEXT_DATA__` present: **False**
+- tables: **0** · rows: **0**
+
+- class names containing 'overs'/'onsensus' (**100**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `cmg_consensus_dropdown`, `consensus-caret`, `consensusFilterSelect`, `consensusLeagueSelect`, `consensusSidesSelect`, `covers`, `covers-Container`, `covers-Container-aside`, `covers-Container-main`, `covers-CoversConsensus-consensusNav`, `covers-CoversConsensus-definitionBrick`, `covers-CoversConsensus-header`, `covers-CoversConsensus-i`, `covers-CoversConsensus-introText`, `covers-CoversDesktop-arrowRight`, `covers-CoversDesktop-sporticon`, `covers-CoversFooter-desktopSocial`, `covers-CoversFooter-gambleAware`, `covers-CoversFooter-gambleAwareComp`
+
+<details><summary>first 40 class names on the page</summary>
+
+```
+Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Covers-CoversFooter-top, Covers-CoversFooterV2-logo, Covers-CoversFooterV2-verifiedSafe, app-banner, app-banner-container, app-banner-headline, app-banner-left, app-banner-right, app-banner-store-logo, baseball-icon, basketball-icon, betting, bettingTitle, border-radius-4px, casinoTitle, close, cmg_communityLeaders_spinner, cmg_consensus_dropdown, cmg_date_picker--new, cmg_gambleaware_ca, cmg_gambleaware_int, cmg_gambleaware_us, cmg_geocontent_ca, cmg_geocontent_us, cmg_geocontent_zz, col, col-md-10, col-md-2, col-md-3, col-md-4, col-md-8, col-sm-5, col-xs-12, col-xs-6, collapse, collapsed, consensus-caret
+```
+</details>
+
+<details><summary>where did the data go?</summary>
+
+- candidate data URLs (**77**):
+
+    - `/consensus/faq`
+    - `/consensus/pickleaders`
+    - `/consensus/pickleadersbyleagueteam`
+    - `/consensus/publicmoney`
+    - `/consensus/topconsensus/mlb/overall`
+    - `/consensus/topconsensusaway/mlb/overall`
+    - `/consensus/topconsensushome/all/overall`
+    - `/consensus/topconsensushome/cfl/overall`
+    - `/consensus/topconsensushome/mlb/expert`
+    - `/consensus/topconsensushome/mlb/overall`
+    - `/consensus/topconsensushome/mlb/top10pct`
+    - `/consensus/topconsensushome/nba/overall`
+    - `/consensus/topconsensushome/ncaaf/overall`
+    - `/consensus/topconsensushome/nfl/overall`
+    - `/consensus/topconsensushome/nhl/overall`
+    - `/consensus/topconsensushome/wnba/overall`
+    - `/consensus/topoverunderconsensus/mlb/overall`
+    - `https://apps.apple.com/us/app/covers-scores-picks-and-odds/id6749450176`
+    - `https://contests.covers.com/consensus`
+    - `https://contests.covers.com/consensus/faq`
+    - `https://contests.covers.com/consensus/pickleaders/all?orderPickBy=Overall&amp;orderBy=Units`
+    - `https://contests.covers.com/consensus/pickleadersbyleagueteam`
+    - `https://contests.covers.com/consensus/publicmoney`
+    - `https://contests.covers.com/consensus/topconsensus/all`
+    - `https://contests.covers.com/consensus/topconsensus/cfl/overall`
+
+- scripts mentioning consensus/percent/tickets (**1**):
+
+    - `(anonymous)` (1,751 chars): `$(".covers-CoversConsensus-i").click(function (e) {             e.stopPropagation();             $(".covers-CoversConsensus-definitionBrick").slideToggle(); `
+
+- `NN%` in RAW html: **108** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **3** (first few: 10, 59, 59)
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **15,255** chars
+
+    visible text around each `NN%`:
+
+    ```
+    … ers are making with consensus picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact  …
+    … us picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact Us Careers Our Team Brand T …
+    … eagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. Top-Rated Sportsbooks About Us Contact Us Careers Our Team Brand Testimonials Be …
+    ```
+
+    HTML around the first one:
+
+    ```html
+    <div class="covers-CoversConsensus-consensusNav" style="display: none;">
+    <div class="cmg_date_picker--new">
+    <input class="text-box single-line" data-currentpage="/consensus/topconsensushome/mlb/overall" id="CompetitionDate" name="SelectedDate" type="text" value=""/>
+    </div>
+    <div class="consensusLeagueSelect form-group">
+    <span class="consensus-caret"></span>
+    <select class="form-control cmg_consensus_dropdown" id="consensusLeagueDDL" name="consensusLeagueDDL"><option value="/consensus/topconsensushome/all/overall">All Leagues</option>
+    <option value="/consensus/topconsensushome/ncaaf/overall">NCAAF</option>
+    <option value="/consensus/topconsensushome/nfl/overall">NFL</option>
+    <option selected="se
+    ```
+- distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-linkcont`, `data-target`, `data-toggle`
+
+- elements whose whole text is `NN%`: **0**
+
+</details>
+
+## Consensus — public MONEY
+
+`https://contests.covers.com/consensus/publicmoney`
+
+- HTTP **200** · 304,722 bytes · content-type `text/html; charset=utf-8`
+- final URL after redirects: `https://contests.covers.com/consensus/publicmoney`
+- title: `Public Money Consensus Sports Picks | Covers.com`
+- `__NEXT_DATA__` present: **False**
+- tables: **1** · rows: **1**
+
+- class names containing 'overs'/'onsensus' (**100**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `consensus-caret`, `consensusLeagueSelect`, `covers`, `covers-Container`, `covers-Container-aside`, `covers-Container-main`, `covers-CoversConsensus-PMTable`, `covers-CoversConsensus-consensusNav`, `covers-CoversConsensus-consensusTableContainer`, `covers-CoversConsensus-definitionBrick`, `covers-CoversConsensus-header`, `covers-CoversConsensus-i`, `covers-CoversConsensus-leagueHeader`, `covers-CoversConsensus-table--pmMoreBTN`, `covers-CoversDesktop-arrowRight`, `covers-CoversDesktop-sporticon`, `covers-CoversFooter-desktopSocial`, `covers-CoversFooter-gambleAware`, `covers-CoversFooter-gambleAwareComp`
+
+<details><summary>first 40 class names on the page</summary>
+
+```
+Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Covers-CoversFooter-top, Covers-CoversFooterV2-logo, Covers-CoversFooterV2-verifiedSafe, app-banner, app-banner-container, app-banner-headline, app-banner-left, app-banner-right, app-banner-store-logo, baseball-icon, basketball-icon, betting, bettingTitle, border-radius-4px, casinoTitle, close, cmg_gambleaware_ca, cmg_gambleaware_int, cmg_gambleaware_us, cmg_geocontent_ca, cmg_geocontent_us, cmg_geocontent_zz, col, col-md-10, col-md-2, col-md-3, col-md-4, col-md-8, col-sm-5, col-xs-12, col-xs-6, collapse, collapsed, consensus-caret, consensusLeagueSelect, container, contestcol-1-m
+```
+</details>
+
+<details><summary>where did the data go?</summary>
+
+- candidate data URLs (**64**):
+
+    - `/consensus/faq`
+    - `/consensus/pickleaders`
+    - `/consensus/pickleadersbyleagueteam`
+    - `/consensus/publicmoney`
+    - `https://apps.apple.com/us/app/covers-scores-picks-and-odds/id6749450176`
+    - `https://contests.covers.com/consensus`
+    - `https://contests.covers.com/consensus/faq`
+    - `https://contests.covers.com/consensus/getpublicmoneyrecords`
+    - `https://contests.covers.com/consensus/pickleaders/all?orderPickBy=Overall&amp;orderBy=Units`
+    - `https://contests.covers.com/consensus/pickleadersbyleagueteam`
+    - `https://contests.covers.com/consensus/publicmoney`
+    - `https://contests.covers.com/consensus/topconsensus/all`
+    - `https://contests.covers.com/consensus/topconsensus/cfl/overall`
+    - `https://contests.covers.com/consensus/topconsensus/mlb/overall`
+    - `https://contests.covers.com/consensus/topconsensus/nba/overall`
+    - `https://contests.covers.com/consensus/topconsensus/ncaab/overall`
+    - `https://contests.covers.com/consensus/topconsensus/ncaaf/overall`
+    - `https://contests.covers.com/consensus/topconsensus/nfl/overall`
+    - `https://contests.covers.com/consensus/topconsensus/nhl/overall`
+    - `https://contests.covers.com/consensus/topconsensus/wnba/overall`
+    - `https://data.covers.com/cff7fdda0680/launch-490b3d016bbf.min.js`
+    - `https://img.covers.com/covers/mobile/consensus_i_new.png`
+    - `https://www.covers.com/golf/british-open/odds`
+    - `https://www.covers.com/golf/masters/odds`
+    - `https://www.covers.com/golf/pga-championship/odds`
+
+- scripts mentioning consensus/percent/tickets (**2**):
+
+    - `NUMBER_RECORDS` (4,008 chars): `var NUMBER_RECORDS = 10;      $(document).ready(function () {         $('#seasonSort').click(sortRecords);         $('#monthSort').click(sortRecords);     `
+    - `(anonymous)` (1,751 chars): `$(".covers-CoversConsensus-i").click(function (e) {             e.stopPropagation();             $(".covers-CoversConsensus-definitionBrick").slideToggle(); `
+
+- `NN%` in RAW html: **105** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **15,351** chars
+- distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-dismiss`, `data-linkcont`, `data-sort`, `data-target`, `data-toggle`
+
+- elements whose whole text is `NN%`: **0**
+
+</details>
+
 ## Odds / slate lines
 
 `https://www.covers.com/sport/baseball/mlb/odds`
 
-- HTTP **200** · 793,376 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 793,354 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/sport/baseball/mlb/odds`
 - title: `MLB Odds 2026 - Best Online & Vegas Baseball Odds & Lines`
 - `__NEXT_DATA__` present: **False**
@@ -146,7 +382,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 - `NN%` in RAW html: **119** (includes CSS widths — not evidence on its own)
 - `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
 - `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
-- visible text length: **27,991** chars
+- visible text length: **27,989** chars
 - distinct `data-*` attributes (**29**): `data-action`, `data-area`, `data-away-conference`, `data-away-team-rank`, `data-betslip-legs`, `data-betslip-source`, `data-blockingmode`, `data-book`, `data-casino-target`, `data-cbid`, `data-controller`, `data-cookieconsent`, `data-date`, `data-dismiss`, `data-enable-betslip`, `data-fallback-url`, `data-game`, `data-home-conference`, `data-home-team-rank`, `data-is-deeplink`
 
 - elements whose whole text is `NN%`: **0**
@@ -157,7 +393,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 
 `https://www.covers.com/forum/mlb-betting-27`
 
-- HTTP **200** · 1,082,963 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 1,082,964 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/forum/mlb-betting-27`
 - title: `MLB Betting Forum | Covers`
 - `__NEXT_DATA__` present: **False**
@@ -210,7 +446,7 @@ Icon, active, align-items-center, align-items-md-start, animate-fade, app-banner
 - `NN%` in RAW html: **272** (includes CSS widths — not evidence on its own)
 - `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
 - `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
-- visible text length: **19,299** chars
+- visible text length: **19,301** chars
 - distinct `data-*` attributes (**24**): `data-aatracker`, `data-ad-attribute`, `data-backdrop`, `data-blockingmode`, `data-bs-target`, `data-bs-toggle`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-entry-id`, `data-forum-id`, `data-hasmore`, `data-linkcont`, `data-mini`, `data-page-number`, `data-parent-target`, `data-role`, `data-target`, `data-thread-id`
 
 - elements whose whole text is `NN%`: **0**
