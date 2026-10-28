@@ -55,7 +55,16 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 
     - `(anonymous)` (1,751 chars): `$(".covers-CoversConsensus-i").click(function (e) {             e.stopPropagation();             $(".covers-CoversConsensus-definitionBrick").slideToggle(); `
 
-- bare `NN%` occurrences in the HTML: **110** (first few: 100, 100, 93, 100, 100, 57, 100, 100, 100, 100)
+- `NN%` in RAW html: **110** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **5** (first few: 10, 59, 59, 58, 62)
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **18,948** chars
+
+    first 400 chars of visible text:
+
+    ```
+    MLB Public Betting, Money Percentages & Splits Sports NFL NFL Home Scores & Matchups Prop Projections NFL Picks NFL Prediction Prices Weather Injuries NCAAF NCAAF Home Scores & Matchups Prop Projections NCAAF Picks Weather Injuries NBA NBA Home Scores & Matchups Prop Projections NBA Picks Injuries NCAAB NCAAB Home Scores & Matchups Prop Projections NCAAB Picks Injuries MLB MLB Home Scores & Matchu
+    ```
 - distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-linkcont`, `data-target`, `data-toggle`
 
 - elements whose whole text is `NN%`: **0**
@@ -115,7 +124,16 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 
     - `mobileConfTabContent` (6,625 chars): `var mobileConfTabContent = "";     var selectedConf = "";      document.addEventListener('DOMContentLoaded', function() {         var OddsFilters = OddsPage`
 
-- bare `NN%` occurrences in the HTML: **119** (first few: 93, 100, 100, 93, 100, 100, 57, 100, 100, 100)
+- `NN%` in RAW html: **119** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **27,989** chars
+
+    first 400 chars of visible text:
+
+    ```
+    MLB Odds 2026 - Best Online & Vegas Baseball Odds & Lines Sports NFL NFL Home Scores & Matchups Prop Projections NFL Picks NFL Prediction Prices Weather Injuries NCAAF NCAAF Home Scores & Matchups Prop Projections NCAAF Picks Weather Injuries NBA NBA Home Scores & Matchups Prop Projections NBA Picks Injuries NCAAB NCAAB Home Scores & Matchups Prop Projections NCAAB Picks Injuries MLB MLB Home Scor
+    ```
 - distinct `data-*` attributes (**29**): `data-action`, `data-area`, `data-away-conference`, `data-away-team-rank`, `data-betslip-legs`, `data-betslip-source`, `data-blockingmode`, `data-book`, `data-casino-target`, `data-cbid`, `data-controller`, `data-cookieconsent`, `data-date`, `data-dismiss`, `data-enable-betslip`, `data-fallback-url`, `data-game`, `data-home-conference`, `data-home-team-rank`, `data-is-deeplink`
 
 - elements whose whole text is `NN%`: **0**
@@ -126,7 +144,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 
 `https://www.covers.com/forum/mlb-betting-27`
 
-- HTTP **200** · 1,082,947 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 1,083,036 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/forum/mlb-betting-27`
 - title: `MLB Betting Forum | Covers`
 - `__NEXT_DATA__` present: **False**
@@ -176,7 +194,16 @@ Icon, active, align-items-center, align-items-md-start, animate-fade, app-banner
 
     - none
 
-- bare `NN%` occurrences in the HTML: **272** (first few: 100, 100, 100, 100, 100, 100, 100, 100, 100, 0)
+- `NN%` in RAW html: **272** (includes CSS widths — not evidence on its own)
+- `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
+- `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
+- visible text length: **19,301** chars
+
+    first 400 chars of visible text:
+
+    ```
+    MLB Betting Forum | Covers Forums Best Betting Sites Sportsbook Promos Best Sports Betting Apps NFL Betting Forum NBA Betting Forum MLB Betting Forum NHL Betting Forum NCAAF Betting Forum NCAAB Betting Forum Soccer Betting Forum Tennis Betting Forum General Discussion Help Forum Guidelines FAQ Forum Updates Faster picks. Smarter bets. All in the NEW Covers App Sports NFL Back NFL NFL Home Scores &
+    ```
 - distinct `data-*` attributes (**24**): `data-aatracker`, `data-ad-attribute`, `data-backdrop`, `data-blockingmode`, `data-bs-target`, `data-bs-toggle`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-entry-id`, `data-forum-id`, `data-hasmore`, `data-linkcont`, `data-mini`, `data-page-number`, `data-parent-target`, `data-role`, `data-target`, `data-thread-id`
 
 - elements whose whole text is `NN%`: **0**
