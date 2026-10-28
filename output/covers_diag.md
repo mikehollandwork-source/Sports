@@ -60,10 +60,29 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 - `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
 - visible text length: **18,948** chars
 
-    first 400 chars of visible text:
+    visible text around each `NN%`:
 
     ```
-    MLB Public Betting, Money Percentages & Splits Sports NFL NFL Home Scores & Matchups Prop Projections NFL Picks NFL Prediction Prices Weather Injuries NCAAF NCAAF Home Scores & Matchups Prop Projections NCAAF Picks Weather Injuries NBA NBA Home Scores & Matchups Prop Projections NBA Picks Injuries NCAAB NCAAB Home Scores & Matchups Prop Projections NCAAB Picks Injuries MLB MLB Home Scores & Matchu
+    … ers are making with consensus picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. For baseball fans and experienced betto …
+    … us picks All Leagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. For baseball fans and experienced bettors, understanding MLB publi …
+    … eagues NCAAF NFL MLB NBA NHL WNBA CFL Overall Team Money Leaders Top 10% Sides Totals Home Over 59% Away Over 59% No other matchups available. For baseball fans and experienced bettors, understanding MLB public betting tren …
+    … centage of MLB moneyline favorites win? Historically, MLB moneyline favorites have been observed to win about 58% to 62% of their games. Though this fluctuates seasonally, bettors should not bet solely on favorites as it ma …
+    …  of MLB moneyline favorites win? Historically, MLB moneyline favorites have been observed to win about 58% to 62% of their games. Though this fluctuates seasonally, bettors should not bet solely on favorites as it may not b …
+    ```
+
+    HTML around the first one:
+
+    ```html
+    <div class="covers-CoversConsensus-consensusNav" style="display: none;">
+    <div class="cmg_date_picker--new">
+    <input class="text-box single-line" data-currentpage="/consensus/topconsensus/mlb/overall" id="CompetitionDate" name="SelectedDate" type="text" value=""/>
+    </div>
+    <div class="consensusLeagueSelect form-group">
+    <span class="consensus-caret"></span>
+    <select class="form-control cmg_consensus_dropdown" id="consensusLeagueDDL" name="consensusLeagueDDL"><option value="/consensus/topconsensus/all/overall">All Leagues</option>
+    <option value="/consensus/topconsensus/ncaaf/overall">NCAAF</option>
+    <option value="/consensus/topconsensus/nfl/overall">NFL</option>
+    <option selected="selected" value="/
     ```
 - distinct `data-*` attributes (**9**): `data-blockingmode`, `data-casino-target`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-linkcont`, `data-target`, `data-toggle`
 
@@ -75,7 +94,7 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 
 `https://www.covers.com/sport/baseball/mlb/odds`
 
-- HTTP **200** · 793,354 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 793,376 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/sport/baseball/mlb/odds`
 - title: `MLB Odds 2026 - Best Online & Vegas Baseball Odds & Lines`
 - `__NEXT_DATA__` present: **False**
@@ -127,13 +146,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 - `NN%` in RAW html: **119** (includes CSS widths — not evidence on its own)
 - `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
 - `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
-- visible text length: **27,989** chars
-
-    first 400 chars of visible text:
-
-    ```
-    MLB Odds 2026 - Best Online & Vegas Baseball Odds & Lines Sports NFL NFL Home Scores & Matchups Prop Projections NFL Picks NFL Prediction Prices Weather Injuries NCAAF NCAAF Home Scores & Matchups Prop Projections NCAAF Picks Weather Injuries NBA NBA Home Scores & Matchups Prop Projections NBA Picks Injuries NCAAB NCAAB Home Scores & Matchups Prop Projections NCAAB Picks Injuries MLB MLB Home Scor
-    ```
+- visible text length: **27,991** chars
 - distinct `data-*` attributes (**29**): `data-action`, `data-area`, `data-away-conference`, `data-away-team-rank`, `data-betslip-legs`, `data-betslip-source`, `data-blockingmode`, `data-book`, `data-casino-target`, `data-cbid`, `data-controller`, `data-cookieconsent`, `data-date`, `data-dismiss`, `data-enable-betslip`, `data-fallback-url`, `data-game`, `data-home-conference`, `data-home-team-rank`, `data-is-deeplink`
 
 - elements whose whole text is `NN%`: **0**
@@ -144,7 +157,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 
 `https://www.covers.com/forum/mlb-betting-27`
 
-- HTTP **200** · 1,083,036 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 1,082,963 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/forum/mlb-betting-27`
 - title: `MLB Betting Forum | Covers`
 - `__NEXT_DATA__` present: **False**
@@ -197,13 +210,7 @@ Icon, active, align-items-center, align-items-md-start, animate-fade, app-banner
 - `NN%` in RAW html: **272** (includes CSS widths — not evidence on its own)
 - `NN%` in VISIBLE text, script/style stripped: **0** — **the percentages are genuinely NOT being delivered**
 - `pickleadersbyteam` team anchors: **0** — the team anchors are gone too
-- visible text length: **19,301** chars
-
-    first 400 chars of visible text:
-
-    ```
-    MLB Betting Forum | Covers Forums Best Betting Sites Sportsbook Promos Best Sports Betting Apps NFL Betting Forum NBA Betting Forum MLB Betting Forum NHL Betting Forum NCAAF Betting Forum NCAAB Betting Forum Soccer Betting Forum Tennis Betting Forum General Discussion Help Forum Guidelines FAQ Forum Updates Faster picks. Smarter bets. All in the NEW Covers App Sports NFL Back NFL NFL Home Scores &
-    ```
+- visible text length: **19,299** chars
 - distinct `data-*` attributes (**24**): `data-aatracker`, `data-ad-attribute`, `data-backdrop`, `data-blockingmode`, `data-bs-target`, `data-bs-toggle`, `data-cbid`, `data-cookieconsent`, `data-currentpage`, `data-dismiss`, `data-entry-id`, `data-forum-id`, `data-hasmore`, `data-linkcont`, `data-mini`, `data-page-number`, `data-parent-target`, `data-role`, `data-target`, `data-thread-id`
 
 - elements whose whole text is `NN%`: **0**
