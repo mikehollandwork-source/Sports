@@ -1,6 +1,6 @@
 # Source health — 2026-10-28
 
-- board generated: `2026-10-28T21:01:53.385864+00:00`
+- board generated: `2026-10-28T21:48:26.878531+00:00`
 - games on slate: **1** · picks: **0**
 
 | input | games covered | state |
@@ -14,6 +14,8 @@
 | src: polymarket_bets | 1/1 (100%) | ✅ ok |
 | src: scoresodds_bets | 1/1 (100%) | ✅ ok |
 
-## ❌ SILENT FAILURE
+_Served correctly but EMPTY at the source: **covers tickets**. covers' own page says "No other matchups available" — checked on the overall, away, home and public-money views alike — so there were no rows to read. Counted dead above, which measures coverage, but nothing on our side is broken and it does not alert._
 
-The board shows **0 picks** while these inputs returned nothing: **covers tickets**. That empty board is a data outage, not a quiet slate - the two are indistinguishable from the board alone, which is the reason this check exists.
+## ✅ Nothing broken — covers tickets had no rows to give
+
+Every input we control answered. An empty board today would be a genuinely quiet slate.
