@@ -75,6 +75,63 @@ def _probe(label: str, url: str) -> list[str]:
                                      for s in keys(o[k], d + 1)][:40]
         out += ["- `__NEXT_DATA__` top keys: `"
                 + ", ".join(keys(nd)[:30]) + "`", ""]
+    out += _hunt(text, soup)
+    return out
+
+
+def _hunt(text: str, soup) -> list[str]:
+    """Where did the data GO? Run when the markup is present but the rows are not.
+
+    On 2026-10-28 the consensus page came back 200, 306KB, right title, with
+    the `covers-CoversConsensus-*` chrome intact - but `tables: 0 · rows: 0`
+    and the three classes the parser keys on
+    (`consensusTable--high`, `--low`, `consensusTableContainer`) simply absent.
+    Page fine, table gone. `__NEXT_DATA__` was False, so it is not the usual
+    Next.js case either, and none of the existing probes say where the numbers
+    moved to. This looks for them: an endpoint the page calls, a JSON blob
+    inlined in a script, or percentages hiding in data- attributes.
+    """
+    import re as _re
+    out = ["<details><summary>where did the data go?</summary>", ""]
+
+    # 1. endpoints the page might fetch the table from
+    urls = sorted({u for u in _re.findall(
+        r'["\'(]((?:https?:)?//[^"\'()\s]+|/[a-zA-Z0-9_\-/.]+)["\')]', text)
+        if any(k in u.lower() for k in
+               ("consensus", "api", "/data", ".json", "odds", "matchup"))})
+    out += [f"- candidate data URLs (**{len(urls)}**):", ""]
+    out += [f"    - `{u}`" for u in urls[:25]] or ["    - none"]
+
+    # 2. inline JSON that smells like the table
+    hits = []
+    for sc in soup.find_all("script"):
+        body = sc.string or sc.get_text() or ""
+        if len(body) < 40:
+            continue
+        low = body.lower()
+        if any(k in low for k in ("consensus", "percent", '"pct"', "wagers",
+                                  "tickets")):
+            var = _re.match(r"\s*(?:window\.|var\s+|const\s+)?([A-Za-z_$][\w$.]{2,40})\s*=",
+                            body)
+            hits.append((var.group(1) if var else "(anonymous)", len(body),
+                         body.strip()[:160].replace("\n", " ")))
+    out += ["", f"- scripts mentioning consensus/percent/tickets "
+            f"(**{len(hits)}**):", ""]
+    for nm, ln, head in hits[:8]:
+        out += [f"    - `{nm}` ({ln:,} chars): `{head}`"]
+    if not hits:
+        out.append("    - none")
+
+    # 3. the numbers themselves, wherever they are
+    pcts = _re.findall(r"\b(\d{1,3})\s?%", text)
+    out += ["", f"- bare `NN%` occurrences in the HTML: **{len(pcts)}**"
+            + (f" (first few: {', '.join(pcts[:10])})" if pcts else
+               " — the percentages are NOT in the delivered HTML at all")]
+    dattrs = sorted({a for el in soup.find_all() for a in el.attrs
+                     if a.startswith("data-")})
+    out += [f"- distinct `data-*` attributes (**{len(dattrs)}**): "
+            + (", ".join(f"`{a}`" for a in dattrs[:20]) or "none")]
+    out += ["", "</details>", ""]
     return out
 
 
