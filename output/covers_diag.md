@@ -6,18 +6,18 @@ _Run because `source_health` reported covers tickets and handle at 0/1 while the
 
 `https://contests.covers.com/consensus/topconsensus/mlb/overall`
 
-- HTTP **200** · 305,484 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 306,484 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://contests.covers.com/consensus/topconsensus/mlb/overall`
 - title: `MLB Public Betting, Money Percentages & Splits`
 - `__NEXT_DATA__` present: **False**
-- tables: **1** · rows: **2**
+- tables: **0** · rows: **0**
 
-- class names containing 'overs'/'onsensus' (**110**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `cmg_consensus_dropdown`, `consensus-caret`, `consensusFilterSelect`, `consensusLeagueSelect`, `consensusSidesSelect`, `covers`, `covers-Container`, `covers-Container-aside`, `covers-Container-main`, `covers-CoversConsensus-consensusNav`, `covers-CoversConsensus-consensusTable--high`, `covers-CoversConsensus-consensusTable--low`, `covers-CoversConsensus-consensusTableContainer`, `covers-CoversConsensus-definitionBrick`, `covers-CoversConsensus-faqQ`, `covers-CoversConsensus-header`, `covers-CoversConsensus-i`, `covers-CoversConsensus-introText`, `covers-CoversConsensus-mainLogo`
+- class names containing 'overs'/'onsensus' (**101**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `cmg_consensus_dropdown`, `consensus-caret`, `consensusFilterSelect`, `consensusLeagueSelect`, `consensusSidesSelect`, `covers`, `covers-Container`, `covers-Container-aside`, `covers-Container-main`, `covers-CoversConsensus-consensusNav`, `covers-CoversConsensus-definitionBrick`, `covers-CoversConsensus-faqQ`, `covers-CoversConsensus-header`, `covers-CoversConsensus-i`, `covers-CoversConsensus-introText`, `covers-CoversDesktop-arrowRight`, `covers-CoversDesktop-sporticon`, `covers-CoversFooter-desktopSocial`, `covers-CoversFooter-gambleAware`
 
 <details><summary>first 40 class names on the page</summary>
 
 ```
-Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Covers-CoversFooter-top, Covers-CoversFooterV2-logo, Covers-CoversFooterV2-verifiedSafe, app-banner, app-banner-container, app-banner-headline, app-banner-left, app-banner-right, app-banner-store-logo, baseball-icon, basketball-icon, betting, bettingTitle, border-radius-4px, casinoTitle, center_align, close, cmg_communityLeaders_spinner, cmg_consensus_dropdown, cmg_date_picker--new, cmg_gambleaware_ca, cmg_gambleaware_int, cmg_gambleaware_us, cmg_geocontent_ca, cmg_geocontent_us, cmg_geocontent_zz, col, col-md-10, col-md-2, col-md-3, col-md-4, col-md-8, col-sm-5, col-xs-12, col-xs-6, collapse, collapsed
+Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Covers-CoversFooter-top, Covers-CoversFooterV2-logo, Covers-CoversFooterV2-verifiedSafe, app-banner, app-banner-container, app-banner-headline, app-banner-left, app-banner-right, app-banner-store-logo, baseball-icon, basketball-icon, betting, bettingTitle, border-radius-4px, casinoTitle, close, cmg_communityLeaders_spinner, cmg_consensus_dropdown, cmg_date_picker--new, cmg_gambleaware_ca, cmg_gambleaware_int, cmg_gambleaware_us, cmg_geocontent_ca, cmg_geocontent_us, cmg_geocontent_zz, col, col-md-10, col-md-2, col-md-3, col-md-4, col-md-8, col-sm-5, col-xs-12, col-xs-6, collapse, collapsed, consensus-caret
 ```
 </details>
 
@@ -25,11 +25,11 @@ Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-legal, Cov
 
 `https://www.covers.com/sport/baseball/mlb/odds`
 
-- HTTP **200** · 1,050,659 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 793,353 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/sport/baseball/mlb/odds`
 - title: `MLB Odds 2026 - Best Online & Vegas Baseball Odds & Lines`
 - `__NEXT_DATA__` present: **False**
-- tables: **5** · rows: **28**
+- tables: **5** · rows: **20**
 
 - class names containing 'overs'/'onsensus' (**116**): `Covers-CoversFooter`, `Covers-CoversFooter--bottom`, `Covers-CoversFooter-legal`, `Covers-CoversFooter-top`, `Covers-CoversFooterV2-logo`, `Covers-CoversFooterV2-verifiedSafe`, `covers`, `covers-Article-LH-Container`, `covers-Container`, `covers-Covers-OddsRelated-Article-Grid-Cont`, `covers-Covers-PageIntroCopy`, `covers-Covers-SportsbookPromos-Article-Grid-Cont`, `covers-CoversDesktop-arrowRight`, `covers-CoversDesktop-sporticon`, `covers-CoversFooter-desktopSocial`, `covers-CoversFooter-gambleAware`, `covers-CoversFooter-gambleAwareComp`, `covers-CoversFooter-linksBlock`, `covers-CoversFooter-mainLinks`, `covers-CoversFooter-promoBlock`, `covers-CoversFooter-promoCont`, `covers-CoversFooter-promoLeft`, `covers-CoversFooter-promoRight`, `covers-CoversFooter-socialLink`, `covers-CoversFooter-topLinkCont`
 
@@ -44,7 +44,7 @@ American, Covers-CoversFooter, Covers-CoversFooter--bottom, Covers-CoversFooter-
 
 `https://www.covers.com/forum/mlb-betting-27`
 
-- HTTP **200** · 1,067,097 bytes · content-type `text/html; charset=utf-8`
+- HTTP **200** · 1,083,275 bytes · content-type `text/html; charset=utf-8`
 - final URL after redirects: `https://www.covers.com/forum/mlb-betting-27`
 - title: `MLB Betting Forum | Covers`
 - `__NEXT_DATA__` present: **False**
@@ -62,9 +62,8 @@ Icon, active, align-items-center, align-items-md-start, animate-fade, app-banner
 
 ## What the CURRENT parser gets
 
-- `consensus()` returned **1** teams
-- sample: `{"tb@cle": {"away": {"abbr": "Tb", "pct": 52.0, "moneyline": "+106"}, "home": {"abbr": "Cle", "pct": 48.0, "moneyline": "-135"}}}`
-- `slate_lines()` returned **4** games
+- `consensus()` returned **0** teams
+- `slate_lines()` returned **1** games
 
 ## Reading it
 
