@@ -145,9 +145,26 @@ def _hunt(text: str, soup) -> list[str]:
     out += [f"- `pickleadersbyteam` team anchors: **{len(team_links)}**"
             + (f" (e.g. {', '.join(a.get_text(strip=True) for a in team_links[:6])})"
                if team_links else " — the team anchors are gone too")]
-    out += [f"- visible text length: **{len(visible):,}** chars",
-            "", "    first 400 chars of visible text:", "",
-            "    ```", "    " + visible[:400].replace("\n", " "), "    ```"]
+    out += [f"- visible text length: **{len(visible):,}** chars"]
+    # CONTEXT around each visible percentage - the only thing that says
+    # whether these are game rows in new markup or unrelated page furniture.
+    if vis_pcts:
+        out += ["", "    visible text around each `NN%`:", "", "    ```"]
+        for m in list(_re.finditer(r"\b\d{1,3}\s?%", visible))[:8]:
+            a, b = max(0, m.start() - 110), min(len(visible), m.end() + 110)
+            out.append("    … " + visible[a:b].replace("\n", " ") + " …")
+        out += ["    ```"]
+        # and the HTML wrapper, so a selector can be written from it
+        out += ["", "    HTML around the first one:", "", "    ```html"]
+        node = vis_soup.find(string=_re.compile(r"\d{1,3}\s?%"))
+        el = node.parent if node else None
+        for _ in range(3):                      # climb to something container-ish
+            if el is None or el.parent is None or el.parent.name in ("body", "[document]"):
+                break
+            el = el.parent
+        snippet = (str(el)[:700] if el else "(not found)")
+        out += ["    " + ln for ln in snippet.splitlines()[:18]]
+        out += ["    ```"]
     dattrs = sorted({a for el in soup.find_all() for a in el.attrs
                      if a.startswith("data-")})
     out += [f"- distinct `data-*` attributes (**{len(dattrs)}**): "
