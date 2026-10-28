@@ -1,6 +1,6 @@
 {
   "date": "2026-10-28",
-  "generated_at": "2026-10-28T06:02:08.291323+00:00",
+  "generated_at": "2026-10-28T07:02:07.641412+00:00",
   "games": [
     {
       "game_pk": 849799,
@@ -113,7 +113,7 @@
           "agree": null,
           "forum_lean": 0.0,
           "consensus_lean": null,
-          "blended_lean": -0.25,
+          "blended_lean": -0.16,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -123,14 +123,9 @@
           "wiki_lean": -0.219,
           "books": {
             "polymarket_bets": {
-              "away": 57,
-              "home": 43,
-              "lean": -0.14
-            },
-            "scoresodds_bets": {
-              "away": 68,
-              "home": 32,
-              "lean": -0.36
+              "away": 58,
+              "home": 42,
+              "lean": -0.16
             }
           }
         }
@@ -138,27 +133,21 @@
       "public_check": {
         "sources": [
           {
-            "name": "scoresodds_bets",
-            "side": "away",
-            "agrees": true
-          },
-          {
             "name": "polymarket_bets",
             "side": "away",
             "agrees": true
           }
         ],
         "majority_side": "away",
-        "agree": 2,
+        "agree": 1,
         "dissent": 0,
         "trusted": true,
-        "verdict": "corroborated",
-        "note": "all 2 sources agree on the public side",
+        "verdict": "unconfirmed",
+        "note": "only one public source \u2014 can't cross-check",
         "flags": [],
         "line": "flat",
-        "money": "with public",
-        "money_side": "away",
-        "money_pct": 55
+        "money": "unknown",
+        "money_side": null
       },
       "bvp": null,
       "bvp_pen": {
@@ -368,7 +357,7 @@
       },
       "pick_criteria": {
         "status": "stay_away",
-        "reason": "line moved flat the money \u2014 no price discount, no play",
+        "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
         "public_trusted": true,
@@ -382,7 +371,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.25,
+            "blended_lean": -0.16,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -419,18 +408,18 @@
           },
           "status": "projection only \u2014 not a bet, untested; logged beside the market line for a later test"
         },
-        "advantage_moneyline": -143,
-        "opponent_moneyline": 119,
+        "advantage_moneyline": -148,
+        "opponent_moneyline": 122,
         "line_check": {
           "open": -140,
-          "current": -143,
-          "implied_shift": 0.005,
+          "current": -148,
+          "implied_shift": 0.013,
           "status": "soft",
-          "reason": "only a slight move our way, below the 2% signal floor (-140\u2192-143, +0.5%)"
+          "reason": "only a slight move our way, below the 2% signal floor (-140\u2192-148, +1.3%)"
         },
         "form_edge": true,
         "form_gap": 0.058,
-        "sharp_money": false,
+        "sharp_money": null,
         "sp_dog_edge": null,
         "pitching_dog": false,
         "signals_hit": 4,
@@ -443,25 +432,25 @@
         },
         "vegas": {
           "bet": "Milwaukee Brewers",
-          "odds": -143,
-          "basis": "money %",
-          "hold_home": 101500,
-          "hold_away": 457692
+          "odds": -148,
+          "basis": "ticket %",
+          "hold_home": -148400,
+          "hold_away": 665946
         },
         "play": "stay_away",
         "stay_bet": null,
         "stay_odds": null,
         "pm_quote": {
-          "pm_pct": 57,
-          "pm_american": -133,
-          "edge_pts": 1.8,
+          "pm_pct": 58,
+          "pm_american": -138,
+          "edge_pts": 1.7,
           "vs_book": "better"
         },
         "projected": {
           "win_prob": 64.6,
           "fair_american": -183
         },
-        "line_vs_money": "flat",
+        "line_vs_money": "with",
         "bet_team": null,
         "bet_moneyline": null,
         "starred": [],
