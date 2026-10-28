@@ -1,6 +1,6 @@
 {
   "date": "2026-10-28",
-  "generated_at": "2026-10-28T08:02:06.641790+00:00",
+  "generated_at": "2026-10-28T09:02:20.988069+00:00",
   "games": [
     {
       "game_pk": 849799,
@@ -107,13 +107,13 @@
           "consensus": null,
           "forum": {
             "pick": "Tampa Bay Rays",
-            "home": 34,
-            "away": 34
+            "home": 36,
+            "away": 35
           },
           "agree": null,
-          "forum_lean": 0.0,
+          "forum_lean": 0.014,
           "consensus_lean": null,
-          "blended_lean": -0.16,
+          "blended_lean": -0.041,
           "reddit": null,
           "reddit_lean": null,
           "wiki": {
@@ -133,6 +133,11 @@
       "public_check": {
         "sources": [
           {
+            "name": "forum",
+            "side": "home",
+            "agrees": false
+          },
+          {
             "name": "polymarket_bets",
             "side": "away",
             "agrees": true
@@ -140,10 +145,10 @@
         ],
         "majority_side": "away",
         "agree": 1,
-        "dissent": 0,
-        "trusted": true,
-        "verdict": "unconfirmed",
-        "note": "only one public source \u2014 can't cross-check",
+        "dissent": 1,
+        "trusted": false,
+        "verdict": "sources split",
+        "note": "sources disagree on the public side (forum differ)",
         "flags": [],
         "line": "flat",
         "money": "unknown",
@@ -360,7 +365,7 @@
         "reason": "no handle/ticket agreement (unknown) \u2014 no play",
         "advantage_team": "Milwaukee Brewers",
         "public_edge": false,
-        "public_trusted": true,
+        "public_trusted": false,
         "edge_strong": true,
         "confidence": 0.55,
         "edge_threshold": 0.4,
@@ -371,7 +376,7 @@
             "weight": 0.55
           },
           "public_fade": {
-            "blended_lean": -0.16,
+            "blended_lean": -0.041,
             "strength": 0.0,
             "weight": 0.45
           },
@@ -434,8 +439,8 @@
           "bet": "Milwaukee Brewers",
           "odds": -148,
           "basis": "ticket %",
-          "hold_home": -180600,
-          "hold_away": 665946
+          "hold_home": -235565,
+          "hold_away": 707248
         },
         "play": "stay_away",
         "stay_bet": null,
@@ -619,7 +624,7 @@
         "wind_mph": 14,
         "wind_dir": "NNE",
         "wind_deg": 33,
-        "precip_pct": 5,
+        "precip_pct": 4,
         "roof": "dome"
       },
       "umpire_hp": null,
