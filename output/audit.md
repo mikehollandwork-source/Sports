@@ -1,4 +1,4 @@
-# 10-day audit — generated 2026-11-01
+# 10-day audit — generated 2026-11-11
 
 ## Books
 - **plays**: 156-124 (-7.15u)
